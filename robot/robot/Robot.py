@@ -21,10 +21,6 @@ DIR = {
    
 class Robot(Node):
     
-    # States for line following
-    STATE_FOLLOWING = 0      # Bám line bình thường
-    STATE_CROSSING = 1       # Vừa gặp line ngang, tiến lên
-    STATE_TURNING = 2        # Đang xoay tìm line phải
     
     def robotMove(self, direction, speed: float = 0):
         # direction = direction.data
@@ -241,7 +237,6 @@ class Robot(Node):
         if direction:
             self.robotMove(direction, self.baseSpeed)
     
-
     def robotManual_callback(self, msg: String):
         print("robotManual_callback called")
         if self.autoMode:
