@@ -1,0 +1,167 @@
+[0.000000] (-) TimerEvent: {}
+[0.001924] (line_sensors) JobQueued: {'identifier': 'line_sensors', 'dependencies': OrderedDict()}
+[0.002598] (mqtt_bridge) JobQueued: {'identifier': 'mqtt_bridge', 'dependencies': OrderedDict()}
+[0.003113] (robot) JobQueued: {'identifier': 'robot', 'dependencies': OrderedDict()}
+[0.003321] (line_sensors) JobStarted: {'identifier': 'line_sensors'}
+[0.063308] (mqtt_bridge) JobStarted: {'identifier': 'mqtt_bridge'}
+[0.098251] (robot) JobStarted: {'identifier': 'robot'}
+[0.099560] (-) TimerEvent: {}
+[0.204312] (-) TimerEvent: {}
+[0.305138] (-) TimerEvent: {}
+[0.406472] (-) TimerEvent: {}
+[0.507290] (-) TimerEvent: {}
+[0.608021] (-) TimerEvent: {}
+[0.708838] (-) TimerEvent: {}
+[0.809603] (-) TimerEvent: {}
+[0.910321] (-) TimerEvent: {}
+[1.011059] (-) TimerEvent: {}
+[1.111886] (-) TimerEvent: {}
+[1.212692] (-) TimerEvent: {}
+[1.313500] (-) TimerEvent: {}
+[1.414863] (-) TimerEvent: {}
+[1.515752] (-) TimerEvent: {}
+[1.616568] (-) TimerEvent: {}
+[1.717317] (-) TimerEvent: {}
+[1.818103] (-) TimerEvent: {}
+[1.918843] (-) TimerEvent: {}
+[2.019571] (-) TimerEvent: {}
+[2.120287] (-) TimerEvent: {}
+[2.221055] (-) TimerEvent: {}
+[2.321808] (-) TimerEvent: {}
+[2.422642] (-) TimerEvent: {}
+[2.523376] (-) TimerEvent: {}
+[2.624245] (-) TimerEvent: {}
+[2.725505] (-) TimerEvent: {}
+[2.826446] (-) TimerEvent: {}
+[2.927253] (-) TimerEvent: {}
+[3.028053] (-) TimerEvent: {}
+[3.128799] (-) TimerEvent: {}
+[3.229507] (-) TimerEvent: {}
+[3.330235] (-) TimerEvent: {}
+[3.430969] (-) TimerEvent: {}
+[3.531660] (-) TimerEvent: {}
+[3.632447] (-) TimerEvent: {}
+[3.733201] (-) TimerEvent: {}
+[3.833944] (-) TimerEvent: {}
+[3.934779] (-) TimerEvent: {}
+[4.035880] (-) TimerEvent: {}
+[4.139224] (-) TimerEvent: {}
+[4.241988] (-) TimerEvent: {}
+[4.342890] (-) TimerEvent: {}
+[4.443923] (-) TimerEvent: {}
+[4.545264] (-) TimerEvent: {}
+[4.648048] (-) TimerEvent: {}
+[4.756458] (-) TimerEvent: {}
+[4.857504] (-) TimerEvent: {}
+[4.959943] (-) TimerEvent: {}
+[5.060872] (-) TimerEvent: {}
+[5.163154] (-) TimerEvent: {}
+[5.268722] (-) TimerEvent: {}
+[5.370178] (-) TimerEvent: {}
+[5.471950] (-) TimerEvent: {}
+[5.576593] (-) TimerEvent: {}
+[5.684685] (-) TimerEvent: {}
+[5.785888] (-) TimerEvent: {}
+[5.888567] (-) TimerEvent: {}
+[5.992554] (-) TimerEvent: {}
+[6.093512] (-) TimerEvent: {}
+[6.194403] (-) TimerEvent: {}
+[6.295331] (-) TimerEvent: {}
+[6.396789] (-) TimerEvent: {}
+[6.497734] (-) TimerEvent: {}
+[6.604784] (-) TimerEvent: {}
+[6.712746] (-) TimerEvent: {}
+[6.814712] (-) TimerEvent: {}
+[6.872766] (robot) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/robot', 'build', '--build-base', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/build', 'install', '--record', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot', 'env': {'PYTHON_BASIC_REPL': '1', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'aclab', 'SSH_CLIENT': '192.168.137.1 29321 22', 'LC_TIME': 'vi_VN', 'XDG_SESSION_TYPE': 'tty', 'GIT_ASKPASS': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass.sh', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib', 'BROWSER': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/helpers/browser.sh', 'MOTD_SHOWN': 'pam', 'HOME': '/home/aclab', 'OLDPWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws', 'TERM_PROGRAM_VERSION': '1.109.2', 'VSCODE_IPC_HOOK_CLI': '/run/user/1000/vscode-ipc-34e4d5ea-6494-4e72-a0e7-cefc75c36b9c.sock', 'ROS_PYTHON_VERSION': '3', 'VSCODE_GIT_ASKPASS_MAIN': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass-main.js', 'LC_MONETARY': 'vi_VN', 'VSCODE_GIT_ASKPASS_NODE': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/node', 'SSL_CERT_FILE': '/usr/lib/ssl/certs/ca-certificates.crt', 'PYDEVD_DISABLE_FILE_VALIDATION': '1', 'BUNDLED_DEBUGPY_PATH': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/libs/debugpy', 'VSCODE_PYTHON_AUTOACTIVATE_GUARD': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'COLCON_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install', 'ROS_DISTRO': 'humble', 'LOGNAME': 'aclab', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'XDG_SESSION_ID': '9', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/debugCommand:/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli:/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/remote-cli:/home/aclab/.local/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/scripts/noConfigScripts', 'LC_ADDRESS': 'vi_VN', 'XDG_RUNTIME_DIR': '/run/user/1000', 'SSL_CERT_DIR': '/usr/lib/ssl/certs', 'VSCODE_DEBUGPY_ADAPTER_ENDPOINTS': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/.noConfigDebugAdapterEndpoints/endpoint-7310425700d665ff.txt', 'LANG': 'en_US.UTF-8', 'PYTHONSTARTUP': '/home/aclab/.vscode-server/data/User/workspaceStorage/81e22dda978ffce28b76b69d41ca5850/ms-python.python/pythonrc.py', 'LC_TELEPHONE': 'vi_VN', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'VSCODE_GIT_IPC_HANDLE': '/run/user/1000/vscode-git-1e8b4cdd35.sock', 'TERM_PROGRAM': 'vscode', 'AMENT_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge:/opt/ros/humble', 'SHELL': '/bin/bash', 'LC_NAME': 'vi_VN', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'vi_VN', 'LC_IDENTIFICATION': 'vi_VN', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS': '', 'PWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot', 'SSH_CONNECTION': '192.168.137.1 29321 192.168.137.211 22', 'XDG_DATA_DIRS': '/usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'vi_VN', 'LC_PAPER': 'vi_VN', 'COLCON': '1'}, 'shell': False}
+[6.914962] (-) TimerEvent: {}
+[6.928809] (mqtt_bridge) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/mqtt_bridge', 'build', '--build-base', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/build', 'install', '--record', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge', 'env': {'PYTHON_BASIC_REPL': '1', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'aclab', 'SSH_CLIENT': '192.168.137.1 29321 22', 'LC_TIME': 'vi_VN', 'XDG_SESSION_TYPE': 'tty', 'GIT_ASKPASS': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass.sh', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib', 'BROWSER': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/helpers/browser.sh', 'MOTD_SHOWN': 'pam', 'HOME': '/home/aclab', 'OLDPWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws', 'TERM_PROGRAM_VERSION': '1.109.2', 'VSCODE_IPC_HOOK_CLI': '/run/user/1000/vscode-ipc-34e4d5ea-6494-4e72-a0e7-cefc75c36b9c.sock', 'ROS_PYTHON_VERSION': '3', 'VSCODE_GIT_ASKPASS_MAIN': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass-main.js', 'LC_MONETARY': 'vi_VN', 'VSCODE_GIT_ASKPASS_NODE': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/node', 'SSL_CERT_FILE': '/usr/lib/ssl/certs/ca-certificates.crt', 'PYDEVD_DISABLE_FILE_VALIDATION': '1', 'BUNDLED_DEBUGPY_PATH': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/libs/debugpy', 'VSCODE_PYTHON_AUTOACTIVATE_GUARD': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'COLCON_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install', 'ROS_DISTRO': 'humble', 'LOGNAME': 'aclab', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'XDG_SESSION_ID': '9', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/debugCommand:/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli:/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/remote-cli:/home/aclab/.local/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/scripts/noConfigScripts', 'LC_ADDRESS': 'vi_VN', 'XDG_RUNTIME_DIR': '/run/user/1000', 'SSL_CERT_DIR': '/usr/lib/ssl/certs', 'VSCODE_DEBUGPY_ADAPTER_ENDPOINTS': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/.noConfigDebugAdapterEndpoints/endpoint-7310425700d665ff.txt', 'LANG': 'en_US.UTF-8', 'PYTHONSTARTUP': '/home/aclab/.vscode-server/data/User/workspaceStorage/81e22dda978ffce28b76b69d41ca5850/ms-python.python/pythonrc.py', 'LC_TELEPHONE': 'vi_VN', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'VSCODE_GIT_IPC_HANDLE': '/run/user/1000/vscode-git-1e8b4cdd35.sock', 'TERM_PROGRAM': 'vscode', 'AMENT_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge:/opt/ros/humble', 'SHELL': '/bin/bash', 'LC_NAME': 'vi_VN', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'vi_VN', 'LC_IDENTIFICATION': 'vi_VN', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS': '', 'PWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge', 'SSH_CONNECTION': '192.168.137.1 29321 192.168.137.211 22', 'XDG_DATA_DIRS': '/usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'vi_VN', 'LC_PAPER': 'vi_VN', 'COLCON': '1'}, 'shell': False}
+[6.966167] (line_sensors) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../build/line_sensors', 'build', '--build-base', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build', 'install', '--record', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log', '--single-version-externally-managed', 'install_data'], 'cwd': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors', 'env': {'PYTHON_BASIC_REPL': '1', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'aclab', 'SSH_CLIENT': '192.168.137.1 29321 22', 'LC_TIME': 'vi_VN', 'XDG_SESSION_TYPE': 'tty', 'GIT_ASKPASS': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass.sh', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib', 'BROWSER': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/helpers/browser.sh', 'MOTD_SHOWN': 'pam', 'HOME': '/home/aclab', 'OLDPWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws', 'TERM_PROGRAM_VERSION': '1.109.2', 'VSCODE_IPC_HOOK_CLI': '/run/user/1000/vscode-ipc-34e4d5ea-6494-4e72-a0e7-cefc75c36b9c.sock', 'ROS_PYTHON_VERSION': '3', 'VSCODE_GIT_ASKPASS_MAIN': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/git/dist/askpass-main.js', 'LC_MONETARY': 'vi_VN', 'VSCODE_GIT_ASKPASS_NODE': '/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/node', 'SSL_CERT_FILE': '/usr/lib/ssl/certs/ca-certificates.crt', 'PYDEVD_DISABLE_FILE_VALIDATION': '1', 'BUNDLED_DEBUGPY_PATH': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/libs/debugpy', 'VSCODE_PYTHON_AUTOACTIVATE_GUARD': '1', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'COLCON_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install', 'ROS_DISTRO': 'humble', 'LOGNAME': 'aclab', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'XDG_SESSION_ID': '9', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/debugCommand:/home/aclab/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli:/home/aclab/.vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/bin/remote-cli:/home/aclab/.local/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/bundled/scripts/noConfigScripts', 'LC_ADDRESS': 'vi_VN', 'XDG_RUNTIME_DIR': '/run/user/1000', 'SSL_CERT_DIR': '/usr/lib/ssl/certs', 'VSCODE_DEBUGPY_ADAPTER_ENDPOINTS': '/home/aclab/.vscode-server/extensions/ms-python.debugpy-2025.18.0-linux-arm64/.noConfigDebugAdapterEndpoints/endpoint-7310425700d665ff.txt', 'LANG': 'en_US.UTF-8', 'PYTHONSTARTUP': '/home/aclab/.vscode-server/data/User/workspaceStorage/81e22dda978ffce28b76b69d41ca5850/ms-python.python/pythonrc.py', 'LC_TELEPHONE': 'vi_VN', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'VSCODE_GIT_IPC_HANDLE': '/run/user/1000/vscode-git-1e8b4cdd35.sock', 'TERM_PROGRAM': 'vscode', 'AMENT_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge:/opt/ros/humble', 'SHELL': '/bin/bash', 'LC_NAME': 'vi_VN', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'vi_VN', 'LC_IDENTIFICATION': 'vi_VN', 'VSCODE_GIT_ASKPASS_EXTRA_ARGS': '', 'PWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors', 'SSH_CONNECTION': '192.168.137.1 29321 192.168.137.211 22', 'XDG_DATA_DIRS': '/usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'vi_VN', 'LC_PAPER': 'vi_VN', 'COLCON': '1'}, 'shell': False}
+[7.015178] (-) TimerEvent: {}
+[7.125193] (-) TimerEvent: {}
+[7.228364] (-) TimerEvent: {}
+[7.331093] (-) TimerEvent: {}
+[7.432125] (-) TimerEvent: {}
+[7.533782] (-) TimerEvent: {}
+[7.634612] (-) TimerEvent: {}
+[7.736777] (-) TimerEvent: {}
+[7.838924] (-) TimerEvent: {}
+[7.939746] (-) TimerEvent: {}
+[8.041878] (-) TimerEvent: {}
+[8.144011] (-) TimerEvent: {}
+[8.244796] (-) TimerEvent: {}
+[8.345655] (-) TimerEvent: {}
+[8.446486] (-) TimerEvent: {}
+[8.543546] (robot) StdoutLine: {'line': b'running egg_info\n'}
+[8.546940] (-) TimerEvent: {}
+[8.547895] (robot) StdoutLine: {'line': b'writing ../build/robot/robot.egg-info/PKG-INFO\n'}
+[8.551742] (line_sensors) StdoutLine: {'line': b'running egg_info\n'}
+[8.559035] (robot) StdoutLine: {'line': b'writing dependency_links to ../build/robot/robot.egg-info/dependency_links.txt\n'}
+[8.559644] (line_sensors) StdoutLine: {'line': b'writing ../build/line_sensors/line_sensors.egg-info/PKG-INFO\n'}
+[8.560634] (line_sensors) StdoutLine: {'line': b'writing dependency_links to ../build/line_sensors/line_sensors.egg-info/dependency_links.txt\n'}
+[8.561301] (robot) StdoutLine: {'line': b'writing entry points to ../build/robot/robot.egg-info/entry_points.txt\n'}
+[8.566848] (robot) StdoutLine: {'line': b'writing requirements to ../build/robot/robot.egg-info/requires.txt\n'}
+[8.567395] (robot) StdoutLine: {'line': b'writing top-level names to ../build/robot/robot.egg-info/top_level.txt\n'}
+[8.567936] (line_sensors) StdoutLine: {'line': b'writing entry points to ../build/line_sensors/line_sensors.egg-info/entry_points.txt\n'}
+[8.573043] (line_sensors) StdoutLine: {'line': b'writing requirements to ../build/line_sensors/line_sensors.egg-info/requires.txt\n'}
+[8.573758] (line_sensors) StdoutLine: {'line': b'writing top-level names to ../build/line_sensors/line_sensors.egg-info/top_level.txt\n'}
+[8.574462] (line_sensors) StdoutLine: {'line': b"reading manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'\n"}
+[8.578698] (robot) StdoutLine: {'line': b"reading manifest file '../build/robot/robot.egg-info/SOURCES.txt'\n"}
+[8.582083] (robot) StdoutLine: {'line': b"writing manifest file '../build/robot/robot.egg-info/SOURCES.txt'\n"}
+[8.584684] (robot) StdoutLine: {'line': b'running build\n'}
+[8.585265] (robot) StdoutLine: {'line': b'running build_py\n'}
+[8.585794] (robot) StdoutLine: {'line': b'running install\n'}
+[8.586249] (robot) StdoutLine: {'line': b'running install_lib\n'}
+[8.590503] (line_sensors) StdoutLine: {'line': b"writing manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'\n"}
+[8.591360] (line_sensors) StdoutLine: {'line': b'running build\n'}
+[8.591915] (line_sensors) StdoutLine: {'line': b'running build_py\n'}
+[8.595043] (line_sensors) StdoutLine: {'line': b'running install\n'}
+[8.595598] (line_sensors) StdoutLine: {'line': b'running install_lib\n'}
+[8.596085] (robot) StdoutLine: {'line': b'running install_data\n'}
+[8.600003] (robot) StdoutLine: {'line': b'running install_egg_info\n'}
+[8.607172] (line_sensors) StdoutLine: {'line': b'running install_data\n'}
+[8.624807] (line_sensors) StdoutLine: {'line': b'running install_egg_info\n'}
+[8.625408] (robot) StdoutLine: {'line': b"removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages/robot-0.0.0-py3.10.egg-info' (and everything under it)\n"}
+[8.626062] (mqtt_bridge) StdoutLine: {'line': b'running egg_info\n'}
+[8.627011] (mqtt_bridge) StdoutLine: {'line': b'writing ../build/mqtt_bridge/mqtt_bridge.egg-info/PKG-INFO\n'}
+[8.627622] (robot) StdoutLine: {'line': b'Copying ../build/robot/robot.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages/robot-0.0.0-py3.10.egg-info\n'}
+[8.628116] (line_sensors) StdoutLine: {'line': b"removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors-0.0.0-py3.10.egg-info' (and everything under it)\n"}
+[8.636266] (line_sensors) StdoutLine: {'line': b'Copying ../build/line_sensors/line_sensors.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors-0.0.0-py3.10.egg-info\n'}
+[8.637164] (line_sensors) StdoutLine: {'line': b'running install_scripts\n'}
+[8.637922] (mqtt_bridge) StdoutLine: {'line': b'writing dependency_links to ../build/mqtt_bridge/mqtt_bridge.egg-info/dependency_links.txt\n'}
+[8.638996] (mqtt_bridge) StdoutLine: {'line': b'writing entry points to ../build/mqtt_bridge/mqtt_bridge.egg-info/entry_points.txt\n'}
+[8.640013] (mqtt_bridge) StdoutLine: {'line': b'writing requirements to ../build/mqtt_bridge/mqtt_bridge.egg-info/requires.txt\n'}
+[8.640959] (mqtt_bridge) StdoutLine: {'line': b'writing top-level names to ../build/mqtt_bridge/mqtt_bridge.egg-info/top_level.txt\n'}
+[8.641959] (robot) StdoutLine: {'line': b'running install_scripts\n'}
+[8.647182] (-) TimerEvent: {}
+[8.656191] (mqtt_bridge) StdoutLine: {'line': b"reading manifest file '../build/mqtt_bridge/mqtt_bridge.egg-info/SOURCES.txt'\n"}
+[8.663152] (mqtt_bridge) StdoutLine: {'line': b"writing manifest file '../build/mqtt_bridge/mqtt_bridge.egg-info/SOURCES.txt'\n"}
+[8.665291] (mqtt_bridge) StdoutLine: {'line': b'running build\n'}
+[8.666674] (mqtt_bridge) StdoutLine: {'line': b'running build_py\n'}
+[8.669496] (mqtt_bridge) StdoutLine: {'line': b'copying mqtt_bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/build/lib/mqtt_bridge\n'}
+[8.676333] (mqtt_bridge) StdoutLine: {'line': b'running install\n'}
+[8.679093] (mqtt_bridge) StdoutLine: {'line': b'running install_lib\n'}
+[8.684695] (mqtt_bridge) StdoutLine: {'line': b'copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/build/lib/mqtt_bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge\n'}
+[8.695245] (mqtt_bridge) StdoutLine: {'line': b'byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge/MQTTBridgeROS.py to MQTTBridgeROS.cpython-310.pyc\n'}
+[8.705832] (mqtt_bridge) StdoutLine: {'line': b'running install_data\n'}
+[8.708676] (mqtt_bridge) StdoutLine: {'line': b'running install_egg_info\n'}
+[8.725234] (mqtt_bridge) StdoutLine: {'line': b"removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge-0.0.0-py3.10.egg-info' (and everything under it)\n"}
+[8.735642] (mqtt_bridge) StdoutLine: {'line': b'Copying ../build/mqtt_bridge/mqtt_bridge.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge-0.0.0-py3.10.egg-info\n'}
+[8.741488] (line_sensors) StdoutLine: {'line': b'Installing line_sensors script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/line_sensors\n'}
+[8.744623] (line_sensors) StdoutLine: {'line': b"writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log'\n"}
+[8.747593] (-) TimerEvent: {}
+[8.763284] (robot) StdoutLine: {'line': b'Installing robot script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/robot\n'}
+[8.770196] (mqtt_bridge) StdoutLine: {'line': b'running install_scripts\n'}
+[8.772713] (robot) StdoutLine: {'line': b"writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log'\n"}
+[8.848005] (-) TimerEvent: {}
+[8.950445] (line_sensors) CommandEnded: {'returncode': 0}
+[8.958776] (-) TimerEvent: {}
+[8.961928] (mqtt_bridge) StdoutLine: {'line': b'Installing mqtt_bridge script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/mqtt_bridge\n'}
+[8.970069] (mqtt_bridge) StdoutLine: {'line': b"writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/install.log'\n"}
+[9.063284] (-) TimerEvent: {}
+[9.130695] (line_sensors) JobEnded: {'identifier': 'line_sensors', 'rc': 0}
+[9.142459] (robot) CommandEnded: {'returncode': 0}
+[9.164044] (-) TimerEvent: {}
+[9.188019] (robot) JobEnded: {'identifier': 'robot', 'rc': 0}
+[9.193014] (mqtt_bridge) CommandEnded: {'returncode': 0}
+[9.230326] (mqtt_bridge) JobEnded: {'identifier': 'mqtt_bridge', 'rc': 0}
+[9.233701] (-) EventReactorShutdown: {}

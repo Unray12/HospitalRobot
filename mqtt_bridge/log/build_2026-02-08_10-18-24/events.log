@@ -1,0 +1,73 @@
+[0.000000] (-) TimerEvent: {}
+[0.001249] (mqtt_bridge) JobQueued: {'identifier': 'mqtt_bridge', 'dependencies': OrderedDict()}
+[0.001470] (mqtt_bridge) JobStarted: {'identifier': 'mqtt_bridge'}
+[0.098175] (-) TimerEvent: {}
+[0.198766] (-) TimerEvent: {}
+[0.299425] (-) TimerEvent: {}
+[0.400032] (-) TimerEvent: {}
+[0.500733] (-) TimerEvent: {}
+[0.601378] (-) TimerEvent: {}
+[0.701951] (-) TimerEvent: {}
+[0.802517] (-) TimerEvent: {}
+[0.903094] (-) TimerEvent: {}
+[1.003750] (-) TimerEvent: {}
+[1.104373] (-) TimerEvent: {}
+[1.205143] (-) TimerEvent: {}
+[1.305968] (-) TimerEvent: {}
+[1.406625] (-) TimerEvent: {}
+[1.507278] (-) TimerEvent: {}
+[1.608077] (-) TimerEvent: {}
+[1.709048] (-) TimerEvent: {}
+[1.809671] (-) TimerEvent: {}
+[1.910247] (-) TimerEvent: {}
+[2.010816] (-) TimerEvent: {}
+[2.111421] (-) TimerEvent: {}
+[2.212022] (-) TimerEvent: {}
+[2.312639] (-) TimerEvent: {}
+[2.413306] (-) TimerEvent: {}
+[2.513920] (-) TimerEvent: {}
+[2.614711] (-) TimerEvent: {}
+[2.715765] (-) TimerEvent: {}
+[2.726217] (mqtt_bridge) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'develop', '--editable', '--build-directory', '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build', '--no-deps', 'symlink_data', '--force'], 'cwd': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge', 'env': {'LESSOPEN': '| /usr/bin/lesspipe %s', 'USER': 'aclab', 'SSH_CLIENT': '172.28.182.98 60642 22', 'LC_TIME': 'vi_VN', 'XDG_SESSION_TYPE': 'tty', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/aarch64-linux-gnu:/opt/ros/humble/lib', 'MOTD_SHOWN': 'pam', 'HOME': '/home/aclab', 'OLDPWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src', 'SSH_TTY': '/dev/pts/1', 'ROS_PYTHON_VERSION': '3', 'LC_MONETARY': 'vi_VN', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLCON_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install', 'ROS_DISTRO': 'humble', 'LOGNAME': 'aclab', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'XDG_SESSION_CLASS': 'user', 'TERM': 'xterm-256color', 'XDG_SESSION_ID': '8', 'ROS_LOCALHOST_ONLY': '0', 'PATH': '/home/aclab/.local/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin', 'LC_ADDRESS': 'vi_VN', 'XDG_RUNTIME_DIR': '/run/user/1000', 'LANG': 'en_US.UTF-8', 'LC_TELEPHONE': 'vi_VN', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:', 'AMENT_PREFIX_PATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge:/opt/ros/humble', 'SHELL': '/bin/bash', 'LC_NAME': 'vi_VN', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'LC_MEASUREMENT': 'vi_VN', 'LC_IDENTIFICATION': 'vi_VN', 'PWD': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge', 'SSH_CONNECTION': '172.28.182.98 60642 172.28.182.106 22', 'XDG_DATA_DIRS': '/usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop', 'PYTHONPATH': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/robot/lib/python3.10/site-packages:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install/mqtt_bridge/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages', 'LC_NUMERIC': 'vi_VN', 'LC_PAPER': 'vi_VN', 'COLCON': '1'}, 'shell': False}
+[2.815928] (-) TimerEvent: {}
+[2.916508] (-) TimerEvent: {}
+[3.017201] (-) TimerEvent: {}
+[3.117848] (-) TimerEvent: {}
+[3.218423] (-) TimerEvent: {}
+[3.319023] (-) TimerEvent: {}
+[3.419675] (-) TimerEvent: {}
+[3.520232] (-) TimerEvent: {}
+[3.620852] (-) TimerEvent: {}
+[3.721427] (-) TimerEvent: {}
+[3.822005] (-) TimerEvent: {}
+[3.909424] (mqtt_bridge) StdoutLine: {'line': b'running develop\n'}
+[3.922151] (-) TimerEvent: {}
+[4.022741] (-) TimerEvent: {}
+[4.123362] (-) TimerEvent: {}
+[4.223962] (-) TimerEvent: {}
+[4.324550] (-) TimerEvent: {}
+[4.425244] (-) TimerEvent: {}
+[4.525823] (-) TimerEvent: {}
+[4.626411] (-) TimerEvent: {}
+[4.683448] (mqtt_bridge) StdoutLine: {'line': b'running egg_info\n'}
+[4.684041] (mqtt_bridge) StdoutLine: {'line': b'writing mqtt_bridge.egg-info/PKG-INFO\n'}
+[4.685395] (mqtt_bridge) StdoutLine: {'line': b'writing dependency_links to mqtt_bridge.egg-info/dependency_links.txt\n'}
+[4.686226] (mqtt_bridge) StdoutLine: {'line': b'writing entry points to mqtt_bridge.egg-info/entry_points.txt\n'}
+[4.686945] (mqtt_bridge) StdoutLine: {'line': b'writing requirements to mqtt_bridge.egg-info/requires.txt\n'}
+[4.687475] (mqtt_bridge) StdoutLine: {'line': b'writing top-level names to mqtt_bridge.egg-info/top_level.txt\n'}
+[4.695250] (mqtt_bridge) StdoutLine: {'line': b"reading manifest file 'mqtt_bridge.egg-info/SOURCES.txt'\n"}
+[4.698472] (mqtt_bridge) StdoutLine: {'line': b"writing manifest file 'mqtt_bridge.egg-info/SOURCES.txt'\n"}
+[4.704312] (mqtt_bridge) StdoutLine: {'line': b'running build_ext\n'}
+[4.705150] (mqtt_bridge) StdoutLine: {'line': b'Creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt-bridge.egg-link (link to .)\n'}
+[4.708500] (mqtt_bridge) StdoutLine: {'line': b'Installing mqtt_bridge script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/mqtt_bridge\n'}
+[4.709468] (mqtt_bridge) StdoutLine: {'line': b'Installing mqtt_bridge2 script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/mqtt_bridge\n'}
+[4.710761] (mqtt_bridge) StdoutLine: {'line': b'\n'}
+[4.711276] (mqtt_bridge) StdoutLine: {'line': b'Installed /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge\n'}
+[4.711602] (mqtt_bridge) StdoutLine: {'line': b'running symlink_data\n'}
+[4.712017] (mqtt_bridge) StdoutLine: {'line': b'symbolically linking /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/resource/mqtt_bridge -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/ament_index/resource_index/packages\n'}
+[4.712823] (mqtt_bridge) StdoutLine: {'line': b'symbolically linking /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/package.xml -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/mqtt_bridge\n'}
+[4.726707] (-) TimerEvent: {}
+[4.827794] (-) TimerEvent: {}
+[4.843063] (mqtt_bridge) CommandEnded: {'returncode': 0}
+[4.897980] (mqtt_bridge) JobEnded: {'identifier': 'mqtt_bridge', 'rc': 0}
+[4.900687] (-) EventReactorShutdown: {}

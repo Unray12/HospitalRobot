@@ -1,0 +1,3 @@
+[console_scripts]
+mqtt_bridge = mqtt_bridge.MQTTBridgeROS:main
+

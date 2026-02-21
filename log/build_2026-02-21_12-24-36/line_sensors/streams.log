@@ -1,0 +1,37 @@
+[6.156s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data
+[7.699s] running egg_info
+[7.706s] creating ../build/line_sensors/line_sensors.egg-info
+[7.714s] writing ../build/line_sensors/line_sensors.egg-info/PKG-INFO
+[7.723s] writing dependency_links to ../build/line_sensors/line_sensors.egg-info/dependency_links.txt
+[7.727s] writing entry points to ../build/line_sensors/line_sensors.egg-info/entry_points.txt
+[7.730s] writing requirements to ../build/line_sensors/line_sensors.egg-info/requires.txt
+[7.735s] writing top-level names to ../build/line_sensors/line_sensors.egg-info/top_level.txt
+[7.739s] writing manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'
+[7.743s] reading manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'
+[7.746s] writing manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'
+[7.749s] running build
+[7.752s] running build_py
+[7.757s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build
+[7.761s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib
+[7.764s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib/line_sensors
+[7.767s] copying line_sensors/__init__.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib/line_sensors
+[7.779s] copying line_sensors/line_sensors.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib/line_sensors
+[7.782s] running install
+[7.785s] running install_lib
+[7.788s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors
+[7.791s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib/line_sensors/__init__.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors
+[7.794s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build/lib/line_sensors/line_sensors.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors
+[7.799s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors/__init__.py to __init__.cpython-310.pyc
+[7.802s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors/line_sensors.py to line_sensors.cpython-310.pyc
+[7.806s] running install_data
+[7.809s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/ament_index
+[7.812s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/ament_index/resource_index
+[7.815s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/ament_index/resource_index/packages
+[7.819s] copying resource/line_sensors -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/ament_index/resource_index/packages
+[7.822s] copying package.xml -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors
+[7.825s] running install_egg_info
+[7.829s] Copying ../build/line_sensors/line_sensors.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors-0.0.0-py3.10.egg-info
+[7.832s] running install_scripts
+[7.891s] Installing line_sensors script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/line_sensors
+[7.894s] writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log'
+[8.057s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data

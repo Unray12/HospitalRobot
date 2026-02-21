@@ -1,0 +1,3 @@
+[console_scripts]
+line_sensors = line_sensors.line_sensors:main
+

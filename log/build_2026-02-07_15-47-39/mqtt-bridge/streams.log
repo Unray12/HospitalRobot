@@ -1,0 +1,23 @@
+[4.282s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt-bridge': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/mqtt-bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/install.log --single-version-externally-managed install_data
+[5.566s] running egg_info
+[5.568s] writing ../build/mqtt-bridge/mqtt_bridge.egg-info/PKG-INFO
+[5.571s] writing dependency_links to ../build/mqtt-bridge/mqtt_bridge.egg-info/dependency_links.txt
+[5.572s] writing entry points to ../build/mqtt-bridge/mqtt_bridge.egg-info/entry_points.txt
+[5.573s] writing requirements to ../build/mqtt-bridge/mqtt_bridge.egg-info/requires.txt
+[5.575s] writing top-level names to ../build/mqtt-bridge/mqtt_bridge.egg-info/top_level.txt
+[5.582s] reading manifest file '../build/mqtt-bridge/mqtt_bridge.egg-info/SOURCES.txt'
+[5.586s] writing manifest file '../build/mqtt-bridge/mqtt_bridge.egg-info/SOURCES.txt'
+[5.588s] running build
+[5.589s] running build_py
+[5.590s] copying mqtt-bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/build/lib/mqtt-bridge
+[5.591s] running install
+[5.592s] running install_lib
+[5.596s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/build/lib/mqtt-bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages/mqtt-bridge
+[5.599s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages/mqtt-bridge/MQTTBridgeROS.py to MQTTBridgeROS.cpython-310.pyc
+[5.603s] running install_data
+[5.604s] running install_egg_info
+[5.616s] removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages/mqtt_bridge-0.0.0-py3.10.egg-info' (and everything under it)
+[5.618s] Copying ../build/mqtt-bridge/mqtt_bridge.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages/mqtt_bridge-0.0.0-py3.10.egg-info
+[5.625s] running install_scripts
+[5.716s] writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/install.log'
+[5.864s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt-bridge' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt-bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/mqtt-bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt-bridge/install.log --single-version-externally-managed install_data

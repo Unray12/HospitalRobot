@@ -1,0 +1,214 @@
+[2.898s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build']
+[2.900s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=False, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=4, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0xffff9ecc5c00>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0xffff9ee6ebf0>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0xffff9ee6ebf0>>, mixin_verb=('build',))
+[7.062s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[7.079s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[7.080s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[7.080s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[7.080s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[7.081s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[7.081s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src'
+[7.082s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[7.082s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[7.083s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[7.084s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[7.084s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[7.084s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[7.084s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[7.085s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[7.085s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[7.205s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[7.205s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[7.205s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[7.206s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[7.206s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[7.214s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[7.214s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[7.214s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[7.216s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[7.216s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[7.217s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[7.218s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extensions ['ignore', 'ignore_ament_install']
+[7.219s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extension 'ignore'
+[7.219s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extension 'ignore_ament_install'
+[7.219s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extensions ['colcon_pkg']
+[7.220s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extension 'colcon_pkg'
+[7.220s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extensions ['colcon_meta']
+[7.220s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extension 'colcon_meta'
+[7.220s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extensions ['ros']
+[7.221s] Level 1:colcon.colcon_core.package_identification:_identify(line_sensors) by extension 'ros'
+[7.250s] DEBUG:colcon.colcon_core.package_identification:Package 'line_sensors' with type 'ros.ament_python' and name 'line_sensors'
+[7.252s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[7.253s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[7.253s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[7.257s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extensions ['ignore', 'ignore_ament_install']
+[7.257s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extension 'ignore'
+[7.258s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extension 'ignore_ament_install'
+[7.258s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extensions ['colcon_pkg']
+[7.258s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extension 'colcon_pkg'
+[7.259s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extensions ['colcon_meta']
+[7.259s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extension 'colcon_meta'
+[7.259s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extensions ['ros']
+[7.259s] Level 1:colcon.colcon_core.package_identification:_identify(mqtt_bridge) by extension 'ros'
+[7.263s] DEBUG:colcon.colcon_core.package_identification:Package 'mqtt_bridge' with type 'ros.ament_python' and name 'mqtt_bridge'
+[7.266s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extensions ['ignore', 'ignore_ament_install']
+[7.266s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extension 'ignore'
+[7.267s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extension 'ignore_ament_install'
+[7.267s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extensions ['colcon_pkg']
+[7.268s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extension 'colcon_pkg'
+[7.268s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extensions ['colcon_meta']
+[7.268s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extension 'colcon_meta'
+[7.268s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extensions ['ros']
+[7.269s] Level 1:colcon.colcon_core.package_identification:_identify(robot) by extension 'ros'
+[7.272s] DEBUG:colcon.colcon_core.package_identification:Package 'robot' with type 'ros.ament_python' and name 'robot'
+[7.273s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[7.273s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[7.273s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[7.273s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[7.274s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[7.837s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[7.838s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[8.329s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 2 installed packages in /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/install
+[8.609s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 272 installed packages in /opt/ros/humble
+[8.628s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[9.679s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_args' from command line to 'None'
+[9.679s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_target' from command line to 'None'
+[9.679s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[9.679s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_clean_cache' from command line to 'False'
+[9.680s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_clean_first' from command line to 'False'
+[9.680s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'cmake_force_configure' from command line to 'False'
+[9.680s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'ament_cmake_args' from command line to 'None'
+[9.680s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'catkin_cmake_args' from command line to 'None'
+[9.680s] Level 5:colcon.colcon_core.verb:set package 'line_sensors' build argument 'catkin_skip_building_tests' from command line to 'False'
+[9.680s] DEBUG:colcon.colcon_core.verb:Building package 'line_sensors' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors', 'merge_install': False, 'path': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors', 'symlink_install': False, 'test_result_base': None}
+[9.682s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_args' from command line to 'None'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_target' from command line to 'None'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_clean_cache' from command line to 'False'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_clean_first' from command line to 'False'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'cmake_force_configure' from command line to 'False'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'ament_cmake_args' from command line to 'None'
+[9.683s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'catkin_cmake_args' from command line to 'None'
+[9.684s] Level 5:colcon.colcon_core.verb:set package 'mqtt_bridge' build argument 'catkin_skip_building_tests' from command line to 'False'
+[9.684s] DEBUG:colcon.colcon_core.verb:Building package 'mqtt_bridge' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge', 'merge_install': False, 'path': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge', 'symlink_install': False, 'test_result_base': None}
+[9.685s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_args' from command line to 'None'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_target' from command line to 'None'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_clean_cache' from command line to 'False'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_clean_first' from command line to 'False'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'cmake_force_configure' from command line to 'False'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'ament_cmake_args' from command line to 'None'
+[9.686s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'catkin_cmake_args' from command line to 'None'
+[9.687s] Level 5:colcon.colcon_core.verb:set package 'robot' build argument 'catkin_skip_building_tests' from command line to 'False'
+[9.687s] DEBUG:colcon.colcon_core.verb:Building package 'robot' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot', 'merge_install': False, 'path': '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot', 'symlink_install': False, 'test_result_base': None}
+[9.687s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[9.730s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[9.743s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors' with build type 'ament_python'
+[9.744s] Level 1:colcon.colcon_core.shell:create_environment_hook('line_sensors', 'ament_prefix_path')
+[9.775s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[9.776s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/ament_prefix_path.ps1'
+[9.798s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/ament_prefix_path.dsv'
+[9.808s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/ament_prefix_path.sh'
+[9.813s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[9.813s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[9.870s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge' with build type 'ament_python'
+[9.872s] Level 1:colcon.colcon_core.shell:create_environment_hook('mqtt_bridge', 'ament_prefix_path')
+[9.873s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/ament_prefix_path.ps1'
+[9.884s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/ament_prefix_path.dsv'
+[9.886s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/ament_prefix_path.sh'
+[9.890s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[9.891s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[9.920s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot' with build type 'ament_python'
+[9.922s] Level 1:colcon.colcon_core.shell:create_environment_hook('robot', 'ament_prefix_path')
+[9.924s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/ament_prefix_path.ps1'
+[9.948s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/ament_prefix_path.dsv'
+[9.950s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/ament_prefix_path.sh'
+[9.954s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[9.955s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[12.955s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors'
+[12.956s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[12.956s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[14.276s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge'
+[14.277s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[14.277s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[15.545s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot'
+[15.546s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[15.546s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[18.166s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log --single-version-externally-managed install_data
+[18.201s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/mqtt_bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/install.log --single-version-externally-managed install_data
+[18.227s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data
+[20.224s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data
+[20.282s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors' for CMake module files
+[20.285s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors' for CMake config files
+[20.293s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib'
+[20.294s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/bin'
+[20.295s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/pkgconfig/line_sensors.pc'
+[20.296s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages'
+[20.297s] Level 1:colcon.colcon_core.shell:create_environment_hook('line_sensors', 'pythonpath')
+[20.298s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/pythonpath.ps1'
+[20.300s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/pythonpath.dsv'
+[20.302s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/hook/pythonpath.sh'
+[20.306s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/bin'
+[20.307s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(line_sensors)
+[20.308s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/package.ps1'
+[20.316s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/package.dsv'
+[20.323s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/package.sh'
+[20.329s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/package.bash'
+[20.338s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/line_sensors/package.zsh'
+[20.344s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/share/colcon-core/packages/line_sensors)
+[20.352s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge' for CMake module files
+[20.354s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/mqtt_bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/mqtt_bridge/install.log --single-version-externally-managed install_data
+[20.357s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge' for CMake config files
+[20.366s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib'
+[20.367s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/bin'
+[20.367s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/pkgconfig/mqtt_bridge.pc'
+[20.369s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/lib/python3.10/site-packages'
+[20.370s] Level 1:colcon.colcon_core.shell:create_environment_hook('mqtt_bridge', 'pythonpath')
+[20.372s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/pythonpath.ps1'
+[20.376s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/pythonpath.dsv'
+[20.379s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/hook/pythonpath.sh'
+[20.384s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/bin'
+[20.384s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(mqtt_bridge)
+[20.386s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/package.ps1'
+[20.389s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/package.dsv'
+[20.392s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/package.sh'
+[20.395s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/package.bash'
+[20.397s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/mqtt_bridge/package.zsh'
+[20.400s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/mqtt_bridge/share/colcon-core/packages/mqtt_bridge)
+[20.403s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot' for CMake module files
+[20.408s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log --single-version-externally-managed install_data
+[20.409s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot' for CMake config files
+[20.416s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib'
+[20.417s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/bin'
+[20.417s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/pkgconfig/robot.pc'
+[20.418s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages'
+[20.419s] Level 1:colcon.colcon_core.shell:create_environment_hook('robot', 'pythonpath')
+[20.420s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/pythonpath.ps1'
+[20.424s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/pythonpath.dsv'
+[20.426s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/hook/pythonpath.sh'
+[20.431s] Level 1:colcon.colcon_core.environment:checking '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/bin'
+[20.431s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(robot)
+[20.433s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/package.ps1'
+[20.436s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/package.dsv'
+[20.439s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/package.sh'
+[20.442s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/package.bash'
+[20.445s] INFO:colcon.colcon_core.shell:Creating package script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/robot/package.zsh'
+[20.447s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/share/colcon-core/packages/robot)
+[20.449s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[20.451s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[20.452s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[20.453s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[20.524s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[20.525s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[20.526s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[20.607s] DEBUG:colcon.colcon_notification.desktop_notification.notify2:Failed to initialize notify2: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.Notifications was not provided by any .service files
+[20.608s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[20.609s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/local_setup.ps1'
+[20.615s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/_local_setup_util_ps1.py'
+[20.625s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/setup.ps1'
+[20.631s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/local_setup.sh'
+[20.636s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/_local_setup_util_sh.py'
+[20.640s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/setup.sh'
+[20.647s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/local_setup.bash'
+[20.651s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/setup.bash'
+[20.658s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/local_setup.zsh'
+[20.662s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/setup.zsh'

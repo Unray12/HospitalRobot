@@ -1,0 +1,21 @@
+[5.983s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log --single-version-externally-managed install_data
+[7.593s] running egg_info
+[7.598s] writing ../build/robot/robot.egg-info/PKG-INFO
+[7.601s] writing dependency_links to ../build/robot/robot.egg-info/dependency_links.txt
+[7.606s] writing entry points to ../build/robot/robot.egg-info/entry_points.txt
+[7.610s] writing requirements to ../build/robot/robot.egg-info/requires.txt
+[7.613s] writing top-level names to ../build/robot/robot.egg-info/top_level.txt
+[7.629s] reading manifest file '../build/robot/robot.egg-info/SOURCES.txt'
+[7.635s] writing manifest file '../build/robot/robot.egg-info/SOURCES.txt'
+[7.636s] running build
+[7.636s] running build_py
+[7.640s] running install
+[7.642s] running install_lib
+[7.654s] running install_data
+[7.656s] running install_egg_info
+[7.675s] removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages/robot-0.0.0-py3.10.egg-info' (and everything under it)
+[7.676s] Copying ../build/robot/robot.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages/robot-0.0.0-py3.10.egg-info
+[7.690s] running install_scripts
+[7.900s] Installing robot script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/robot
+[7.903s] writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log'
+[8.095s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/robot build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/robot/install.log --single-version-externally-managed install_data

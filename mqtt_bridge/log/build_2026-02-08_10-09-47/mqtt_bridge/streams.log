@@ -1,0 +1,41 @@
+[2.962s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/mqtt_bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/install.log --single-version-externally-managed install_data
+[4.062s] running egg_info
+[4.064s] creating build/mqtt_bridge/mqtt_bridge.egg-info
+[4.065s] writing build/mqtt_bridge/mqtt_bridge.egg-info/PKG-INFO
+[4.066s] writing dependency_links to build/mqtt_bridge/mqtt_bridge.egg-info/dependency_links.txt
+[4.067s] writing entry points to build/mqtt_bridge/mqtt_bridge.egg-info/entry_points.txt
+[4.068s] writing requirements to build/mqtt_bridge/mqtt_bridge.egg-info/requires.txt
+[4.068s] writing top-level names to build/mqtt_bridge/mqtt_bridge.egg-info/top_level.txt
+[4.069s] writing manifest file 'build/mqtt_bridge/mqtt_bridge.egg-info/SOURCES.txt'
+[4.076s] reading manifest file 'build/mqtt_bridge/mqtt_bridge.egg-info/SOURCES.txt'
+[4.080s] writing manifest file 'build/mqtt_bridge/mqtt_bridge.egg-info/SOURCES.txt'
+[4.081s] running build
+[4.081s] running build_py
+[4.081s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build
+[4.082s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib
+[4.082s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge
+[4.083s] copying mqtt_bridge/__init__.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge
+[4.083s] copying mqtt_bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge
+[4.084s] copying mqtt_bridge/MQTTBridgeROS2.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge
+[4.085s] running install
+[4.086s] running install_lib
+[4.089s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge
+[4.090s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge/__init__.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge
+[4.091s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge/MQTTBridgeROS.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge
+[4.091s] copying /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build/lib/mqtt_bridge/MQTTBridgeROS2.py -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge
+[4.094s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge/__init__.py to __init__.cpython-310.pyc
+[4.095s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge/MQTTBridgeROS.py to MQTTBridgeROS.cpython-310.pyc
+[4.099s] byte-compiling /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge/MQTTBridgeROS2.py to MQTTBridgeROS2.cpython-310.pyc
+[4.102s] running install_data
+[4.102s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/ament_index
+[4.103s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/ament_index/resource_index
+[4.103s] creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/ament_index/resource_index/packages
+[4.104s] copying resource/mqtt_bridge -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/ament_index/resource_index/packages
+[4.104s] copying package.xml -> /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/share/mqtt_bridge
+[4.104s] running install_egg_info
+[4.116s] Copying build/mqtt_bridge/mqtt_bridge.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages/mqtt_bridge-0.0.0-py3.10.egg-info
+[4.121s] running install_scripts
+[4.198s] Installing mqtt_bridge script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/mqtt_bridge
+[4.199s] Installing mqtt_bridge2 script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/mqtt_bridge
+[4.200s] writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/install.log'
+[4.316s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/install/mqtt_bridge/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base build/mqtt_bridge build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/mqtt_bridge/build/mqtt_bridge/install.log --single-version-externally-managed install_data

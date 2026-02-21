@@ -1,0 +1,18 @@
+[2.754s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot/build --no-deps symlink_data
+[3.950s] running develop
+[4.737s] running egg_info
+[4.738s] writing robot.egg-info/PKG-INFO
+[4.739s] writing dependency_links to robot.egg-info/dependency_links.txt
+[4.740s] writing entry points to robot.egg-info/entry_points.txt
+[4.741s] writing requirements to robot.egg-info/requires.txt
+[4.741s] writing top-level names to robot.egg-info/top_level.txt
+[4.749s] reading manifest file 'robot.egg-info/SOURCES.txt'
+[4.752s] writing manifest file 'robot.egg-info/SOURCES.txt'
+[4.757s] running build_ext
+[4.758s] Creating /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/install/robot/lib/python3.10/site-packages/robot.egg-link (link to .)
+[4.762s] Installing robot script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/install/robot/lib/robot
+[4.762s] Installing robot2 script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/install/robot/lib/robot
+[4.764s] 
+[4.764s] Installed /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot
+[4.765s] running symlink_data
+[4.899s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/install/robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/robot/build/robot/build --no-deps symlink_data

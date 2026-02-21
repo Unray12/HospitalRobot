@@ -1,0 +1,21 @@
+[6.048s] Invoking command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data
+[7.640s] running egg_info
+[7.644s] writing ../build/line_sensors/line_sensors.egg-info/PKG-INFO
+[7.649s] writing dependency_links to ../build/line_sensors/line_sensors.egg-info/dependency_links.txt
+[7.655s] writing entry points to ../build/line_sensors/line_sensors.egg-info/entry_points.txt
+[7.670s] writing requirements to ../build/line_sensors/line_sensors.egg-info/requires.txt
+[7.682s] writing top-level names to ../build/line_sensors/line_sensors.egg-info/top_level.txt
+[7.711s] reading manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'
+[7.713s] writing manifest file '../build/line_sensors/line_sensors.egg-info/SOURCES.txt'
+[7.727s] running build
+[7.728s] running build_py
+[7.730s] running install
+[7.732s] running install_lib
+[7.752s] running install_data
+[7.755s] running install_egg_info
+[7.774s] removing '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors-0.0.0-py3.10.egg-info' (and everything under it)
+[7.777s] Copying ../build/line_sensors/line_sensors.egg-info to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages/line_sensors-0.0.0-py3.10.egg-info
+[7.795s] running install_scripts
+[7.855s] Installing line_sensors script to /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/line_sensors
+[7.861s] writing list of installed files to '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log'
+[8.169s] Invoked command in '/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/line_sensors' returned '0': PYTHONPATH=/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/install/line_sensors/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_sensors build --build-base /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/build install --record /home/aclab/Desktop/workspaces/RobotROS2/ros2_ws/src/build/line_sensors/install.log --single-version-externally-managed install_data

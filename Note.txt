@@ -1,0 +1,16 @@
+######### ROS2 #########
+source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
+ros2 topic echo /VR_control
+ros2 run mqtt_bridge mqtt_bridge
+ros2 run robot robot
+colcon build -> source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
+ros2 topic echo /VR_control
+add package: ros2 pkg create line_sensor --build-type ament_python --dependencies rclpy std_msgs sensor_msgs
+ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
+######### MQTT #########
+
+Check package: ros2 pkg list | grep mqtt
+Test topic: mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
+ttyUSB0
+ttyACM0
+
