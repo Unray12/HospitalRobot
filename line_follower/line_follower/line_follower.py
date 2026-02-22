@@ -72,7 +72,15 @@ class LineFollowerFSM:
         if self.state == self.STATE_CROSSING:
             return self._handle_crossing(now)
         if self.state == self.STATE_PLAN:
-            return self._handle_plan(frame, now, False)
+            if frame is None:
+                return self._handle_plan(None, now, False)
+            left_full = frame["left_full"]
+            mid_full = frame["mid_full"]
+            right_full = frame["right_full"]
+            cross_detected = left_full and mid_full and right_full
+            cross_event = cross_detected and not self._cross_active
+            self._cross_active = cross_detected
+            return self._handle_plan(frame, now, cross_event)
 
         if frame is None:
             return None
