@@ -11,6 +11,8 @@
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>std_srvs</depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
   <depend>line_sensors</depend>
   <depend>line_follower</depend>
   <depend>motor_driver</depend>

@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-from .system_main import main
+import sys
+import launch
+from launch import LaunchDescription, LaunchService
+from launch_ros.actions import Node
 
 
-# Direction map for mecanum wheels
-# Order: [FL, FR, RL, RR]
-DIR = {
-    'Forward': (-1, -1, -1, -1),   # Forward
-    'Backward': (+1, +1, +1, +1),   # Backward
-    'Right': (-1, +1, -1, +1),   # Right
-    'Left': (+1, -1, +1, -1),   # Left
-    'RotateRight': (-1, -1, +1, +1),   # Forward Right
-    'RotateLeft': ( +1, +1, -1, -1),   # Forward Left
-    'Stop': (0, 0, 0, 0)    # Stop
-}
+def main():
+    ld = LaunchDescription(
+        [
+            Node(package="line_sensors", executable="line_sensor_driver", output="screen"),
+            Node(package="line_follower", executable="line_follower", output="screen"),
+            Node(package="motor_driver", executable="motor_driver", output="screen"),
+            Node(package="manual_control", executable="manual_control", output="screen"),
+        ]
+    )
+
+    ls = LaunchService(argv=sys.argv[1:])
+    ls.include_launch_description(ld)
+    return ls.run()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
