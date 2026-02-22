@@ -1,8 +1,25 @@
 {
-    "name": "u_turn",
+    "name": "plan_u_turn",
     "steps": [
-        { "action": "Backward", "speed": 4, "duration": 0.5 },
-        { "action": "RotateLeft", "speed": 6 }
+        {
+            "action": "Wait",
+            "duration": 0.2
+        },
+        {
+            "action": "RotateRight",
+            "speed": 6,
+            "duration": 1.8
+        },
+        {
+            "action": "RotateRight",
+            "speed": 6,
+            "until": "line",
+            "timeout": 2.0
+        },
+        {
+            "action": "Follow",
+            "duration": 0.6
+        }
     ],
     "end_state": "follow"
 }

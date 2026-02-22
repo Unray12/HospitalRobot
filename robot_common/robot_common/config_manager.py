@@ -3,7 +3,7 @@ from importlib import resources
 
 
 class ConfigManager:
-    _global_cache = None
+    _global_cache = {}
     _plan_cache = {}
 
     def __init__(self, package, filename="config.json", logger=None):
@@ -12,7 +12,8 @@ class ConfigManager:
         self._logger = logger
 
     def load(self, defaults=None, force=False):
-        if ConfigManager._global_cache is None or force:
+        cache_key = self.filename
+        if force or cache_key not in ConfigManager._global_cache:
             data = {}
             try:
                 path = resources.files("robot_common").joinpath(self.filename)
@@ -21,9 +22,9 @@ class ConfigManager:
             except Exception as exc:
                 self._log_warn(f"robot_common/{self.filename} not loaded, using defaults: {exc}")
 
-            ConfigManager._global_cache = data
+            ConfigManager._global_cache[cache_key] = data
 
-        data = ConfigManager._global_cache.get(self.package, {})
+        data = ConfigManager._global_cache.get(cache_key, {}).get(self.package, {})
         if defaults:
             data = self._deep_merge(defaults, data)
         return data
@@ -55,6 +56,6 @@ class ConfigManager:
 
     def _log_warn(self, msg):
         if self._logger:
-            self._logger.warn(msg)
+            self._logger.warning(msg)
         else:
             print(msg)

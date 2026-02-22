@@ -2,23 +2,34 @@
     "name": "plan_ntp",
     "steps": [
         {
+            "action": "Wait",
+            "duration": 0.2
+        },
+        {
+            "label": "scan_left",
             "action": "RotateLeft",
-            "speed": 5
+            "speed": 5,
+            "until": "line",
+            "timeout": 1.8
         },
         {
+            "action": "Follow",
+            "duration": 0.4
+        },
+        {
+            "label": "scan_right",
             "action": "RotateRight",
-            "speed": 5
+            "speed": 5,
+            "until": "line",
+            "timeout": 1.8
         },
         {
-            "action": "RotateRight",
-            "speed": 5
+            "action": "Follow",
+            "duration": 0.4
         },
         {
-            "action": "RotateRight",
-            "speed": 5
-        },
-        {
-            "action": "Stop"
+            "action": "Stop",
+            "duration": 0.2
         }
     ],
     "end_state": "follow"

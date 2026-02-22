@@ -1,5 +1,9 @@
-import serial
 import time
+
+try:
+    import serial
+except ImportError:
+    serial = None
 
 # Direction map for mecanum wheels
 # Order: [FL, FR, RL, RR]
@@ -18,6 +22,10 @@ class MotorController:
     def __init__(self, port="/dev/ttyUSB0", baudrate=115200, timeout=0.1, logger=None):
         self._logger = logger
         self.ser = None
+
+        if serial is None:
+            self._log_error("pyserial is not installed; motor serial is unavailable")
+            return
 
         try:
             self.ser = serial.Serial(

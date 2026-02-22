@@ -29,6 +29,10 @@
         "cross_pre_forward_duration": 3.0,
         "cross_pre_stop_duration": 1.0,
         "rotate_min_duration": 2,
+        "rotate_line_mid_min_count": 1,
+        "rotate_line_side_max_count": 2,
+        "rotate_early_stop_on_side": true,
+        "rotate_line_side_min_count": 1,
         "cross_plan_name": "plan_ntp",
         "plan_end_state": "stop",
         "topics": {
@@ -42,10 +46,7 @@
         },
         "plan_alias": {
             "0": "clear",
-            "1": "plan_ntp",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "1": "plan_ntp"
         }
     },
     "motor_driver": {
@@ -93,10 +94,7 @@
         },
         "plan_keys": {
             "0": "clear",
-            "1": "plan_ntp",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "1": "plan_ntp"
         }
     }
 }

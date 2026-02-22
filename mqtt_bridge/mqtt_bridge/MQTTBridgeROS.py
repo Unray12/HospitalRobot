@@ -1,18 +1,34 @@
 #!/usr/bin/python3
 import sys
-import termios
 import threading
-import tty
+from threading import Event
+import os
 
-import paho.mqtt.client as mqtt
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    mqtt = None
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from robot_common.config_manager import ConfigManager
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import termios
+    import tty
+
 
 # Hàm đọc phím 1 ký tự
 def get_key():
+    if os.name == "nt":
+        key = msvcrt.getch()
+        try:
+            return key.decode("utf-8", errors="ignore")
+        except Exception:
+            return ""
+
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
@@ -56,29 +72,43 @@ class MQTTBridgeNode(Node):
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
 
+        if mqtt is None:
+            raise RuntimeError("paho-mqtt is not installed")
+
         # MQTT client
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
+        self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
+        self._mqtt_connected = False
 
         self.client.connect(self.broker_address, self.broker_port, 60)
 
         # MQTT chạy ở thread riêng
-        mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
-        mqtt_thread.start()
+        self._stop_event = Event()
+        self._mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
+        self._mqtt_thread.start()
+
+        # Keyboard đọc ở worker thread để không block executor
+        self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
+        self._keyboard_thread.start()
 
         self.get_logger().info("MQTT ↔ ROS 2 bridge started")
-        self.keyboard_loop()
 
     # MQTT callbacks
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
+            self._mqtt_connected = True
             self.get_logger().info("Connected to MQTT broker")
             client.subscribe(self.topic_vr)
             client.subscribe(self.topic_pick)
             client.subscribe(self.topic_plan)
         else:
             self.get_logger().error(f"MQTT connect failed: {rc}")
+
+    def on_disconnect(self, client, userdata, rc):
+        self._mqtt_connected = False
+        self.get_logger().warning(f"Disconnected from MQTT broker: rc={rc}")
 
     def on_message(self, client, userdata, msg):
         data = msg.payload.decode()
@@ -97,7 +127,7 @@ class MQTTBridgeNode(Node):
     def keyboard_loop(self):
         self.get_logger().info("Điều khiển WASD | q để thoát")
         autoMode = False
-        while rclpy.ok():
+        while rclpy.ok() and not self._stop_event.is_set():
             key = get_key().lower()
             cmd = ""
 
@@ -110,13 +140,21 @@ class MQTTBridgeNode(Node):
                 self.get_logger().info(f"ROS2 → MQTT: {mode_msg}")
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
-                self.client.publish(self.topic_plan, plan_name)
-                ros_msg = String()
-                ros_msg.data = plan_name
-                self.ros_plan_pub.publish(ros_msg)
-                self.get_logger().info(f"ROS2 → MQTT: {plan_name}")
+                if self._mqtt_connected:
+                    self.client.publish(self.topic_plan, plan_name)
+                    self.get_logger().info(f"ROS2 → MQTT: {plan_name}")
+                else:
+                    # Fallback local publish so operator key still works when MQTT is down.
+                    ros_msg = String()
+                    ros_msg.data = plan_name
+                    self.ros_plan_pub.publish(ros_msg)
+                    self.get_logger().warning(
+                        f"MQTT unavailable, published plan locally: {plan_name}"
+                    )
             elif key == self.key_quit:
                 self.get_logger().info("Thoát chương trình")
+                self._stop_event.set()
+                rclpy.shutdown()
                 break
 
             if cmd:
@@ -125,14 +163,27 @@ class MQTTBridgeNode(Node):
 
         self.client.disconnect()
 
+    def destroy_node(self):
+        self._stop_event.set()
+        try:
+            self.client.disconnect()
+        except Exception:
+            pass
+        super().destroy_node()
+
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = MQTTBridgeNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

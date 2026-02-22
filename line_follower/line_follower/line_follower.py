@@ -20,6 +20,10 @@ class LineFollowerFSM:
         cross_pre_forward_duration=2.0,
         cross_pre_stop_duration=1.0,
         rotate_min_duration=0.5,
+        rotate_line_mid_min_count=1,
+        rotate_line_side_max_count=2,
+        rotate_early_stop_on_side=True,
+        rotate_line_side_min_count=1,
         logger=None,
     ):
         self._logger = logger
@@ -33,6 +37,10 @@ class LineFollowerFSM:
         self.cross_pre_forward_duration = cross_pre_forward_duration
         self.cross_pre_stop_duration = cross_pre_stop_duration
         self.rotate_min_duration = rotate_min_duration
+        self.rotate_line_mid_min_count = int(max(1, rotate_line_mid_min_count))
+        self.rotate_line_side_max_count = int(max(0, rotate_line_side_max_count))
+        self.rotate_early_stop_on_side = bool(rotate_early_stop_on_side)
+        self.rotate_line_side_min_count = int(max(1, rotate_line_side_min_count))
 
         self.state = self.STATE_FOLLOWING
         self.crossing_start_time = None
@@ -43,6 +51,8 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
+        self._plan_labels = {}
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -58,6 +68,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -73,6 +84,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -82,6 +94,7 @@ class LineFollowerFSM:
         self.cross_plan = steps or []
         if end_state:
             self.plan_end_state = end_state
+        self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
         self._plan_index = 0
         self._plan_step_start = None
         self._plan_action_until = None
@@ -89,6 +102,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
         self._plan_new_step = True
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
@@ -98,6 +112,7 @@ class LineFollowerFSM:
     def clear_plan(self):
         self.cross_plan = []
         self.plan_end_state = "stop"
+        self._plan_labels = {}
         self._plan_index = 0
         self._plan_step_start = None
         self._plan_action_until = None
@@ -105,6 +120,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
@@ -202,71 +218,147 @@ class LineFollowerFSM:
         if not self.cross_plan:
             return self._follow_default()
 
-        if self._plan_index >= len(self.cross_plan):
-            if self.plan_end_state == "follow":
+        jump_guard = 0
+        while jump_guard < max(4, len(self.cross_plan) * 2):
+            jump_guard += 1
+            if self._plan_index >= len(self.cross_plan):
+                if self.plan_end_state == "follow":
+                    return self._follow_default()
+                self.stop()
+                return "Stop", 0
+
+            step = self.cross_plan[self._plan_index]
+            self._plan_index += 1
+            self._plan_new_step = False
+
+            action = self._normalize_action(step.get("action", "Stop"))
+            speed = int(step.get("speed", self.base_speed))
+            duration = float(step.get("duration", 0) or 0)
+            until = str(step.get("until", "") or "").strip().lower()
+            timeout = step.get("timeout")
+            timeout = float(timeout) if timeout is not None else None
+
+            if action in ("LABEL",):
+                continue
+
+            if action == "GOTO":
+                target = self._resolve_goto_target(step.get("target"))
+                if target is None:
+                    self._log_warn(f"Invalid Goto target: {step.get('target')}")
+                    continue
+                self._plan_index = target
+                continue
+
+            if action in ("AUTO",):
                 return self._follow_default()
-            self.stop()
-            return "Stop", 0
 
-        step = self.cross_plan[self._plan_index]
-        self._plan_index += 1
-        self._plan_new_step = False
+            if action in ("WAIT", "STOP"):
+                if duration and duration > 0:
+                    self.state = self.STATE_PLAN
+                    self._plan_action = "Stop"
+                    self._plan_action_speed = 0
+                    self._plan_action_until = now + duration
+                    self._plan_action_until_line = False
+                    self._plan_action_min_until = None
+                    self._plan_action_timeout = None
+                    return "Stop", 0
+                if action == "WAIT":
+                    duration = 0.3
+                    self.state = self.STATE_PLAN
+                    self._plan_action = "Stop"
+                    self._plan_action_speed = 0
+                    self._plan_action_until = now + duration
+                    self._plan_action_until_line = False
+                    self._plan_action_min_until = None
+                    self._plan_action_timeout = None
+                    return "Stop", 0
+                if self.plan_end_state == "follow":
+                    return self._follow_default()
+                self.stop()
+                return "Stop", 0
 
-        action = step.get("action", "Stop")
-        speed = int(step.get("speed", self.base_speed))
-        duration = step.get("duration", 0)
-
-        if action == "Auto":
-            return self._follow_default()
-
-        if action == "Stop":
-            if duration and duration > 0:
+            if action == "FOLLOW":
+                if duration <= 0:
+                    duration = 0.6
                 self.state = self.STATE_PLAN
-                self._plan_action = "Stop"
-                self._plan_action_speed = 0
+                self._plan_action = "AutoFollow"
+                self._plan_action_speed = self.base_speed
                 self._plan_action_until = now + duration
                 self._plan_action_until_line = False
-                return "Stop", 0
-            if self.plan_end_state == "follow":
-                return self._follow_default()
-            self.stop()
-            return "Stop", 0
+                self._plan_action_min_until = None
+                self._plan_action_timeout = None
+                return "Forward", self.base_speed
 
-        if action in ("RotateLeft", "RotateRight"):
-            # Rotate until line is centered (no duration)
-            self.state = self.STATE_PLAN
-            self._plan_action = action
-            self._plan_action_speed = speed
-            self._plan_action_until = None
-            self._plan_action_until_line = True
-            self._plan_action_min_until = now + self.rotate_min_duration
-            return action, speed
+            if action in ("ROTATELEFT", "ROTATERIGHT"):
+                move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
+                self.state = self.STATE_PLAN
+                self._plan_action = move_action
+                self._plan_action_speed = speed
+                self._plan_action_until = None
+                self._plan_action_min_until = now + self.rotate_min_duration
+                self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
+                if duration > 0:
+                    self._plan_action_until = now + duration
+                    self._plan_action_until_line = False
+                    return move_action, speed
+                self._plan_action_until_line = (until == "line") or (until == "")
+                return move_action, speed
 
-        if action in ("Forward", "Backward", "Left", "Right"):
-            if duration <= 0:
-                duration = 0.5
-            self.state = self.STATE_PLAN
-            self._plan_action = action
-            self._plan_action_speed = speed
-            self._plan_action_until = now + duration
-            self._plan_action_until_line = False
-            return action, speed
+            if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
+                if duration <= 0:
+                    duration = 0.5
+                move_action = action.capitalize()
+                self.state = self.STATE_PLAN
+                self._plan_action = move_action
+                self._plan_action_speed = speed
+                self._plan_action_until = now + duration
+                self._plan_action_until_line = False
+                self._plan_action_min_until = None
+                self._plan_action_timeout = None
+                return move_action, speed
 
-        return self._follow_default()
+            self._log_warn(f"Unknown plan action skipped: {step.get('action')}")
+            continue
+
+        self._log_warn("Plan jump loop exceeded safety guard")
+        self.stop()
+        return "Stop", 0
 
     def _run_plan_action(self, frame, now):
         if self._plan_action is None:
             self.state = self.STATE_FOLLOWING
             return self._follow_default()
 
+        if self._plan_action == "AutoFollow":
+            if self._plan_action_until is not None and now < self._plan_action_until:
+                if frame is None:
+                    return "Forward", self.base_speed
+                return self._follow_line(frame)
+            self._plan_action = None
+            self._plan_action_speed = None
+            self._plan_action_until = None
+            self._plan_action_until_line = False
+            self._plan_action_min_until = None
+            self._plan_action_timeout = None
+            return self._after_plan_action()
+
         if self._plan_action_until_line:
-            if self._plan_action_min_until is not None and now < self._plan_action_min_until:
-                return self._plan_action, int(self._plan_action_speed)
-            if frame is not None and self._is_centered(frame):
+            if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
+                self._log_warn(f"Plan rotate timeout reached: {self._plan_action}")
                 self._plan_action = None
                 self._plan_action_speed = None
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
+                self._plan_action_timeout = None
+                return self._after_plan_action()
+            if self._plan_action_min_until is not None and now < self._plan_action_min_until:
+                return self._plan_action, int(self._plan_action_speed)
+            if frame is not None and self._is_line_reacquired(frame, self._plan_action):
+                self._plan_action = None
+                self._plan_action_speed = None
+                self._plan_action_until_line = False
+                self._plan_action_min_until = None
+                self._plan_action_timeout = None
                 return self._after_plan_action()
             return self._plan_action, int(self._plan_action_speed)
 
@@ -279,6 +371,7 @@ class LineFollowerFSM:
         self._plan_action_until = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._plan_action_timeout = None
         return self._after_plan_action()
 
     def _follow_default(self):
@@ -299,8 +392,22 @@ class LineFollowerFSM:
         left_count = frame["left_count"]
         mid_count = frame["mid_count"]
         right_count = frame["right_count"]
-        mid_full = frame["mid_full"]
-        return mid_full and left_count <= 1 and right_count <= 1
+        return (
+            mid_count >= self.rotate_line_mid_min_count
+            and left_count <= self.rotate_line_side_max_count
+            and right_count <= self.rotate_line_side_max_count
+        )
+
+    def _is_line_reacquired(self, frame, rotate_action):
+        if self._is_centered(frame):
+            return True
+        if not self.rotate_early_stop_on_side:
+            return False
+        if rotate_action == "RotateLeft":
+            return frame["left_count"] >= self.rotate_line_side_min_count
+        if rotate_action == "RotateRight":
+            return frame["right_count"] >= self.rotate_line_side_min_count
+        return False
 
     def _follow_line(self, frame):
         left_count = frame["left_count"]
@@ -344,3 +451,51 @@ class LineFollowerFSM:
             self._logger.info(msg)
         else:
             print(msg)
+
+    def _log_warn(self, msg):
+        if self._logger:
+            self._logger.warning(msg)
+        else:
+            print(msg)
+
+    def _normalize_action(self, action):
+        text = str(action or "").strip().upper()
+        alias = {
+            "TURNLEFT": "ROTATELEFT",
+            "TURNRIGHT": "ROTATERIGHT",
+            "ROTATE_LEFT": "ROTATELEFT",
+            "ROTATE_RIGHT": "ROTATERIGHT",
+            "PAUSE": "WAIT",
+            "SLEEP": "WAIT",
+            "GO": "FORWARD",
+            "STRAIGHT": "FORWARD",
+        }
+        return alias.get(text, text)
+
+    def _resolve_goto_target(self, target):
+        if isinstance(target, int):
+            if 0 <= target < len(self.cross_plan):
+                return target
+            return None
+        if isinstance(target, str):
+            name = target.strip()
+            if not name:
+                return None
+            if name.isdigit():
+                idx = int(name)
+                if 0 <= idx < len(self.cross_plan):
+                    return idx
+            return self._plan_labels.get(name)
+        return None
+
+    def _rebuild_plan_labels(self, steps):
+        labels = {}
+        for idx, step in enumerate(steps or []):
+            if not isinstance(step, dict):
+                continue
+            name = step.get("label")
+            if isinstance(name, str):
+                key = name.strip()
+                if key:
+                    labels[key] = idx
+        return labels

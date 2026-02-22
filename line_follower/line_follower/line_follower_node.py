@@ -6,6 +6,7 @@ from std_msgs.msg import Int16MultiArray, Bool, String
 from std_srvs.srv import SetBool
 
 from .line_follower import LineFollowerFSM
+from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
 
 
@@ -19,8 +20,11 @@ class LineFollowerNode(Node):
         self.plan_alias = config.get("plan_alias", {})
 
         self.base_speed = int(config.get("base_speed", 6))
+        self.plan_select_debounce_sec = float(config.get("plan_select_debounce_sec", 0.35))
         self.autoMode = False
         self._last_frame = None
+        self._last_plan_name = None
+        self._last_plan_ts = 0.0
 
         cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
         plan_name = config.get("cross_plan_name")
@@ -39,6 +43,10 @@ class LineFollowerNode(Node):
             cross_pre_forward_duration=config.get("cross_pre_forward_duration", 2.0),
             cross_pre_stop_duration=config.get("cross_pre_stop_duration", 1.0),
             rotate_min_duration=config.get("rotate_min_duration", 0.5),
+            rotate_line_mid_min_count=config.get("rotate_line_mid_min_count", 1),
+            rotate_line_side_max_count=config.get("rotate_line_side_max_count", 2),
+            rotate_early_stop_on_side=config.get("rotate_early_stop_on_side", True),
+            rotate_line_side_min_count=config.get("rotate_line_side_min_count", 1),
             logger=self.get_logger(),
         )
 
@@ -58,7 +66,7 @@ class LineFollowerNode(Node):
 
     def _frame_cb(self, msg: Int16MultiArray):
         if len(msg.data) < 6:
-            self.get_logger().warn("Line frame invalid length")
+            self.get_logger().warning("Line frame invalid length")
             return
 
         self._last_frame = {
@@ -90,15 +98,25 @@ class LineFollowerNode(Node):
         if name in self.plan_alias:
             name = self.plan_alias[name]
 
+        now = time.time()
+        if (
+            self._last_plan_name == name
+            and (now - self._last_plan_ts) < self.plan_select_debounce_sec
+        ):
+            self.get_logger().info(f"Plan duplicate ignored: {name}")
+            return
+
         cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
         plan_data = cfg_mgr.load_plan(name)
         if not plan_data:
-            self.get_logger().warn(f"Plan not found: {name}")
+            self.get_logger().warning(f"Plan not found: {name}")
             return
 
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
         self.follower.set_plan(steps, end_state)
+        self._last_plan_name = name
+        self._last_plan_ts = now
         if self.autoMode:
             self.follower.reset()
         self.get_logger().info(f"Plan selected: {name}")
@@ -126,11 +144,11 @@ class LineFollowerNode(Node):
         self.cmd_pub.publish(self._command_to_msg(direction, speed))
 
     def _command_to_msg(self, direction, speed):
+        command = format_command(direction, speed)
+        if command is None:
+            command = "Stop:0"
         msg = String()
-        speed = int(round(speed))
-        if speed < 0:
-            speed = 0
-        msg.data = f"{direction}:{speed}"
+        msg.data = command
         return msg
 
     def _publish_stop(self):
