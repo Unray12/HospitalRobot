@@ -72,12 +72,10 @@ class MQTTBridgeNode(Node):
     # Keyboard → MQTT
     def keyboard_loop(self):
         self.get_logger().info("Điều khiển WASD | q để thoát")
-        autoMode = ""
+        autoMode = False
         while rclpy.ok():
             key = get_key().lower()
             cmd = ""
-            
-
 
             if key == "w":
                 cmd = "Forward"
@@ -94,15 +92,14 @@ class MQTTBridgeNode(Node):
             elif key == "p":
                 cmd = "RotateRight"
             elif key == "k":
-                autoMode = "0" if autoMode == "1" else "1"
+                autoMode = not autoMode
+                mode_msg = "1" if autoMode else "0"
+                self.client.publish(TOPICS[1], mode_msg)
+                self.get_logger().info(f"ROS2 → MQTT: {mode_msg}")
             elif key == "q":
                 self.get_logger().info("Thoát chương trình")
                 break
 
-            
-            if autoMode:
-                self.client.publish(TOPICS[1], autoMode)
-                self.get_logger().info(f"ROS2 → MQTT: {autoMode}")
             if cmd:
                 self.client.publish(TOPICS[0], cmd)
                 self.get_logger().info(f"ROS2 → MQTT: {cmd}")

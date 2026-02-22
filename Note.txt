@@ -1,12 +1,28 @@
 ######### ROS2 #########
+colcon build
 source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
-ros2 topic echo /VR_control
+
+# MQTT bridge
 ros2 run mqtt_bridge mqtt_bridge
+
+# RUN ALL NODES (bringup)
 ros2 run robot robot
-colcon build -> source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
+
+# RUN NODES SEPARATELY
+ros2 run line_sensors line_sensor_driver
+ros2 run line_follower line_follower
+ros2 run motor_driver motor_driver
+ros2 run manual_control manual_control
+
+# TOPICS
 ros2 topic echo /VR_control
-add package: ros2 pkg create line_sensor --build-type ament_python --dependencies rclpy std_msgs sensor_msgs
+ros2 topic echo /cmd_vel
+ros2 topic echo /line_sensors/frame
+ros2 topic echo /auto_mode
+
+# AUTO MODE ON/OFF
 ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
+ros2 topic pub /pick_robot std_msgs/msg/String "{data: '0'}" --once
 ######### MQTT #########
 
 Check package: ros2 pkg list | grep mqtt

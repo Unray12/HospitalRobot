@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='aclab',
     maintainer_email='aclab@todo.todo',
-    description='TODO: Package description',
+    description='Robot bringup (multi-node executor)',
     license='TODO: License declaration',
     extras_require={
         'test': [

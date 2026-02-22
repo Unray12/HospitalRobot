@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer='aclab',
     maintainer_email='aclab@todo.todo',
-    description='TODO: Package description',
+    description='Line sensor driver node',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'line_sensors = line_sensors.line_sensors:main',
+            'line_sensor_driver = line_sensors.line_sensor_driver_node:main',
         ],
     },
 )

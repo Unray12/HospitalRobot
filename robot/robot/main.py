@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-import rclpy
-from .Robot import Robot
+from .system_main import main
 
 
 # Direction map for mecanum wheels
@@ -16,12 +15,5 @@ DIR = {
 }
 
 
-def main(args=None):
-    rclpy.init(args=args)
-    node = Robot()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
