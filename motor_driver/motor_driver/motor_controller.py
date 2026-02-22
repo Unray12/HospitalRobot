@@ -42,12 +42,13 @@ class MotorController:
     def move(self, direction, speed: float = 0):
         if direction not in DIR:
             self._log_error("Invalid direction command")
-            return
+            return None
 
         wheel_speeds = [s * speed for s in DIR[direction]]
         cmd = ",".join(f"{v}" for v in wheel_speeds) + "\n"
         if self.ser and self.ser.is_open:
             self.ser.write(f"({cmd})".encode())
+        return wheel_speeds
 
     def close(self):
         if self.ser and self.ser.is_open:

@@ -62,6 +62,7 @@ export NO_COLOR=1
 - `BRIDGE_OUT`: ROS -> MQTT.
 - `BRIDGE_FALLBACK`: fallback local khi MQTT lỗi.
 - `KEYBOARD`: thao tác keyboard.
+- `DEBUG_TOGGLE`: bật/tắt debug log bằng phím `e`.
 
 ### manual_control
 
@@ -70,6 +71,8 @@ export NO_COLOR=1
 ### line_sensors / motor_driver
 
 - `INFO/WARN/ERR`: kết nối serial, lỗi parse/thiết bị.
+- `SENSOR`: log giá trị cảm biến line (khi debug bật).
+- `MOTOR`: log tốc độ 4 bánh (khi debug bật).
 
 ## 6. Quy tắc nội dung message
 
@@ -108,3 +111,6 @@ self.log.error("Serial open failed", event="SERIAL")
 - Khi debug plan: lọc theo `PLAN` và `PLAN_STATUS`.
 - Khi debug bridge: lọc theo `MQTT`, `BRIDGE_IN`, `BRIDGE_OUT`.
 - Khi debug auto mode: lọc theo `MODE`, `AUTO_SYNC`.
+- Bật/tắt debug sensor + motor:
+  - Nhấn phím `e` trong `mqtt_bridge`.
+  - Topic toggle: `/debug_logs_toggle` (`std_msgs/Bool`).

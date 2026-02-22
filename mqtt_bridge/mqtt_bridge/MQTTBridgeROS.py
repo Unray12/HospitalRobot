@@ -10,7 +10,7 @@ except ImportError:
     mqtt = None
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
@@ -56,6 +56,7 @@ class MQTTBridgeNode(Node):
         self.topic_vr = topics_cfg.get("vr_control", "VR_control")
         self.topic_pick = topics_cfg.get("pick_robot", "pick_robot")
         self.topic_plan = topics_cfg.get("plan_select", "plan_select")
+        self.topic_debug_toggle = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
         self.keyboard_map = {
             keyboard_cfg.get("forward", "w"): "Forward",
             keyboard_cfg.get("backward", "s"): "Backward",
@@ -66,13 +67,16 @@ class MQTTBridgeNode(Node):
             keyboard_cfg.get("rotate_right", "p"): "RotateRight",
         }
         self.key_toggle_auto = keyboard_cfg.get("toggle_auto", "k")
+        self.key_toggle_debug_logs = keyboard_cfg.get("toggle_debug_logs", "e")
         self.key_quit = keyboard_cfg.get("quit", "q")
         self.plan_key_map = plan_keys
+        self._debug_logs_enabled = False
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
+        self.ros_debug_pub = self.create_publisher(Bool, self.topic_debug_toggle, 10)
 
         if mqtt is None:
             raise RuntimeError("paho-mqtt is not installed")
@@ -140,6 +144,14 @@ class MQTTBridgeNode(Node):
                 mode_msg = "1" if autoMode else "0"
                 self.client.publish(self.topic_pick, mode_msg)
                 self.log.info(f"ROS2 -> MQTT: {mode_msg}", event="BRIDGE_OUT")
+            elif key == self.key_toggle_debug_logs:
+                self._debug_logs_enabled = not self._debug_logs_enabled
+                self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
+                state = "ON" if self._debug_logs_enabled else "OFF"
+                self.log.info(
+                    f"Debug logs toggled: {state} (key={self.key_toggle_debug_logs})",
+                    event="DEBUG_TOGGLE",
+                )
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
                 if self._mqtt_connected:

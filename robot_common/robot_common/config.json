@@ -18,6 +18,9 @@
         "publish": {
             "topic": "/line_sensors/frame",
             "rate_hz": 100
+        },
+        "topics": {
+            "debug_toggle": "/debug_logs_toggle"
         }
     },
     "line_follower": {
@@ -57,6 +60,9 @@
         },
         "subscribe": {
             "cmd_vel": "/motor_cmd"
+        },
+        "topics": {
+            "debug_toggle": "/debug_logs_toggle"
         }
     },
     "manual_control": {
@@ -79,7 +85,8 @@
         "topics": {
             "vr_control": "VR_control",
             "pick_robot": "pick_robot",
-            "plan_select": "plan_select"
+            "plan_select": "plan_select",
+            "debug_toggle": "/debug_logs_toggle"
         },
         "keyboard": {
             "forward": "w",
@@ -89,6 +96,7 @@
             "stop": " ",
             "rotate_left": "j",
             "rotate_right": "p",
+            "toggle_debug_logs": "e",
             "toggle_auto": "k",
             "quit": "q"
         },
