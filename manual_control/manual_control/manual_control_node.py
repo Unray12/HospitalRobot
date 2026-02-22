@@ -6,12 +6,14 @@ from std_srvs.srv import SetBool
 from .auto_mode_sync import AutoModeSync
 from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 class ManualControlNode(Node):
     def __init__(self):
         super().__init__("manual_control")
+        self.log = LogAdapter(self.get_logger(), "manual_control")
 
-        config = ConfigManager("manual_control", logger=self.get_logger()).load()
+        config = ConfigManager("manual_control", logger=self.log).load()
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
 
@@ -56,7 +58,7 @@ class ManualControlNode(Node):
         if action == "wait":
             return
         if action == "give_up":
-            self.get_logger().warning(f"set_auto_mode sync dropped after retries: {enabled}")
+            self.log.warning(f"set_auto_mode sync dropped after retries: {enabled}", event="AUTO_SYNC")
             return
         req = SetBool.Request()
         req.data = enabled
@@ -67,12 +69,12 @@ class ManualControlNode(Node):
         try:
             response = future.result()
         except Exception as exc:
-            self.get_logger().warning(f"set_auto_mode request failed: {exc}")
+            self.log.warning(f"set_auto_mode request failed: {exc}", event="AUTO_SYNC")
             self._auto_sync.queue(target)
             return
 
         if not response.success:
-            self.get_logger().warning(f"set_auto_mode rejected: {response.message}")
+            self.log.warning(f"set_auto_mode rejected: {response.message}", event="AUTO_SYNC")
             self._auto_sync.queue(target)
 
     def _command_to_msg(self, command, speed):

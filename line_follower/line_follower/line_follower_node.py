@@ -8,13 +8,15 @@ from std_srvs.srv import SetBool
 from .line_follower import LineFollowerFSM
 from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 
 class LineFollowerNode(Node):
     def __init__(self):
         super().__init__("line_follower")
+        self.log = LogAdapter(self.get_logger(), "line_follower")
 
-        config = ConfigManager("line_follower", logger=self.get_logger()).load()
+        config = ConfigManager("line_follower", logger=self.log).load()
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
         self.plan_alias = config.get("plan_alias", {})
@@ -25,8 +27,12 @@ class LineFollowerNode(Node):
         self._last_frame = None
         self._last_plan_name = None
         self._last_plan_ts = 0.0
+        self._active_plan_name = None
+        self._last_plan_status_text = None
+        self._last_plan_status_log_ts = 0.0
+        self.plan_status_log_period = float(config.get("plan_status_log_period", 0.8))
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
+        cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_name = config.get("cross_plan_name")
         plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
         plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
@@ -47,7 +53,7 @@ class LineFollowerNode(Node):
             rotate_line_side_max_count=config.get("rotate_line_side_max_count", 2),
             rotate_early_stop_on_side=config.get("rotate_early_stop_on_side", True),
             rotate_line_side_min_count=config.get("rotate_line_side_min_count", 1),
-            logger=self.get_logger(),
+            logger=self.log,
         )
 
         cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
@@ -66,7 +72,7 @@ class LineFollowerNode(Node):
 
     def _frame_cb(self, msg: Int16MultiArray):
         if len(msg.data) < 6:
-            self.get_logger().warning("Line frame invalid length")
+            self.log.warning("Line frame invalid length", event="FRAME")
             return
 
         self._last_frame = {
@@ -93,7 +99,8 @@ class LineFollowerNode(Node):
             return
         if name == "0" or name.lower() == "clear":
             self.follower.clear_plan()
-            self.get_logger().info("Plan cleared")
+            self._active_plan_name = None
+            self.log.info("Plan cleared", event="PLAN")
             return
         if name in self.plan_alias:
             name = self.plan_alias[name]
@@ -103,45 +110,49 @@ class LineFollowerNode(Node):
             self._last_plan_name == name
             and (now - self._last_plan_ts) < self.plan_select_debounce_sec
         ):
-            self.get_logger().info(f"Plan duplicate ignored: {name}")
+            self.log.info(f"Plan duplicate ignored: {name}", event="PLAN")
             return
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
+        cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_data = cfg_mgr.load_plan(name)
         if not plan_data:
-            self.get_logger().warning(f"Plan not found: {name}")
+            self.log.warning(f"Plan not found: {name}", event="PLAN")
             return
 
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
         self.follower.set_plan(steps, end_state)
+        self._active_plan_name = name
         self._last_plan_name = name
         self._last_plan_ts = now
         if self.autoMode:
             self.follower.reset()
-        self.get_logger().info(f"Plan selected: {name}")
+        self.log.info(f"Plan selected: {name}", event="PLAN")
 
     def _set_auto_mode(self, enabled: bool):
         if enabled and not self.autoMode:
             self.autoMode = True
             self.follower.reset()
-            self.get_logger().info("Auto Mode Enabled")
+            self.log.info("Auto Mode Enabled", event="MODE")
         elif not enabled and self.autoMode:
             self.autoMode = False
             self.follower.stop()
             self._publish_stop()
-            self.get_logger().info("Auto Mode Disabled")
+            self.log.info("Auto Mode Disabled", event="MODE")
 
     def _timer_cb(self):
         if not self.autoMode:
             return
 
-        result = self.follower.update(self._last_frame, time.time())
+        now = time.time()
+        result = self.follower.update(self._last_frame, now)
         if result is None:
+            self._log_plan_status(now)
             return
 
         direction, speed = result
         self.cmd_pub.publish(self._command_to_msg(direction, speed))
+        self._log_plan_status(now)
 
     def _command_to_msg(self, direction, speed):
         command = format_command(direction, speed)
@@ -153,6 +164,23 @@ class LineFollowerNode(Node):
 
     def _publish_stop(self):
         self.cmd_pub.publish(self._command_to_msg("Stop", 0))
+
+    def _log_plan_status(self, now):
+        status = self.follower.get_plan_status()
+        if not status.get("has_plan"):
+            return
+        plan_name = self._active_plan_name or "unknown"
+        text = (
+            f"{plan_name} | state={status['state']} | "
+            f"step={status['next_step']}/{status['total_steps']} | "
+            f"action={status['current_action']} | end_state={status['end_state']}"
+        )
+        period_ok = (now - self._last_plan_status_log_ts) >= self.plan_status_log_period
+        changed = text != self._last_plan_status_text
+        if changed or period_ok:
+            self.log.info(text, event="PLAN_STATUS")
+            self._last_plan_status_text = text
+            self._last_plan_status_log_ts = now
 
 
 

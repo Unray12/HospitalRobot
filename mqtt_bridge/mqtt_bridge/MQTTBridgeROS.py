@@ -12,6 +12,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 if os.name == "nt":
     import msvcrt
@@ -42,8 +43,9 @@ def get_key():
 class MQTTBridgeNode(Node):
     def __init__(self):
         super().__init__('mqtt_bridge_ros2')
+        self.log = LogAdapter(self.get_logger(), "mqtt_bridge")
 
-        config = ConfigManager("mqtt_bridge", logger=self.get_logger()).load()
+        config = ConfigManager("mqtt_bridge", logger=self.log).load()
         broker_cfg = config.get("broker", {})
         topics_cfg = config.get("topics", {})
         keyboard_cfg = config.get("keyboard", {})
@@ -93,26 +95,26 @@ class MQTTBridgeNode(Node):
         self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
         self._keyboard_thread.start()
 
-        self.get_logger().info("MQTT ↔ ROS 2 bridge started")
+        self.log.info("MQTT <-> ROS2 bridge started", event="BOOT")
 
     # MQTT callbacks
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self._mqtt_connected = True
-            self.get_logger().info("Connected to MQTT broker")
+            self.log.info("Connected to MQTT broker", event="MQTT")
             client.subscribe(self.topic_vr)
             client.subscribe(self.topic_pick)
             client.subscribe(self.topic_plan)
         else:
-            self.get_logger().error(f"MQTT connect failed: {rc}")
+            self.log.error(f"MQTT connect failed: {rc}", event="MQTT")
 
     def on_disconnect(self, client, userdata, rc):
         self._mqtt_connected = False
-        self.get_logger().warning(f"Disconnected from MQTT broker: rc={rc}")
+        self.log.warning(f"Disconnected from MQTT broker: rc={rc}", event="MQTT")
 
     def on_message(self, client, userdata, msg):
         data = msg.payload.decode()
-        self.get_logger().info(f"MQTT → ROS2: {data}")
+        self.log.info(f"MQTT -> ROS2: {data}", event="BRIDGE_IN")
 
         ros_msg = String()
         ros_msg.data = data
@@ -125,7 +127,7 @@ class MQTTBridgeNode(Node):
 
     # Keyboard → MQTT
     def keyboard_loop(self):
-        self.get_logger().info("Điều khiển WASD | q để thoát")
+        self.log.info("Dieu khien WASD | q de thoat", event="KEYBOARD")
         autoMode = False
         while rclpy.ok() and not self._stop_event.is_set():
             key = get_key().lower()
@@ -137,29 +139,30 @@ class MQTTBridgeNode(Node):
                 autoMode = not autoMode
                 mode_msg = "1" if autoMode else "0"
                 self.client.publish(self.topic_pick, mode_msg)
-                self.get_logger().info(f"ROS2 → MQTT: {mode_msg}")
+                self.log.info(f"ROS2 -> MQTT: {mode_msg}", event="BRIDGE_OUT")
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
                 if self._mqtt_connected:
                     self.client.publish(self.topic_plan, plan_name)
-                    self.get_logger().info(f"ROS2 → MQTT: {plan_name}")
+                    self.log.info(f"ROS2 -> MQTT: {plan_name}", event="BRIDGE_OUT")
                 else:
                     # Fallback local publish so operator key still works when MQTT is down.
                     ros_msg = String()
                     ros_msg.data = plan_name
                     self.ros_plan_pub.publish(ros_msg)
-                    self.get_logger().warning(
+                    self.log.warning(
                         f"MQTT unavailable, published plan locally: {plan_name}"
+                        , event="BRIDGE_FALLBACK"
                     )
             elif key == self.key_quit:
-                self.get_logger().info("Thoát chương trình")
+                self.log.info("Thoat chuong trinh", event="KEYBOARD")
                 self._stop_event.set()
                 rclpy.shutdown()
                 break
 
             if cmd:
                 self.client.publish(self.topic_vr, cmd)
-                self.get_logger().info(f"ROS2 → MQTT: {cmd}")
+                self.log.info(f"ROS2 -> MQTT: {cmd}", event="BRIDGE_OUT")
 
         self.client.disconnect()
 

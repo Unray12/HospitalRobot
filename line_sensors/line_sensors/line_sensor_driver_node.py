@@ -4,13 +4,15 @@ from std_msgs.msg import Int16MultiArray
 
 from .line_sensor_reader import LineSensorReader
 from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 
 class LineSensorDriverNode(Node):
     def __init__(self):
         super().__init__("line_sensor_driver")
+        self.log = LogAdapter(self.get_logger(), "line_sensors")
 
-        config = ConfigManager("line_sensors", logger=self.get_logger()).load()
+        config = ConfigManager("line_sensors", logger=self.log).load()
         serial_cfg = config.get("serial", {})
         pub_cfg = config.get("publish", {})
 
@@ -24,7 +26,7 @@ class LineSensorDriverNode(Node):
             port=port,
             baudrate=baudrate,
             timeout=timeout,
-            logger=self.get_logger(),
+            logger=self.log,
         )
 
         self.pub = self.create_publisher(Int16MultiArray, topic, 10)

@@ -5,13 +5,15 @@ from std_msgs.msg import String
 from .motor_controller import MotorController
 from robot_common.command_protocol import parse_command
 from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 
 class MotorDriverNode(Node):
     def __init__(self):
         super().__init__("motor_driver")
+        self.log = LogAdapter(self.get_logger(), "motor_driver")
 
-        config = ConfigManager("motor_driver", logger=self.get_logger()).load()
+        config = ConfigManager("motor_driver", logger=self.log).load()
         serial_cfg = config.get("serial", {})
         sub_cfg = config.get("subscribe", {})
 
@@ -24,7 +26,7 @@ class MotorDriverNode(Node):
             port=port,
             baudrate=baudrate,
             timeout=timeout,
-            logger=self.get_logger(),
+            logger=self.log,
         )
 
         self.create_subscription(String, cmd_topic, self._cmd_cb, 10)

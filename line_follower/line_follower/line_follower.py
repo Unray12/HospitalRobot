@@ -246,6 +246,7 @@ class LineFollowerFSM:
                 if target is None:
                     self._log_warn(f"Invalid Goto target: {step.get('target')}")
                     continue
+                self._log_info(f"[PLAN] Goto -> step {target + 1}")
                 self._plan_index = target
                 continue
 
@@ -261,6 +262,7 @@ class LineFollowerFSM:
                     self._plan_action_until_line = False
                     self._plan_action_min_until = None
                     self._plan_action_timeout = None
+                    self._log_plan_step(self._plan_index, step, "timed-stop")
                     return "Stop", 0
                 if action == "WAIT":
                     duration = 0.3
@@ -271,10 +273,13 @@ class LineFollowerFSM:
                     self._plan_action_until_line = False
                     self._plan_action_min_until = None
                     self._plan_action_timeout = None
+                    self._log_plan_step(self._plan_index, step, "wait-default")
                     return "Stop", 0
                 if self.plan_end_state == "follow":
+                    self._log_info("[PLAN] Stop step reached, returning to follow")
                     return self._follow_default()
                 self.stop()
+                self._log_info("[PLAN] Stop step reached, robot stopped")
                 return "Stop", 0
 
             if action == "FOLLOW":
@@ -287,6 +292,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
+                self._log_plan_step(self._plan_index, step, "follow")
                 return "Forward", self.base_speed
 
             if action in ("ROTATELEFT", "ROTATERIGHT"):
@@ -300,8 +306,10 @@ class LineFollowerFSM:
                 if duration > 0:
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
+                    self._log_plan_step(self._plan_index, step, "rotate-duration")
                     return move_action, speed
                 self._plan_action_until_line = (until == "line") or (until == "")
+                self._log_plan_step(self._plan_index, step, "rotate-until-line")
                 return move_action, speed
 
             if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
@@ -315,6 +323,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
+                self._log_plan_step(self._plan_index, step, "move")
                 return move_action, speed
 
             self._log_warn(f"Unknown plan action skipped: {step.get('action')}")
@@ -380,6 +389,7 @@ class LineFollowerFSM:
 
     def _after_plan_action(self):
         if self._plan_index >= len(self.cross_plan):
+            self._log_info(f"[PLAN] Completed all steps (end_state={self.plan_end_state})")
             if self.plan_end_state == "follow":
                 self.state = self.STATE_FOLLOWING
                 return self._follow_default()
@@ -499,3 +509,40 @@ class LineFollowerFSM:
                 if key:
                     labels[key] = idx
         return labels
+
+    def get_plan_status(self):
+        total = len(self.cross_plan)
+        next_step = self._plan_index + 1 if self._plan_index < total else total
+        return {
+            "has_plan": total > 0,
+            "state": self._state_name(self.state),
+            "total_steps": total,
+            "next_step": next_step,
+            "current_action": self._plan_action,
+            "end_state": self.plan_end_state,
+        }
+
+    def _state_name(self, state):
+        names = {
+            self.STATE_FOLLOWING: "FOLLOWING",
+            self.STATE_CROSSING: "CROSSING",
+            self.STATE_TURN_LEFT: "TURN_LEFT",
+            self.STATE_TURN_RIGHT: "TURN_RIGHT",
+            self.STATE_BACKWARD: "BACKWARD",
+            self.STATE_PLAN: "PLAN",
+            self.STATE_CROSS_PRE: "CROSS_PRE",
+            self.STATE_STOPPED: "STOPPED",
+        }
+        return names.get(state, f"UNKNOWN({state})")
+
+    def _log_plan_step(self, step_index_1_based, step, mode):
+        action = step.get("action", "Stop")
+        speed = step.get("speed", self.base_speed)
+        duration = step.get("duration")
+        until = step.get("until")
+        timeout = step.get("timeout")
+        total = len(self.cross_plan)
+        self._log_info(
+            f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}, "
+            f"speed={speed}, duration={duration}, until={until}, timeout={timeout}"
+        )
