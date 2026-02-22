@@ -91,6 +91,8 @@ class LineFollowerNode(Node):
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
         self.follower.set_plan(steps, end_state)
+        if self.autoMode:
+            self.follower.reset()
         self.get_logger().info(f"Plan selected: {name}")
 
     def _set_auto_mode(self, enabled: bool):

@@ -67,6 +67,8 @@ class LineFollowerFSM:
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_new_step = True
+        self._cross_active = False
+        self.state = self.STATE_FOLLOWING
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
