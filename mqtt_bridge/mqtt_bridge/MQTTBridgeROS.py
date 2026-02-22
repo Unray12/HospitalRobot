@@ -111,6 +111,9 @@ class MQTTBridgeNode(Node):
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
                 self.client.publish(self.topic_plan, plan_name)
+                ros_msg = String()
+                ros_msg.data = plan_name
+                self.ros_plan_pub.publish(ros_msg)
                 self.get_logger().info(f"ROS2 → MQTT: {plan_name}")
             elif key == self.key_quit:
                 self.get_logger().info("Thoát chương trình")
