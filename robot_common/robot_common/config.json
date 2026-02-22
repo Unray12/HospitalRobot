@@ -25,6 +25,9 @@
         "turn_speed_left": 6,
         "turn_speed_right": 6,
         "crossing_duration": 2.0,
+        "cross_pre_forward_speed": 8,
+        "cross_pre_forward_duration": 2.0,
+        "cross_pre_stop_duration": 1.0,
         "cross_plan_name": "plan_turn_left",
         "plan_end_state": "stop",
         "topics": {

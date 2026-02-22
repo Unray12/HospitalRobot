@@ -35,6 +35,9 @@ class LineFollowerNode(Node):
             crossing_duration=config.get("crossing_duration", 2.0),
             cross_plan=plan_steps,
             plan_end_state=plan_end_state,
+            cross_pre_forward_speed=config.get("cross_pre_forward_speed", 8),
+            cross_pre_forward_duration=config.get("cross_pre_forward_duration", 2.0),
+            cross_pre_stop_duration=config.get("cross_pre_stop_duration", 1.0),
             logger=self.get_logger(),
         )
 
