@@ -1,3 +1,6 @@
+import json
+from importlib import resources
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int16MultiArray
@@ -9,15 +12,26 @@ class LineSensorDriverNode(Node):
     def __init__(self):
         super().__init__("line_sensor_driver")
 
+        config = self._load_config()
+        serial_cfg = config.get("serial", {})
+        pub_cfg = config.get("publish", {})
+
+        port = serial_cfg.get("port", "/dev/ttyACM0")
+        baudrate = serial_cfg.get("baudrate", 115200)
+        timeout = serial_cfg.get("timeout", 0.1)
+        topic = pub_cfg.get("topic", "/line_sensors/frame")
+        rate_hz = pub_cfg.get("rate_hz", 100)
+
         self.reader = LineSensorReader(
-            port="/dev/ttyACM0",
-            baudrate=115200,
-            timeout=0.1,
+            port=port,
+            baudrate=baudrate,
+            timeout=timeout,
             logger=self.get_logger(),
         )
 
-        self.pub = self.create_publisher(Int16MultiArray, "/line_sensors/frame", 10)
-        self.timer = self.create_timer(0.01, self._timer_cb)
+        self.pub = self.create_publisher(Int16MultiArray, topic, 10)
+        period = 1.0 / max(rate_hz, 1)
+        self.timer = self.create_timer(period, self._timer_cb)
 
     def _timer_cb(self):
         frame = self.reader.read_frame()
@@ -38,6 +52,15 @@ class LineSensorDriverNode(Node):
     def destroy_node(self):
         self.reader.close()
         super().destroy_node()
+
+    def _load_config(self):
+        try:
+            path = resources.files("line_sensors").joinpath("config.json")
+            with path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
+            return {}
 
 
 def main(args=None):

@@ -1,18 +1,15 @@
 #!/usr/bin/python3
+import json
+import sys
+import termios
+import threading
+import tty
+from importlib import resources
+
+import paho.mqtt.client as mqtt
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-
-import paho.mqtt.client as mqtt
-import sys
-import termios
-import tty
-import threading
-
-# MQTT settings
-BROKER_ADDRESS = "127.0.0.1"
-MQTT_PORT = 1883
-TOPICS = ['VR_control', 'pick_robot']
 
 
 # Hàm đọc phím 1 ký tự
@@ -31,16 +28,37 @@ class MQTTBridgeNode(Node):
     def __init__(self):
         super().__init__('mqtt_bridge_ros2')
 
+        config = self._load_config()
+        broker_cfg = config.get("broker", {})
+        topics_cfg = config.get("topics", {})
+        keyboard_cfg = config.get("keyboard", {})
+
+        self.broker_address = broker_cfg.get("address", "127.0.0.1")
+        self.broker_port = broker_cfg.get("port", 1883)
+        self.topic_vr = topics_cfg.get("vr_control", "VR_control")
+        self.topic_pick = topics_cfg.get("pick_robot", "pick_robot")
+        self.keyboard_map = {
+            keyboard_cfg.get("forward", "w"): "Forward",
+            keyboard_cfg.get("backward", "s"): "Backward",
+            keyboard_cfg.get("left", "a"): "Left",
+            keyboard_cfg.get("right", "d"): "Right",
+            keyboard_cfg.get("stop", " "): "Stop",
+            keyboard_cfg.get("rotate_left", "j"): "RotateLeft",
+            keyboard_cfg.get("rotate_right", "p"): "RotateRight",
+        }
+        self.key_toggle_auto = keyboard_cfg.get("toggle_auto", "k")
+        self.key_quit = keyboard_cfg.get("quit", "q")
+
         # ROS 2 publisher
-        self.ros_pub = self.create_publisher(String, 'VR_control', 10)
-        self.ros_pick_pub = self.create_publisher(String, 'pick_robot', 10)
+        self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
+        self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
 
         # MQTT client
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
-        self.client.connect(BROKER_ADDRESS, MQTT_PORT, 60)
+        self.client.connect(self.broker_address, self.broker_port, 60)
 
         # MQTT chạy ở thread riêng
         mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
@@ -53,8 +71,8 @@ class MQTTBridgeNode(Node):
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self.get_logger().info("Connected to MQTT broker")
-            for topic in TOPICS:
-                client.subscribe(topic)
+            client.subscribe(self.topic_vr)
+            client.subscribe(self.topic_pick)
         else:
             self.get_logger().error(f"MQTT connect failed: {rc}")
 
@@ -64,9 +82,9 @@ class MQTTBridgeNode(Node):
 
         ros_msg = String()
         ros_msg.data = data
-        if msg.topic == TOPICS[0]:
+        if msg.topic == self.topic_vr:
             self.ros_pub.publish(ros_msg)
-        elif msg.topic == TOPICS[1]:
+        elif msg.topic == self.topic_pick:
             self.ros_pick_pub.publish(ros_msg)
 
     # Keyboard → MQTT
@@ -77,34 +95,31 @@ class MQTTBridgeNode(Node):
             key = get_key().lower()
             cmd = ""
 
-            if key == "w":
-                cmd = "Forward"
-            elif key == "s":
-                cmd = "Backward"
-            elif key == "a":
-                cmd = "Left"
-            elif key == "d":
-                cmd = "Right"
-            elif key == " ":
-                cmd = "Stop"
-            elif key == "j":
-                cmd = "RotateLeft"
-            elif key == "p":
-                cmd = "RotateRight"
-            elif key == "k":
+            if key in self.keyboard_map:
+                cmd = self.keyboard_map[key]
+            elif key == self.key_toggle_auto:
                 autoMode = not autoMode
                 mode_msg = "1" if autoMode else "0"
-                self.client.publish(TOPICS[1], mode_msg)
+                self.client.publish(self.topic_pick, mode_msg)
                 self.get_logger().info(f"ROS2 → MQTT: {mode_msg}")
-            elif key == "q":
+            elif key == self.key_quit:
                 self.get_logger().info("Thoát chương trình")
                 break
 
             if cmd:
-                self.client.publish(TOPICS[0], cmd)
+                self.client.publish(self.topic_vr, cmd)
                 self.get_logger().info(f"ROS2 → MQTT: {cmd}")
 
         self.client.disconnect()
+
+    def _load_config(self):
+        try:
+            path = resources.files("mqtt_bridge").joinpath("config.json")
+            with path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
+            return {}
 
 
 def main(args=None):

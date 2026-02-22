@@ -1,3 +1,6 @@
+import json
+from importlib import resources
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
@@ -9,15 +12,25 @@ class ManualControlNode(Node):
     def __init__(self):
         super().__init__("manual_control")
 
-        self.base_speed = 6
+        config = self._load_config()
+        topics_cfg = config.get("topics", {})
+        service_cfg = config.get("service", {})
+
+        self.base_speed = config.get("base_speed", 6)
         self.autoMode = False
 
-        self.cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-        self.auto_pub = self.create_publisher(Bool, "/auto_mode", 10)
-        self.auto_client = self.create_client(SetBool, "/set_auto_mode")
+        cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
+        auto_topic = topics_cfg.get("auto_mode", "/auto_mode")
+        vr_topic = topics_cfg.get("vr_control", "/VR_control")
+        pick_topic = topics_cfg.get("pick_robot", "/pick_robot")
+        auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
-        self.create_subscription(String, "/VR_control", self._manual_cb, 10)
-        self.create_subscription(String, "/pick_robot", self._pick_cb, 10)
+        self.cmd_pub = self.create_publisher(Twist, cmd_topic, 10)
+        self.auto_pub = self.create_publisher(Bool, auto_topic, 10)
+        self.auto_client = self.create_client(SetBool, auto_service)
+
+        self.create_subscription(String, vr_topic, self._manual_cb, 10)
+        self.create_subscription(String, pick_topic, self._pick_cb, 10)
 
     def _manual_cb(self, msg: String):
         if self.autoMode:
@@ -53,6 +66,15 @@ class ManualControlNode(Node):
         elif command == "Stop":
             pass
         return msg
+
+    def _load_config(self):
+        try:
+            path = resources.files("manual_control").joinpath("config.json")
+            with path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
+            return {}
 
 
 def main(args=None):
