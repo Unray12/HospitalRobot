@@ -28,6 +28,7 @@
         "cross_pre_forward_speed": 8,
         "cross_pre_forward_duration": 2.0,
         "cross_pre_stop_duration": 1.0,
+        "rotate_min_duration": 0.5,
         "cross_plan_name": "plan_turn_left",
         "plan_end_state": "stop",
         "topics": {

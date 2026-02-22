@@ -38,6 +38,7 @@ class LineFollowerNode(Node):
             cross_pre_forward_speed=config.get("cross_pre_forward_speed", 8),
             cross_pre_forward_duration=config.get("cross_pre_forward_duration", 2.0),
             cross_pre_stop_duration=config.get("cross_pre_stop_duration", 1.0),
+            rotate_min_duration=config.get("rotate_min_duration", 0.5),
             logger=self.get_logger(),
         )
 

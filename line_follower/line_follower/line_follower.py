@@ -19,6 +19,7 @@ class LineFollowerFSM:
         cross_pre_forward_speed=8,
         cross_pre_forward_duration=2.0,
         cross_pre_stop_duration=1.0,
+        rotate_min_duration=0.5,
         logger=None,
     ):
         self._logger = logger
@@ -31,6 +32,7 @@ class LineFollowerFSM:
         self.cross_pre_forward_speed = int(cross_pre_forward_speed)
         self.cross_pre_forward_duration = cross_pre_forward_duration
         self.cross_pre_stop_duration = cross_pre_stop_duration
+        self.rotate_min_duration = rotate_min_duration
 
         self.state = self.STATE_FOLLOWING
         self.crossing_start_time = None
@@ -40,6 +42,7 @@ class LineFollowerFSM:
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_action_until_line = False
+        self._plan_action_min_until = None
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -54,6 +57,7 @@ class LineFollowerFSM:
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_action_until_line = False
+        self._plan_action_min_until = None
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -68,6 +72,7 @@ class LineFollowerFSM:
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_action_until_line = False
+        self._plan_action_min_until = None
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -86,6 +91,7 @@ class LineFollowerFSM:
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
         self._plan_action_until_line = False
+        self._plan_action_min_until = None
         self._cross_pre_phase = 0
         self._cross_pre_until = None
 
@@ -201,6 +207,7 @@ class LineFollowerFSM:
             self._plan_action_speed = speed
             self._plan_action_until = None
             self._plan_action_until_line = True
+            self._plan_action_min_until = now + self.rotate_min_duration
             return action, speed
 
         if action in ("Backward", "Left", "Right"):
@@ -221,10 +228,13 @@ class LineFollowerFSM:
             return self._follow_default()
 
         if self._plan_action_until_line:
+            if self._plan_action_min_until is not None and now < self._plan_action_min_until:
+                return self._plan_action, int(self._plan_action_speed)
             if frame is not None and self._is_centered(frame):
                 self._plan_action = None
                 self._plan_action_speed = None
                 self._plan_action_until_line = False
+                self._plan_action_min_until = None
                 return self._after_plan_action()
             return self._plan_action, int(self._plan_action_speed)
 
@@ -236,6 +246,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until = None
         self._plan_action_until_line = False
+        self._plan_action_min_until = None
         return self._after_plan_action()
 
     def _follow_default(self):
