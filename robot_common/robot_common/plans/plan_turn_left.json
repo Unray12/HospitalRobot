@@ -1,7 +1,0 @@
-{
-    "name": "turn_left",
-    "steps": [
-        { "action": "RotateLeft", "speed": 5 }
-    ],
-    "end_state": "follow"
-}

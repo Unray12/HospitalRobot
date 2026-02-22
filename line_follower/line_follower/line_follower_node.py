@@ -83,6 +83,10 @@ class LineFollowerNode(Node):
         name = msg.data.strip()
         if not name:
             return
+        if name == "0" or name.lower() == "clear":
+            self.follower.clear_plan()
+            self.get_logger().info("Plan cleared")
+            return
         if name in self.plan_alias:
             name = self.plan_alias[name]
 

@@ -87,11 +87,26 @@ class LineFollowerFSM:
         self._plan_action_until = None
         self._plan_action = None
         self._plan_action_speed = None
+        self._plan_action_until_line = False
+        self._plan_action_min_until = None
         self._plan_new_step = True
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
+        self._cross_pre_phase = 0
+        self._cross_pre_until = None
+
+    def clear_plan(self):
+        self.cross_plan = []
+        self.plan_end_state = "stop"
+        self._plan_index = 0
+        self._plan_step_start = None
+        self._plan_action_until = None
+        self._plan_action = None
+        self._plan_action_speed = None
         self._plan_action_until_line = False
         self._plan_action_min_until = None
+        self._cross_active = False
+        self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
         self._cross_pre_until = None
 
@@ -99,7 +114,7 @@ class LineFollowerFSM:
         if self.state == self.STATE_STOPPED:
             return "Stop", 0
         if self.state == self.STATE_CROSSING:
-            return self._handle_crossing(now)
+            return self._handle_crossing(frame, now)
         if self.state == self.STATE_PLAN:
             return self._run_plan_action(frame, now)
         if self.state == self.STATE_CROSS_PRE:
@@ -142,7 +157,7 @@ class LineFollowerFSM:
 
         return self._follow_line(frame)
 
-    def _handle_crossing(self, now):
+    def _handle_crossing(self, frame, now):
         if self.crossing_start_time is None:
             self.crossing_start_time = now
 
@@ -150,8 +165,15 @@ class LineFollowerFSM:
         if elapsed < self.crossing_duration:
             return "Forward", self.base_speed
 
+        # After crossing duration: if line detected -> follow, else stop
+        if frame is not None:
+            total_black = frame["left_count"] + frame["mid_count"] + frame["right_count"]
+            if total_black > 0:
+                self.state = self.STATE_FOLLOWING
+                return self._follow_line(frame)
+
         self.stop()
-        self._log_info("===> CROSS done: STOP")
+        self._log_info("===> CROSS done: STOP (no line)")
         return "Stop", 0
 
     def _handle_cross_pre(self, now):
