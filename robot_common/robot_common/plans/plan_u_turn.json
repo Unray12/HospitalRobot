@@ -1,0 +1,9 @@
+{
+    "name": "u_turn",
+    "steps": [
+        { "action": "Backward", "speed": 4, "duration": 0.5 },
+        { "action": "RotateLeft", "speed": 6, "duration": 2.0 },
+        { "action": "Forward", "speed": 6, "duration": 1.0 }
+    ],
+    "end_state": "stop"
+}

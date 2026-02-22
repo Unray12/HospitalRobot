@@ -1,0 +1,9 @@
+{
+    "name": "turn_left",
+    "steps": [
+        { "action": "Forward", "speed": 6, "duration": 1.0 },
+        { "action": "RotateLeft", "speed": 5, "duration": 1.2 },
+        { "action": "Forward", "speed": 6, "duration": 0.8 }
+    ],
+    "end_state": "stop"
+}

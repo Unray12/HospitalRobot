@@ -1,17 +1,15 @@
-import json
-from importlib import resources
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
 from std_srvs.srv import SetBool
 
+from robot_common.config_manager import ConfigManager
 
 class ManualControlNode(Node):
     def __init__(self):
         super().__init__("manual_control")
 
-        config = self._load_config()
+        config = ConfigManager("manual_control", logger=self.get_logger()).load()
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
 
@@ -65,14 +63,6 @@ class ManualControlNode(Node):
             return String(data=f"{command}:{speed}")
         return None
 
-    def _load_config(self):
-        try:
-            path = resources.files("manual_control").joinpath("config.json")
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as exc:
-            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
-            return {}
 
 
 def main(args=None):

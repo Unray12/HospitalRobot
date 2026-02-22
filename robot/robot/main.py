@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
-import json
 import sys
-from importlib import resources
 
 import launch
 from launch import LaunchDescription, LaunchService
 from launch_ros.actions import Node
+from robot_common.config_manager import ConfigManager
 
 
 def _load_config():
-    try:
-        path = resources.files("robot").joinpath("config.json")
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    return ConfigManager("robot").load()
 
 
 def main():

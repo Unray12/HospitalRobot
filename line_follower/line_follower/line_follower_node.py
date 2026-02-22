@@ -1,6 +1,4 @@
-import json
 import time
-from importlib import resources
 
 import rclpy
 from rclpy.node import Node
@@ -8,34 +6,48 @@ from std_msgs.msg import Int16MultiArray, Bool, String
 from std_srvs.srv import SetBool
 
 from .line_follower import LineFollowerFSM
+from robot_common.config_manager import ConfigManager
 
 
 class LineFollowerNode(Node):
     def __init__(self):
         super().__init__("line_follower")
 
-        config = self._load_config()
+        config = ConfigManager("line_follower", logger=self.get_logger()).load()
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
+        self.plan_alias = config.get("plan_alias", {})
 
         self.base_speed = int(config.get("base_speed", 6))
         self.autoMode = False
         self._last_frame = None
 
+        cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
+        plan_name = config.get("cross_plan_name")
+        plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
+        plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
+        plan_end_state = plan_data.get("end_state", config.get("plan_end_state", "stop")) if plan_data else config.get("plan_end_state", "stop")
+
         self.follower = LineFollowerFSM(
             base_speed=self.base_speed,
+            turn_speed_left=config.get("turn_speed_left", self.base_speed),
+            turn_speed_right=config.get("turn_speed_right", self.base_speed),
             crossing_duration=config.get("crossing_duration", 2.0),
+            cross_plan=plan_steps,
+            plan_end_state=plan_end_state,
             logger=self.get_logger(),
         )
 
         cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
         frame_topic = topics_cfg.get("line_frame", "/line_sensors/frame")
         auto_topic = topics_cfg.get("auto_mode", "/auto_mode")
+        plan_topic = topics_cfg.get("plan_select", "/plan_select")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
         self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
+        self.create_subscription(String, plan_topic, self._plan_cb, 10)
         self.create_service(SetBool, auto_service, self._auto_srv_cb)
 
         self.timer = self.create_timer(0.01, self._timer_cb)
@@ -62,6 +74,24 @@ class LineFollowerNode(Node):
         response.success = True
         response.message = "Auto mode updated"
         return response
+
+    def _plan_cb(self, msg: String):
+        name = msg.data.strip()
+        if not name:
+            return
+        if name in self.plan_alias:
+            name = self.plan_alias[name]
+
+        cfg_mgr = ConfigManager("line_follower", logger=self.get_logger())
+        plan_data = cfg_mgr.load_plan(name)
+        if not plan_data:
+            self.get_logger().warn(f"Plan not found: {name}")
+            return
+
+        steps = plan_data.get("steps", [])
+        end_state = plan_data.get("end_state", "stop")
+        self.follower.set_plan(steps, end_state)
+        self.get_logger().info(f"Plan selected: {name}")
 
     def _set_auto_mode(self, enabled: bool):
         if enabled and not self.autoMode:
@@ -96,14 +126,6 @@ class LineFollowerNode(Node):
     def _publish_stop(self):
         self.cmd_pub.publish(self._command_to_msg("Stop", 0))
 
-    def _load_config(self):
-        try:
-            path = resources.files("line_follower").joinpath("config.json")
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as exc:
-            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
-            return {}
 
 
 def main(args=None):

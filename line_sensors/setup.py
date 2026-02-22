@@ -7,7 +7,7 @@ setup(
     version='0.0.0',
     packages=find_packages(exclude=['test']),
     package_data={
-        'line_sensors': ['lineData.json', 'config.json'],
+        'line_sensors': ['lineData.json'],
     },
     include_package_data=True,
     data_files=[

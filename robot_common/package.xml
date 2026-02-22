@@ -1,16 +1,13 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>manual_control</name>
+  <name>robot_common</name>
   <version>0.0.0</version>
-  <description>Manual control node for robot</description>
+  <description>Common utilities for robot packages</description>
   <maintainer email="aclab@todo.todo">aclab</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
-  <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>robot_common</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

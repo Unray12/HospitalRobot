@@ -1,18 +1,16 @@
-import json
-from importlib import resources
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
 from .motor_controller import MotorController
+from robot_common.config_manager import ConfigManager
 
 
 class MotorDriverNode(Node):
     def __init__(self):
         super().__init__("motor_driver")
 
-        config = self._load_config()
+        config = ConfigManager("motor_driver", logger=self.get_logger()).load()
         serial_cfg = config.get("serial", {})
         sub_cfg = config.get("subscribe", {})
 
@@ -70,14 +68,6 @@ class MotorDriverNode(Node):
         self.motor.close()
         super().destroy_node()
 
-    def _load_config(self):
-        try:
-            path = resources.files("motor_driver").joinpath("config.json")
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as exc:
-            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
-            return {}
 
 
 def main(args=None):

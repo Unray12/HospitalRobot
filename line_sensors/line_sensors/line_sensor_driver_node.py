@@ -1,18 +1,16 @@
-import json
-from importlib import resources
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int16MultiArray
 
 from .line_sensor_reader import LineSensorReader
+from robot_common.config_manager import ConfigManager
 
 
 class LineSensorDriverNode(Node):
     def __init__(self):
         super().__init__("line_sensor_driver")
 
-        config = self._load_config()
+        config = ConfigManager("line_sensors", logger=self.get_logger()).load()
         serial_cfg = config.get("serial", {})
         pub_cfg = config.get("publish", {})
 
@@ -53,14 +51,6 @@ class LineSensorDriverNode(Node):
         self.reader.close()
         super().destroy_node()
 
-    def _load_config(self):
-        try:
-            path = resources.files("line_sensors").joinpath("config.json")
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as exc:
-            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
-            return {}
 
 
 def main(args=None):

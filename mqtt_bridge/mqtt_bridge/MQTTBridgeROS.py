@@ -1,15 +1,14 @@
 #!/usr/bin/python3
-import json
 import sys
 import termios
 import threading
 import tty
-from importlib import resources
 
 import paho.mqtt.client as mqtt
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from robot_common.config_manager import ConfigManager
 
 
 # Hàm đọc phím 1 ký tự
@@ -28,15 +27,17 @@ class MQTTBridgeNode(Node):
     def __init__(self):
         super().__init__('mqtt_bridge_ros2')
 
-        config = self._load_config()
+        config = ConfigManager("mqtt_bridge", logger=self.get_logger()).load()
         broker_cfg = config.get("broker", {})
         topics_cfg = config.get("topics", {})
         keyboard_cfg = config.get("keyboard", {})
+        plan_keys = config.get("plan_keys", {})
 
         self.broker_address = broker_cfg.get("address", "127.0.0.1")
         self.broker_port = broker_cfg.get("port", 1883)
         self.topic_vr = topics_cfg.get("vr_control", "VR_control")
         self.topic_pick = topics_cfg.get("pick_robot", "pick_robot")
+        self.topic_plan = topics_cfg.get("plan_select", "plan_select")
         self.keyboard_map = {
             keyboard_cfg.get("forward", "w"): "Forward",
             keyboard_cfg.get("backward", "s"): "Backward",
@@ -48,10 +49,12 @@ class MQTTBridgeNode(Node):
         }
         self.key_toggle_auto = keyboard_cfg.get("toggle_auto", "k")
         self.key_quit = keyboard_cfg.get("quit", "q")
+        self.plan_key_map = plan_keys
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
+        self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
 
         # MQTT client
         self.client = mqtt.Client()
@@ -73,6 +76,7 @@ class MQTTBridgeNode(Node):
             self.get_logger().info("Connected to MQTT broker")
             client.subscribe(self.topic_vr)
             client.subscribe(self.topic_pick)
+            client.subscribe(self.topic_plan)
         else:
             self.get_logger().error(f"MQTT connect failed: {rc}")
 
@@ -86,6 +90,8 @@ class MQTTBridgeNode(Node):
             self.ros_pub.publish(ros_msg)
         elif msg.topic == self.topic_pick:
             self.ros_pick_pub.publish(ros_msg)
+        elif msg.topic == self.topic_plan:
+            self.ros_plan_pub.publish(ros_msg)
 
     # Keyboard → MQTT
     def keyboard_loop(self):
@@ -102,6 +108,10 @@ class MQTTBridgeNode(Node):
                 mode_msg = "1" if autoMode else "0"
                 self.client.publish(self.topic_pick, mode_msg)
                 self.get_logger().info(f"ROS2 → MQTT: {mode_msg}")
+            elif key in self.plan_key_map:
+                plan_name = self.plan_key_map[key]
+                self.client.publish(self.topic_plan, plan_name)
+                self.get_logger().info(f"ROS2 → MQTT: {plan_name}")
             elif key == self.key_quit:
                 self.get_logger().info("Thoát chương trình")
                 break
@@ -112,14 +122,6 @@ class MQTTBridgeNode(Node):
 
         self.client.disconnect()
 
-    def _load_config(self):
-        try:
-            path = resources.files("mqtt_bridge").joinpath("config.json")
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as exc:
-            self.get_logger().warn(f"config.json not loaded, using defaults: {exc}")
-            return {}
 
 
 def main(args=None):
