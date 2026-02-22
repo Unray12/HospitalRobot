@@ -4,9 +4,8 @@ from importlib import resources
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int16MultiArray, Bool
+from std_msgs.msg import Int16MultiArray, Bool, String
 from std_srvs.srv import SetBool
-from geometry_msgs.msg import Twist
 
 from .line_follower import LineFollowerFSM
 
@@ -16,23 +15,16 @@ class LineFollowerNode(Node):
         super().__init__("line_follower")
 
         config = self._load_config()
-        pid_cfg = config.get("pid", {})
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
 
-        self.base_speed = config.get("base_speed", 6)
+        self.base_speed = int(config.get("base_speed", 6))
         self.autoMode = False
         self._last_frame = None
 
         self.follower = LineFollowerFSM(
             base_speed=self.base_speed,
             crossing_duration=config.get("crossing_duration", 2.0),
-            pid_kp=pid_cfg.get("kp", 6.0),
-            pid_ki=pid_cfg.get("ki", 0.0),
-            pid_kd=pid_cfg.get("kd", 0.0),
-            pid_deadband=pid_cfg.get("deadband", 0.15),
-            min_turn_speed=pid_cfg.get("min_turn_speed", 2.0),
-            max_turn_speed=pid_cfg.get("max_turn_speed", self.base_speed),
             logger=self.get_logger(),
         )
 
@@ -41,7 +33,7 @@ class LineFollowerNode(Node):
         auto_topic = topics_cfg.get("auto_mode", "/auto_mode")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
-        self.cmd_pub = self.create_publisher(Twist, cmd_topic, 10)
+        self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_service(SetBool, auto_service, self._auto_srv_cb)
@@ -91,26 +83,18 @@ class LineFollowerNode(Node):
             return
 
         direction, speed = result
-        self.cmd_pub.publish(self._command_to_twist(direction, speed))
+        self.cmd_pub.publish(self._command_to_msg(direction, speed))
 
-    def _command_to_twist(self, direction, speed):
-        msg = Twist()
-        if direction == "Forward":
-            msg.linear.x = speed
-        elif direction == "Backward":
-            msg.linear.x = -speed
-        elif direction == "Left":
-            msg.linear.y = speed
-        elif direction == "Right":
-            msg.linear.y = -speed
-        elif direction == "RotateLeft":
-            msg.angular.z = speed
-        elif direction == "RotateRight":
-            msg.angular.z = -speed
+    def _command_to_msg(self, direction, speed):
+        msg = String()
+        speed = int(round(speed))
+        if speed < 0:
+            speed = 0
+        msg.data = f"{direction}:{speed}"
         return msg
 
     def _publish_stop(self):
-        self.cmd_pub.publish(Twist())
+        self.cmd_pub.publish(self._command_to_msg("Stop", 0))
 
     def _load_config(self):
         try:

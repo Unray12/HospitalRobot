@@ -1,6 +1,3 @@
-from .PID import PID
-
-
 class LineFollowerFSM:
     STATE_FOLLOWING = 0
     STATE_CROSSING = 1
@@ -12,28 +9,11 @@ class LineFollowerFSM:
         self,
         base_speed=6.0,
         crossing_duration=2.0,
-        pid_kp=6.0,
-        pid_ki=0.0,
-        pid_kd=0.0,
-        pid_deadband=0.15,
-        min_turn_speed=2.0,
-        max_turn_speed=None,
         logger=None,
     ):
         self._logger = logger
-        self.base_speed = base_speed
+        self.base_speed = int(base_speed)
         self.crossing_duration = crossing_duration
-        self.pid_deadband = pid_deadband
-        self.min_turn_speed = min_turn_speed
-        self.max_turn_speed = max_turn_speed if max_turn_speed is not None else base_speed
-
-        self.pid = PID(
-            kp=pid_kp,
-            ki=pid_ki,
-            kd=pid_kd,
-            setpoint=0.0,
-            output_limits=(-self.max_turn_speed, self.max_turn_speed),
-        )
 
         self.state = self.STATE_FOLLOWING
         self.crossing_start_time = None
@@ -41,12 +21,10 @@ class LineFollowerFSM:
     def reset(self):
         self.state = self.STATE_FOLLOWING
         self.crossing_start_time = None
-        self.pid.reset()
 
     def stop(self):
         self.state = self.STATE_STOPPED
         self.crossing_start_time = None
-        self.pid.reset()
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -79,19 +57,29 @@ class LineFollowerFSM:
             self._log_info("===> LOST LINE: STOP")
             return "Stop", 0
 
-        position = self._compute_line_position(left_count, right_count, total_black)
-        output = self.pid.update(position, now)
-
-        if abs(output) < self.pid_deadband:
+        # Follow logic (no PID)
+        if mid_full and left_count <= 1 and right_count <= 1:
             self.state = self.STATE_FOLLOWING
             return "Forward", self.base_speed
 
-        speed = self._clamp(abs(output), self.min_turn_speed, self.max_turn_speed)
-        if output > 0:
+        if left_count > right_count:
             self.state = self.STATE_TURN_LEFT
-            return "RotateLeft", speed
-        self.state = self.STATE_TURN_RIGHT
-        return "RotateRight", speed
+            return "RotateLeft", self.base_speed
+
+        if right_count > left_count:
+            self.state = self.STATE_TURN_RIGHT
+            return "RotateRight", self.base_speed
+
+        if mid_count == 0:
+            if left_count > 0:
+                self.state = self.STATE_TURN_LEFT
+                return "RotateLeft", self.base_speed
+            if right_count > 0:
+                self.state = self.STATE_TURN_RIGHT
+                return "RotateRight", self.base_speed
+
+        self.state = self.STATE_FOLLOWING
+        return "Forward", self.base_speed
 
     def _handle_crossing(self, now):
         if self.crossing_start_time is None:
@@ -104,17 +92,6 @@ class LineFollowerFSM:
         self.stop()
         self._log_info("===> CROSS done: STOP")
         return "Stop", 0
-
-    def _compute_line_position(self, left_count, right_count, total_black):
-        # Positive position => line is to the right.
-        return (right_count - left_count) / total_black
-
-    def _clamp(self, value, min_value, max_value):
-        if value < min_value:
-            return min_value
-        if value > max_value:
-            return max_value
-        return value
 
     def _log_info(self, msg):
         if self._logger:

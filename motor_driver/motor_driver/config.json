@@ -5,6 +5,6 @@
         "timeout": 0.1
     },
     "subscribe": {
-        "cmd_vel": "/cmd_vel"
+        "cmd_vel": "/motor_cmd"
     }
 }

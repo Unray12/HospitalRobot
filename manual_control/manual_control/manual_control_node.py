@@ -5,7 +5,6 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
 from std_srvs.srv import SetBool
-from geometry_msgs.msg import Twist
 
 
 class ManualControlNode(Node):
@@ -25,7 +24,7 @@ class ManualControlNode(Node):
         pick_topic = topics_cfg.get("pick_robot", "/pick_robot")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
-        self.cmd_pub = self.create_publisher(Twist, cmd_topic, 10)
+        self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.auto_pub = self.create_publisher(Bool, auto_topic, 10)
         self.auto_client = self.create_client(SetBool, auto_service)
 
@@ -36,8 +35,9 @@ class ManualControlNode(Node):
         if self.autoMode:
             return
         cmd = msg.data.strip()
-        twist = self._command_to_twist(cmd, self.base_speed)
-        self.cmd_pub.publish(twist)
+        msg = self._command_to_msg(cmd, self.base_speed)
+        if msg:
+            self.cmd_pub.publish(msg)
 
     def _pick_cb(self, msg: String):
         data = msg.data.strip()
@@ -49,24 +49,21 @@ class ManualControlNode(Node):
             req.data = self.autoMode
             self.auto_client.call_async(req)
 
-    def _command_to_twist(self, command, speed):
-        msg = Twist()
-        speed = float(speed)
-        if command == "Forward":
-            msg.linear.x = speed
-        elif command == "Backward":
-            msg.linear.x = -speed
-        elif command == "Left":
-            msg.linear.y = speed
-        elif command == "Right":
-            msg.linear.y = -speed
-        elif command == "RotateLeft":
-            msg.angular.z = speed
-        elif command == "RotateRight":
-            msg.angular.z = -speed
-        elif command == "Stop":
-            pass
-        return msg
+    def _command_to_msg(self, command, speed):
+        command = command.strip()
+        if not command:
+            return None
+
+        if command == "Stop":
+            return String(data="Stop:0")
+
+        speed = int(round(speed))
+        if speed < 0:
+            speed = 0
+
+        if command in ("Forward", "Backward", "Left", "Right", "RotateLeft", "RotateRight"):
+            return String(data=f"{command}:{speed}")
+        return None
 
     def _load_config(self):
         try:

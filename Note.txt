@@ -32,7 +32,7 @@ Topics:
   /VR_control           (std_msgs/String)   manual command
   /pick_robot           (std_msgs/String)   auto mode on/off ("1"/"0")
   /line_sensors/frame   (std_msgs/Int16MultiArray)
-  /cmd_vel              (geometry_msgs/Twist)
+  /motor_cmd            (std_msgs/String)   "Direction:Speed"
   /auto_mode            (std_msgs/Bool)
 
 Service:
@@ -41,7 +41,7 @@ Service:
 Echo topics:
   ros2 topic echo /VR_control
   ros2 topic echo /line_sensors/frame
-  ros2 topic echo /cmd_vel
+  ros2 topic echo /motor_cmd
   ros2 topic echo /auto_mode
 
 Auto mode ON/OFF (manual publish):

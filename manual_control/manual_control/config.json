@@ -3,7 +3,7 @@
     "topics": {
         "vr_control": "/VR_control",
         "pick_robot": "/pick_robot",
-        "cmd_vel": "/cmd_vel",
+        "cmd_vel": "/motor_cmd",
         "auto_mode": "/auto_mode"
     },
     "service": {

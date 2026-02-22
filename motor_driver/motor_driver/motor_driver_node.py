@@ -3,7 +3,7 @@ from importlib import resources
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from std_msgs.msg import String
 
 from .motor_controller import MotorController
 
@@ -28,21 +28,43 @@ class MotorDriverNode(Node):
             logger=self.get_logger(),
         )
 
-        self.create_subscription(Twist, cmd_topic, self._cmd_cb, 10)
+        self.create_subscription(String, cmd_topic, self._cmd_cb, 10)
 
-    def _cmd_cb(self, msg: Twist):
-        direction, speed = self._twist_to_command(msg)
+    def _cmd_cb(self, msg: String):
+        direction, speed = self._parse_command(msg.data)
+        if not direction:
+            return
         self.motor.move(direction, speed)
 
-    def _twist_to_command(self, msg: Twist):
-        eps = 1e-3
-        if abs(msg.angular.z) > eps:
-            return ("RotateLeft", abs(msg.angular.z)) if msg.angular.z > 0 else ("RotateRight", abs(msg.angular.z))
-        if abs(msg.linear.y) > eps:
-            return ("Left", abs(msg.linear.y)) if msg.linear.y > 0 else ("Right", abs(msg.linear.y))
-        if abs(msg.linear.x) > eps:
-            return ("Forward", abs(msg.linear.x)) if msg.linear.x > 0 else ("Backward", abs(msg.linear.x))
-        return "Stop", 0
+    def _parse_command(self, data: str):
+        text = (data or "").strip()
+        if not text:
+            return None, None
+
+        direction = text
+        speed = 0
+
+        for sep in (":", ",", " "):
+            if sep in text:
+                parts = [p for p in text.split(sep) if p]
+                if parts:
+                    direction = parts[0].strip()
+                if len(parts) > 1:
+                    try:
+                        speed = int(parts[1])
+                    except ValueError:
+                        speed = 0
+                break
+
+        if direction == "Stop":
+            return "Stop", 0
+
+        if direction in ("Forward", "Backward", "Left", "Right", "RotateLeft", "RotateRight"):
+            if speed < 0:
+                speed = 0
+            return direction, int(speed)
+
+        return None, None
 
     def destroy_node(self):
         self.motor.close()
