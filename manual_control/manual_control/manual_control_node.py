@@ -16,7 +16,7 @@ class ManualControlNode(Node):
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
 
-        self.base_speed = config.get("base_speed", 6)
+        self.base_speed = int(config.get("base_speed", 6))
         self.autoMode = False
 
         cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
@@ -51,6 +51,7 @@ class ManualControlNode(Node):
 
     def _command_to_twist(self, command, speed):
         msg = Twist()
+        speed = float(speed)
         if command == "Forward":
             msg.linear.x = speed
         elif command == "Backward":
