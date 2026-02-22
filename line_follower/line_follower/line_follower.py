@@ -216,6 +216,9 @@ class LineFollowerFSM:
         speed = int(step.get("speed", self.base_speed))
         duration = step.get("duration", 0)
 
+        if action == "Auto":
+            return self._follow_default()
+
         if action == "Stop":
             if self.plan_end_state == "follow":
                 return self._follow_default()
@@ -232,7 +235,7 @@ class LineFollowerFSM:
             self._plan_action_min_until = now + self.rotate_min_duration
             return action, speed
 
-        if action in ("Backward", "Left", "Right"):
+        if action in ("Forward", "Backward", "Left", "Right"):
             if duration <= 0:
                 duration = 0.5
             self.state = self.STATE_PLAN

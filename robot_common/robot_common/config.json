@@ -43,8 +43,8 @@
         "plan_alias": {
             "0": "clear",
             "1": "plan_ntp",
-            "2": "plan_turn_right",
-            "3": "plan_u_turn"
+            "2": "plan_straight",
+            "3": "plan_turn_right"
         }
     },
     "motor_driver": {
@@ -93,8 +93,8 @@
         "plan_keys": {
             "0": "clear",
             "1": "plan_ntp",
-            "2": "plan_turn_right",
-            "3": "plan_u_turn"
+            "2": "plan_straight",
+            "3": "plan_turn_right"
         }
     }
 }
