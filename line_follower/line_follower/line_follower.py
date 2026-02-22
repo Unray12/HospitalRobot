@@ -220,6 +220,13 @@ class LineFollowerFSM:
             return self._follow_default()
 
         if action == "Stop":
+            if duration and duration > 0:
+                self.state = self.STATE_PLAN
+                self._plan_action = "Stop"
+                self._plan_action_speed = 0
+                self._plan_action_until = now + duration
+                self._plan_action_until_line = False
+                return "Stop", 0
             if self.plan_end_state == "follow":
                 return self._follow_default()
             self.stop()

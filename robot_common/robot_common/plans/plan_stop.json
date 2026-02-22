@@ -1,0 +1,7 @@
+{
+    "name": "plan_stop",
+    "steps": [
+        { "action": "Stop" }
+    ],
+    "end_state": "stop"
+}
