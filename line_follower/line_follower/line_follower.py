@@ -31,6 +31,7 @@ class LineFollowerFSM:
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
+        self._plan_action_speed = None
         self._cross_active = False
         self._plan_new_step = True
 
@@ -41,6 +42,7 @@ class LineFollowerFSM:
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
+        self._plan_action_speed = None
         self._cross_active = False
         self._plan_new_step = True
 
@@ -51,6 +53,7 @@ class LineFollowerFSM:
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
+        self._plan_action_speed = None
         self._cross_active = False
         self._plan_new_step = True
 
@@ -62,9 +65,8 @@ class LineFollowerFSM:
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
+        self._plan_action_speed = None
         self._plan_new_step = True
-        if self.cross_plan:
-            self.state = self.STATE_PLAN
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -72,15 +74,7 @@ class LineFollowerFSM:
         if self.state == self.STATE_CROSSING:
             return self._handle_crossing(now)
         if self.state == self.STATE_PLAN:
-            if frame is None:
-                return self._handle_plan(None, now, False)
-            left_full = frame["left_full"]
-            mid_full = frame["mid_full"]
-            right_full = frame["right_full"]
-            cross_detected = left_full and mid_full and right_full
-            cross_event = cross_detected and not self._cross_active
-            self._cross_active = cross_detected
-            return self._handle_plan(frame, now, cross_event)
+            return self._run_plan_action(now)
 
         if frame is None:
             return None
@@ -100,9 +94,9 @@ class LineFollowerFSM:
         # Cross detected
         if cross_detected:
             if self.cross_plan:
-                self.state = self.STATE_PLAN
-                self._log_info("===> CROSS detected: start/continue plan")
-                return self._handle_plan(frame, now, cross_event)
+                if cross_event:
+                    return self._start_plan_action(now)
+                return self._follow_line(frame)
             self.state = self.STATE_CROSSING
             self.crossing_start_time = now
             self._log_info("===> CROSS detected: move forward 2s")
@@ -128,52 +122,66 @@ class LineFollowerFSM:
         self._log_info("===> CROSS done: STOP")
         return "Stop", 0
 
-    def _handle_plan(self, frame, now, cross_event):
+    def _start_plan_action(self, now):
         if not self.cross_plan:
-            self.stop()
-            return "Stop", 0
+            return self._follow_default()
 
         if self._plan_index >= len(self.cross_plan):
             if self.plan_end_state == "follow":
-                self.state = self.STATE_FOLLOWING
-                return "Forward", self.base_speed
+                return self._follow_default()
             self.stop()
             return "Stop", 0
 
-        if cross_event:
-            self._plan_index += 1
-            self._plan_new_step = True
-            if self._plan_index >= len(self.cross_plan):
-                if self.plan_end_state == "follow":
-                    self.state = self.STATE_FOLLOWING
-                    return "Forward", self.base_speed
-                self.stop()
-                return "Stop", 0
-
         step = self.cross_plan[self._plan_index]
-        action = step.get("action", "Forward")
+        self._plan_index += 1
+        self._plan_new_step = False
+
+        action = step.get("action", "Stop")
         speed = int(step.get("speed", self.base_speed))
         duration = step.get("duration", 0)
 
-        if self._plan_new_step:
-            self._plan_new_step = False
-            if action in ("RotateLeft", "RotateRight", "Backward"):
-                if duration > 0:
-                    self._plan_action = action
-                    self._plan_action_until = now + duration
-                return action, speed
+        if action == "Stop":
+            if self.plan_end_state == "follow":
+                return self._follow_default()
+            self.stop()
+            return "Stop", 0
 
-        if self._plan_action_until is not None:
-            if now < self._plan_action_until:
-                return self._plan_action, speed
-            self._plan_action_until = None
-            self._plan_action = None
+        if action in ("RotateLeft", "RotateRight", "Backward", "Left", "Right"):
+            if duration <= 0:
+                duration = 0.5
+            self.state = self.STATE_PLAN
+            self._plan_action = action
+            self._plan_action_speed = speed
+            self._plan_action_until = now + duration
+            return action, speed
 
-        if frame is None:
-            return None
+        return self._follow_default()
 
-        # Follow line between crosses
-        return self._follow_line(frame)
+    def _run_plan_action(self, now):
+        if self._plan_action is None or self._plan_action_until is None:
+            self.state = self.STATE_FOLLOWING
+            return self._follow_default()
+
+        if now < self._plan_action_until:
+            return self._plan_action, int(self._plan_action_speed)
+
+        # action done
+        self._plan_action = None
+        self._plan_action_speed = None
+        self._plan_action_until = None
+        if self._plan_index >= len(self.cross_plan):
+            if self.plan_end_state == "follow":
+                self.state = self.STATE_FOLLOWING
+                return self._follow_default()
+            self.stop()
+            return "Stop", 0
+
+        self.state = self.STATE_FOLLOWING
+        return self._follow_default()
+
+    def _follow_default(self):
+        self.state = self.STATE_FOLLOWING
+        return "Forward", self.base_speed
 
     def _follow_line(self, frame):
         left_count = frame["left_count"]
