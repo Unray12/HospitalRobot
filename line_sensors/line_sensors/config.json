@@ -1,0 +1,11 @@
+{
+    "serial": {
+        "port": "/dev/ttyACM0",
+        "baudrate": 115200,
+        "timeout": 0.1
+    },
+    "publish": {
+        "topic": "/line_sensors/frame",
+        "rate_hz": 100
+    }
+}

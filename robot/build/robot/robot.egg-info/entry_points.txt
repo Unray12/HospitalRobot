@@ -1,4 +1,0 @@
-[console_scripts]
-robot = robot.main:main
-robot2 = robot.main2:main
-

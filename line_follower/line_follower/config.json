@@ -1,0 +1,20 @@
+{
+    "base_speed": 6,
+    "crossing_duration": 2.0,
+    "pid": {
+        "kp": 6.0,
+        "ki": 0.0,
+        "kd": 0.0,
+        "deadband": 0.15,
+        "min_turn_speed": 2.0,
+        "max_turn_speed": 6.0
+    },
+    "topics": {
+        "line_frame": "/line_sensors/frame",
+        "cmd_vel": "/cmd_vel",
+        "auto_mode": "/auto_mode"
+    },
+    "service": {
+        "set_auto_mode": "/set_auto_mode"
+    }
+}

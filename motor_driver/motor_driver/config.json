@@ -1,0 +1,10 @@
+{
+    "serial": {
+        "port": "/dev/ttyUSB0",
+        "baudrate": 115200,
+        "timeout": 0.1
+    },
+    "subscribe": {
+        "cmd_vel": "/cmd_vel"
+    }
+}
