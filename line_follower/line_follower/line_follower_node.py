@@ -55,6 +55,8 @@ class LineFollowerNode(Node):
             rotate_line_side_min_count=config.get("rotate_line_side_min_count", 1),
             logger=self.log,
         )
+        if plan_name:
+            self._active_plan_name = plan_name
 
         cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
         frame_topic = topics_cfg.get("line_frame", "/line_sensors/frame")

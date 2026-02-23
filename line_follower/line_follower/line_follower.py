@@ -52,7 +52,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
-        self._plan_labels = {}
+        self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -230,6 +230,9 @@ class LineFollowerFSM:
             step = self.cross_plan[self._plan_index]
             self._plan_index += 1
             self._plan_new_step = False
+            if not isinstance(step, dict):
+                self._log_warn(f"Invalid plan step type at index {self._plan_index - 1}: {type(step).__name__}")
+                continue
 
             action = self._normalize_action(step.get("action", "Stop"))
             speed = int(step.get("speed", self.base_speed))

@@ -49,7 +49,10 @@
         },
         "plan_alias": {
             "0": "clear",
-            "1": "plan_ntp"
+            "1": "plan_ntp",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
         }
     },
     "motor_driver": {
@@ -102,7 +105,10 @@
         },
         "plan_keys": {
             "0": "clear",
-            "1": "plan_ntp"
+            "1": "plan_ntp",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
         }
     }
 }
