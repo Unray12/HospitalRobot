@@ -26,7 +26,7 @@
   title: title,
   homepage: homepage,
   authors: author,
-  write-title: true,
+  write-title: false,
   page-w: 350.28pt,
   page-h: 241.89pt,
   title-align: left,
@@ -43,48 +43,89 @@
   color-box: my-colors,
 )
 
-= System Overview
-#concept-block[
-  #inline("Workspace packages")
-  - `robot_common`
-  - `line_sensors`
-  - `line_follower`
-  - `motor_driver`
-  - `manual_control`
-  - `mqtt_bridge`
-  - `robot`
-
-  #inline("Main flow")
-  - `line_sensors -> /line_sensors/frame -> line_follower -> /motor_cmd -> motor_driver`
-  - `manual_control` và `mqtt_bridge` đẩy command/mode/plan vào cùng luồng.
-
-  #inline("Core control service")
-  - Service đồng bộ auto mode: `/set_auto_mode` (`std_srvs/SetBool`)
-
-  #inline("Plan runtime")
-  - Topic chọn plan: `/plan_select`
-  - Plan files: `robot_common/robot_common/plans/*.json`
+#align(center)[
+  #v(4.5cm)
+  #text(18pt, weight: "bold")[HospitalRobot]
+  #v(0.7cm)
+  #text(12pt, weight: "semibold")[ROS2 Technical Report]
+  #v(0.6cm)
+  #text(10pt)[Version: 2026-02-23]
+  #linebreak()
+  #text(10pt)[Team: ACLAB]
+  #v(0.8cm)
+  #text(9pt)[Repository: #link("https://github.com/Unray12/HospitalRobot")[github.com/Unray12/HospitalRobot]]
 ]
 
-= Runtime Commands
+#colbreak()
+
+= System Overview
 #concept-block[
-  #inline("Build & source")
+  #inline("Purpose")
+  Tài liệu này mô tả chi tiết kiến trúc kỹ thuật của workspace `HospitalRobot`,
+  bao gồm interfaces, cấu hình runtime, luồng dữ liệu và checklist debug.
+
+  #inline("In-scope packages")
+  - `robot_common`: config/plan/command/logging shared layer
+  - `line_sensors`: serial sensor driver
+  - `line_follower`: FSM + plan executor
+  - `motor_driver`: actuation bridge to motor controller
+  - `manual_control`: manual path + auto mode sync
+  - `mqtt_bridge`: MQTT/keyboard integration
+  - `robot`: bringup entrypoint
+
+  #inline("Primary control path")
+  `line_sensors -> /line_sensors/frame -> line_follower -> /motor_cmd -> motor_driver`
+
+  #inline("Secondary control paths")
+  - Manual command path:
+    `/VR_control -> manual_control -> /motor_cmd`
+  - Auto mode path:
+    `/pick_robot -> manual_control -> /auto_mode -> line_follower`
+  - Plan select path:
+    `/plan_select -> line_follower -> plan files`
+
+  #inline("Core service interface")
+  `/set_auto_mode` (`std_srvs/SetBool`) for mode synchronization.
+]
+
+#colbreak()
+
+= Interface Matrix
+#concept-block[
+  #inline("Topics")
+  - `/line_sensors/frame` (`std_msgs/Int16MultiArray`): sensor frame
+  - `/motor_cmd` (`std_msgs/String`): low-level motion command
+  - `/auto_mode` (`std_msgs/Bool`): global auto state
+  - `/VR_control` (`std_msgs/String`): manual command input
+  - `/pick_robot` (`std_msgs/String`): auto mode trigger
+  - `/plan_select` (`std_msgs/String`): plan runtime selection
+  - `/debug_logs_toggle` (`std_msgs/Bool`): runtime debug toggle
+
+  #inline("Services")
+  - `/set_auto_mode` (`std_srvs/SetBool`)
+]
+
+#colbreak()
+
+= Runtime Procedure
+#concept-block[
+  #inline("Step 1 - Build and source")
   ```bash
   colcon build --symlink-install
   source install/setup.bash
   ```
 
-  #inline("Bringup runtime")
+  #inline("Step 2 - Bringup core runtime")
   ```bash
   ros2 run robot robot
   ```
 
-  #inline("Start MQTT bridge")
+  #inline("Step 3 - Start MQTT bridge (optional but recommended)")
   ```bash
   ros2 run mqtt_bridge mqtt_bridge
   ```
 
-  #inline("Debug quick checks")
+  #inline("Step 4 - Verify runtime interfaces")
   ```bash
   ros2 topic list
   ros2 topic echo /line_sensors/frame
@@ -92,6 +133,8 @@
   ros2 service list | grep set_auto_mode
   ```
 ]
+
+#colbreak()
 
 = System Flow Diagram
 #{
@@ -106,24 +149,38 @@
   })
 }
 
+#colbreak()
+
 = Package Sheets
 #include "packages/robot_common.typ"
+#colbreak()
 #include "packages/line_sensors.typ"
+#colbreak()
 #include "packages/line_follower.typ"
+#colbreak()
 #include "packages/motor_driver.typ"
+#colbreak()
 #include "packages/manual_control.typ"
+#colbreak()
 #include "packages/mqtt_bridge.typ"
+#colbreak()
 #include "packages/robot.typ"
+
+#colbreak()
 
 = Build Docs
 #concept-block[
-  #inline("Compile single file")
+  #inline("Compile index only")
   ```bash
   typst compile docs/index.typ docs/build/index.pdf
   ```
 
-  #inline("Build all docs")
+  #inline("Compile all Typst docs in workspace")
   ```powershell
   powershell -ExecutionPolicy Bypass -File scripts/build_typst.ps1
   ```
+
+  #inline("Output artifacts")
+  - Main report: `docs/build/index.pdf`
+  - Per-package sheets: `docs/build/packages/*.pdf`
 ]

@@ -6,31 +6,45 @@
             "duration": 0.2
         },
         {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "timeout": 4
+        },
+        {
             "label": "scan_left",
             "action": "RotateLeft",
             "speed": 5,
             "until": "line",
-            "timeout": 1.8
-        },
-        {
-            "action": "Follow",
-            "duration": 0.4
+            "timeout": 4
         },
         {
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "timeout": 1.8
+            "timeout": 4
         },
         {
-            "action": "Follow",
-            "duration": 0.4
-        },
-        {
+            "label": "Stop before room entry",
             "action": "Stop",
             "duration": 0.2
-        }
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "timeout": 4
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "duration": 2.5,
+            "timeout": 4
+        }    
     ],
-    "end_state": "follow"
+    "end_state": "stop"
 }
