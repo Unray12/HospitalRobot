@@ -3,9 +3,9 @@
 <package format="3">
   <name>mqtt_bridge</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>MQTT bridge between operator inputs and ROS2 robot topics</description>
   <maintainer email="aclab@todo.todo">aclab</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>

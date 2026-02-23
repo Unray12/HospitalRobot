@@ -23,7 +23,7 @@ setup(
     maintainer='aclab',
     maintainer_email='aclab@todo.todo',
     description='Line sensor driver node',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

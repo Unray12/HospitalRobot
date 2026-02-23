@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Common utilities for robot packages</description>
   <maintainer email="aclab@todo.todo">aclab</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
 

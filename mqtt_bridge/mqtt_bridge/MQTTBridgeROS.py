@@ -58,17 +58,17 @@ class MQTTBridgeNode(Node):
         self.topic_plan = topics_cfg.get("plan_select", "plan_select")
         self.topic_debug_toggle = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
         self.keyboard_map = {
-            keyboard_cfg.get("forward", "w"): "Forward",
-            keyboard_cfg.get("backward", "s"): "Backward",
-            keyboard_cfg.get("left", "a"): "Left",
-            keyboard_cfg.get("right", "d"): "Right",
-            keyboard_cfg.get("stop", " "): "Stop",
-            keyboard_cfg.get("rotate_left", "j"): "RotateLeft",
-            keyboard_cfg.get("rotate_right", "p"): "RotateRight",
+            str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
+            str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
+            str(keyboard_cfg.get("left", "a")).lower(): "Left",
+            str(keyboard_cfg.get("right", "d")).lower(): "Right",
+            str(keyboard_cfg.get("stop", " ")).lower(): "Stop",
+            str(keyboard_cfg.get("rotate_left", "j")).lower(): "RotateLeft",
+            str(keyboard_cfg.get("rotate_right", "p")).lower(): "RotateRight",
         }
-        self.key_toggle_auto = keyboard_cfg.get("toggle_auto", "k")
-        self.key_toggle_debug_logs = keyboard_cfg.get("toggle_debug_logs", "e")
-        self.key_quit = keyboard_cfg.get("quit", "q")
+        self.key_toggle_auto = str(keyboard_cfg.get("toggle_auto", "k")).lower()
+        self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
+        self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
         self._debug_logs_enabled = False
 
@@ -163,8 +163,8 @@ class MQTTBridgeNode(Node):
                     ros_msg.data = plan_name
                     self.ros_plan_pub.publish(ros_msg)
                     self.log.warning(
-                        f"MQTT unavailable, published plan locally: {plan_name}"
-                        , event="BRIDGE_FALLBACK"
+                        f"MQTT unavailable, published plan locally: {plan_name}",
+                        event="BRIDGE_FALLBACK",
                     )
             elif key == self.key_quit:
                 self.log.info("Thoat chuong trinh", event="KEYBOARD")

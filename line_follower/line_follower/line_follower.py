@@ -235,11 +235,10 @@ class LineFollowerFSM:
                 continue
 
             action = self._normalize_action(step.get("action", "Stop"))
-            speed = int(step.get("speed", self.base_speed))
-            duration = float(step.get("duration", 0) or 0)
+            speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
+            duration = self._to_float(step.get("duration"), 0.0, "duration", step)
             until = str(step.get("until", "") or "").strip().lower()
-            timeout = step.get("timeout")
-            timeout = float(timeout) if timeout is not None else None
+            timeout = self._to_float(step.get("timeout"), None, "timeout", step)
 
             if action in ("LABEL",):
                 continue
@@ -549,3 +548,25 @@ class LineFollowerFSM:
             f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}, "
             f"speed={speed}, duration={duration}, until={until}, timeout={timeout}"
         )
+
+    def _to_int(self, raw, default, field_name, step):
+        if raw is None:
+            return int(default)
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            self._log_warn(
+                f"Invalid {field_name}='{raw}' in step action={step.get('action')}; use default={default}"
+            )
+            return int(default)
+
+    def _to_float(self, raw, default, field_name, step):
+        if raw is None:
+            return default
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            self._log_warn(
+                f"Invalid {field_name}='{raw}' in step action={step.get('action')}; use default={default}"
+            )
+            return default

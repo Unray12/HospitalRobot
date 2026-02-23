@@ -15,7 +15,7 @@ setup(
     maintainer="aclab",
     maintainer_email="aclab@todo.todo",
     description="Manual control node for robot",
-    license="TODO: License declaration",
+    license="Apache-2.0",
     extras_require={
         "test": [
             "pytest",
