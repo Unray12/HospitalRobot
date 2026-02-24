@@ -31,7 +31,7 @@
         "cross_pre_forward_speed": 8,
         "cross_pre_forward_duration": 3.0,
         "cross_pre_stop_duration": 1.0,
-        "rotate_min_duration": 3,
+        "rotate_min_duration": 4,
         "rotate_line_mid_min_count": 1,
         "rotate_line_side_max_count": 3,
         "rotate_early_stop_on_side": true,
