@@ -91,7 +91,8 @@
             "vr_control": "VR_control",
             "pick_robot": "pick_robot",
             "plan_select": "plan_select",
-            "debug_toggle": "/debug_logs_toggle"
+            "debug_toggle": "/debug_logs_toggle",
+            "robot_logs": "robot_logs"
         },
         "keyboard": {
             "forward": "w",
@@ -117,6 +118,17 @@
             "2": "plan_straight",
             "3": "plan_turn_right",
             "4": "plan_stop"
+        },
+        "log_bridge": {
+            "enabled": true,
+            "ros_topic": "/rosout",
+            "source_nodes": [
+                "line_follower"
+            ],
+            "keywords": [
+                "[PLAN_STATUS]",
+                "[PLAN]"
+            ]
         }
     }
 }

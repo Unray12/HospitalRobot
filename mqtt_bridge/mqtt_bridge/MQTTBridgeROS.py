@@ -12,6 +12,7 @@ except ImportError:
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String, Bool
+from rcl_interfaces.msg import Log
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
@@ -52,6 +53,7 @@ class MQTTBridgeNode(Node):
         keyboard_cfg = config.get("keyboard", {})
         plan_keys = config.get("plan_keys", {})
         room_plans = config.get("room_plans", {})
+        log_bridge_cfg = config.get("log_bridge", {})
 
         self.broker_address = broker_cfg.get("address", "127.0.0.1")
         self.broker_port = broker_cfg.get("port", 1883)
@@ -59,6 +61,7 @@ class MQTTBridgeNode(Node):
         self.topic_pick = topics_cfg.get("pick_robot", "pick_robot")
         self.topic_plan = topics_cfg.get("plan_select", "plan_select")
         self.topic_debug_toggle = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
+        self.topic_log_out = topics_cfg.get("robot_logs", "robot_logs")
         self.keyboard_map = {
             str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
             str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
@@ -82,12 +85,26 @@ class MQTTBridgeNode(Node):
             }
         self._known_plans = set(self.room_plan_map.values()) | set(self.plan_key_map.values())
         self._debug_logs_enabled = False
+        self._log_bridge_enabled = bool(log_bridge_cfg.get("enabled", True))
+        self._log_bridge_ros_topic = str(log_bridge_cfg.get("ros_topic", "/rosout"))
+        self._log_bridge_sources = {
+            str(name).strip().lower()
+            for name in log_bridge_cfg.get("source_nodes", ["line_follower"])
+            if str(name).strip()
+        }
+        self._log_bridge_keywords = [
+            str(word)
+            for word in log_bridge_cfg.get("keywords", ["[PLAN_STATUS]", "[PLAN]"])
+            if str(word)
+        ]
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
         self.ros_debug_pub = self.create_publisher(Bool, self.topic_debug_toggle, 10)
+        if self._log_bridge_enabled:
+            self.create_subscription(Log, self._log_bridge_ros_topic, self._rosout_cb, 100)
 
         if mqtt is None:
             raise RuntimeError("paho-mqtt is not installed")
@@ -205,6 +222,21 @@ class MQTTBridgeNode(Node):
         except Exception:
             pass
         super().destroy_node()
+
+    def _rosout_cb(self, msg: Log):
+        if not self._mqtt_connected:
+            return
+
+        logger_name = str(msg.name or "").strip().lower()
+        if self._log_bridge_sources and logger_name not in self._log_bridge_sources:
+            return
+
+        text = str(msg.msg or "")
+        if self._log_bridge_keywords and not any(word in text for word in self._log_bridge_keywords):
+            return
+
+        # Publish only filtered plan logs for UI consumption.
+        self.client.publish(self.topic_log_out, text)
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()
