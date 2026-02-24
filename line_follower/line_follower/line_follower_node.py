@@ -109,6 +109,7 @@ class LineFollowerNode(Node):
             return
         if name == "0" or name.lower() == "clear":
             self.follower.clear_plan()
+            self.follower.set_autoline_mode(False)
             cleared_plan = self._active_plan_name
             self._active_plan_name = None
             self._active_plan_autoline = None
@@ -146,6 +147,7 @@ class LineFollowerNode(Node):
             False,
         )
         self.follower.set_plan(steps, end_state)
+        self.follower.set_autoline_mode(auto_on_select)
         self._active_plan_name = name
         self._active_plan_autoline = auto_on_select
         self._plan_completion_reported = False
@@ -199,6 +201,7 @@ class LineFollowerNode(Node):
         if requested is None:
             return
         self._active_plan_autoline = bool(requested)
+        self.follower.set_autoline_mode(bool(requested))
         self._publish_plan_status_event(
             "autoline_step",
             status=self.follower.get_plan_status(),

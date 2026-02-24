@@ -59,6 +59,7 @@ class LineFollowerFSM:
         self._cross_pre_until = None
         self._requested_autoline = None
         self._plan_start_requested = False
+        self._autoline_mode = False
 
     def reset(self):
         self.state = self.STATE_FOLLOWING
@@ -77,6 +78,7 @@ class LineFollowerFSM:
         self._cross_pre_until = None
         self._requested_autoline = None
         self._plan_start_requested = False
+        self._autoline_mode = False
 
     def stop(self):
         self.state = self.STATE_STOPPED
@@ -95,6 +97,7 @@ class LineFollowerFSM:
         self._cross_pre_until = None
         self._requested_autoline = None
         self._plan_start_requested = False
+        self._autoline_mode = False
 
     def set_plan(self, steps, end_state=None):
         self.cross_plan = steps or []
@@ -116,6 +119,7 @@ class LineFollowerFSM:
         self._cross_pre_until = None
         self._requested_autoline = None
         self._plan_start_requested = False
+        self._autoline_mode = False
 
     def clear_plan(self):
         self.cross_plan = []
@@ -135,6 +139,7 @@ class LineFollowerFSM:
         self._cross_pre_until = None
         self._requested_autoline = None
         self._plan_start_requested = False
+        self._autoline_mode = False
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -532,8 +537,13 @@ class LineFollowerFSM:
         self._plan_start_requested = True
         return True
 
+    def set_autoline_mode(self, enabled):
+        self._autoline_mode = bool(enabled)
+
     def _should_skip_cross_pre(self):
         """Skip pre-forward phase when next actionable step is rotate for immediate turn."""
+        if self._autoline_mode:
+            return False
         idx = self._plan_index
         guard = 0
         while idx < len(self.cross_plan) and guard < len(self.cross_plan):
