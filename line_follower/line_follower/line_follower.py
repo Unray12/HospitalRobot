@@ -147,10 +147,13 @@ class LineFollowerFSM:
             return self._handle_cross_pre(now)
         if self._plan_start_requested and self.cross_plan:
             self._plan_start_requested = False
+            self._cross_active = False
+            if self._should_skip_cross_pre():
+                self._log_info("===> PLAN trigger: start without cross (skip cross_pre)")
+                return self._start_plan_action(now)
             self.state = self.STATE_CROSS_PRE
             self._cross_pre_phase = 0
             self._cross_pre_until = now + self.cross_pre_forward_duration
-            self._cross_active = False
             self._log_info("===> PLAN trigger: start without cross")
             return "Forward", self.cross_pre_forward_speed
 
@@ -173,6 +176,8 @@ class LineFollowerFSM:
         if cross_detected:
             if self.cross_plan:
                 if cross_event:
+                    if self._should_skip_cross_pre():
+                        return self._start_plan_action(now)
                     self.state = self.STATE_CROSS_PRE
                     self._cross_pre_phase = 0
                     self._cross_pre_until = now + self.cross_pre_forward_duration
@@ -526,6 +531,22 @@ class LineFollowerFSM:
             return False
         self._plan_start_requested = True
         return True
+
+    def _should_skip_cross_pre(self):
+        """Skip pre-forward phase when next actionable step is rotate for immediate turn."""
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL", "GOTO"):
+                continue
+            return action in ("ROTATELEFT", "ROTATERIGHT")
+        return False
 
     def _resolve_goto_target(self, target):
         if isinstance(target, int):
