@@ -7,7 +7,7 @@
             "action": "RotateRight",
             "until": "line",
             "speed": 5,
-            "timeout": 10
+            "timeout": 50
         },
         {
             "action": "AutoLine",
@@ -18,34 +18,35 @@
             "action": "RotateLeft",
             "speed": 5,
             "until": "line",
-            "timeout": 10
+            "timeout": 50
         },
         {
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "timeout": 10
+            "timeout": 50
         },
         {
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "timeout": 10
+            "timeout": 50
         },
         {
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "timeout": 10
+            "timeout": 50
         },
         {
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
-            "timeout": 10
+            "until": "line",
+            "timeout": 50
         },
         {
             "action": "AutoLine",
