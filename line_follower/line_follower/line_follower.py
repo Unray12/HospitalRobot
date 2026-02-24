@@ -57,6 +57,8 @@ class LineFollowerFSM:
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
+        self._requested_autoline = None
+        self._plan_start_requested = False
 
     def reset(self):
         self.state = self.STATE_FOLLOWING
@@ -73,6 +75,8 @@ class LineFollowerFSM:
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
+        self._requested_autoline = None
+        self._plan_start_requested = False
 
     def stop(self):
         self.state = self.STATE_STOPPED
@@ -89,6 +93,8 @@ class LineFollowerFSM:
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
+        self._requested_autoline = None
+        self._plan_start_requested = False
 
     def set_plan(self, steps, end_state=None):
         self.cross_plan = steps or []
@@ -108,6 +114,8 @@ class LineFollowerFSM:
         self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
         self._cross_pre_until = None
+        self._requested_autoline = None
+        self._plan_start_requested = False
 
     def clear_plan(self):
         self.cross_plan = []
@@ -125,6 +133,8 @@ class LineFollowerFSM:
         self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
         self._cross_pre_until = None
+        self._requested_autoline = None
+        self._plan_start_requested = False
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -135,6 +145,14 @@ class LineFollowerFSM:
             return self._run_plan_action(frame, now)
         if self.state == self.STATE_CROSS_PRE:
             return self._handle_cross_pre(now)
+        if self._plan_start_requested and self.cross_plan:
+            self._plan_start_requested = False
+            self.state = self.STATE_CROSS_PRE
+            self._cross_pre_phase = 0
+            self._cross_pre_until = now + self.cross_pre_forward_duration
+            self._cross_active = False
+            self._log_info("===> PLAN trigger: start without cross")
+            return "Forward", self.cross_pre_forward_speed
 
         if frame is None:
             return None
@@ -251,6 +269,17 @@ class LineFollowerFSM:
                 self._log_info(f"[PLAN] Goto -> step {target + 1}")
                 self._plan_index = target
                 continue
+
+            if action == "AUTOLINE":
+                enabled = self._to_bool(
+                    step.get("enabled", step.get("value", step.get("autoline"))),
+                    True,
+                )
+                self._requested_autoline = enabled
+                self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
+                # After AutoLine step, return to FOLLOWING and wait next cross event
+                # before executing the next plan step.
+                return self._follow_default()
 
             if action in ("AUTO",):
                 return self._follow_default()
@@ -481,8 +510,22 @@ class LineFollowerFSM:
             "SLEEP": "WAIT",
             "GO": "FORWARD",
             "STRAIGHT": "FORWARD",
+            "AUTO_LINE": "AUTOLINE",
+            "AUTOLINE_ON": "AUTOLINE",
+            "AUTOLINE_OFF": "AUTOLINE",
         }
         return alias.get(text, text)
+
+    def consume_requested_autoline(self):
+        value = self._requested_autoline
+        self._requested_autoline = None
+        return value
+
+    def request_plan_start(self):
+        if not self.cross_plan:
+            return False
+        self._plan_start_requested = True
+        return True
 
     def _resolve_goto_target(self, target):
         if isinstance(target, int):
@@ -570,3 +613,17 @@ class LineFollowerFSM:
                 f"Invalid {field_name}='{raw}' in step action={step.get('action')}; use default={default}"
             )
             return default
+
+    def _to_bool(self, raw, default):
+        if raw is None:
+            return bool(default)
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, (int, float)):
+            return bool(raw)
+        text = str(raw).strip().lower()
+        if text in {"1", "true", "yes", "on", "enable", "enabled"}:
+            return True
+        if text in {"0", "false", "no", "off", "disable", "disabled"}:
+            return False
+        return bool(default)

@@ -36,7 +36,7 @@
         "rotate_line_side_max_count": 3,
         "rotate_early_stop_on_side": true,
         "rotate_line_side_min_count": 1,
-        "cross_plan_name": "plan_ntp",
+        "cross_plan_name": "a20",
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
         "topics": {
@@ -117,6 +117,10 @@
             "4": "plan_stop"
         },
         "room_plans": {
+            "a20": "a20",
+            "a21": "plan_straight",
+            "a22": "plan_turn_right",
+            "a23": "plan_stop",
             "1": "a20",
             "2": "plan_straight",
             "3": "plan_turn_right",

@@ -1,8 +1,17 @@
 {
-    "name": "plan_ntp",
-    "autoline": true,
+    "name": "a20",
+    "start_without_cross": true,
     "steps": [
-        
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "timeout": 10
+        },
+        {
+            "action": "AutoLine",
+            "enabled": true
+        },
         {
             "label": "scan_left",
             "action": "RotateLeft",
@@ -28,8 +37,22 @@
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
+            "until": "line",
             "timeout": 10
-        }    
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "timeout": 10
+        },
+        {
+            "action": "AutoLine",
+            "enabled": false
+        },
+        {
+            "action": "Stop"
+        }
     ],
     "end_state": "stop"
 }

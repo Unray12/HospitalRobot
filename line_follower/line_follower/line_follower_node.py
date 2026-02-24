@@ -141,6 +141,10 @@ class LineFollowerNode(Node):
             else plan_data.get("auto_on_select")
         )
         auto_on_select = self._to_bool(auto_flag_raw, self.auto_on_plan_select_default)
+        start_without_cross = self._to_bool(
+            plan_data.get("start_without_cross", plan_data.get("start_immediately")),
+            False,
+        )
         self.follower.set_plan(steps, end_state)
         self._active_plan_name = name
         self._active_plan_autoline = auto_on_select
@@ -155,6 +159,10 @@ class LineFollowerNode(Node):
             self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
         elif self.autoMode:
             self.follower.reset()
+        if start_without_cross:
+            if self.follower.request_plan_start():
+                self._publish_plan_status_event("triggered_without_cross", status=self.follower.get_plan_status())
+                self.log.info(f"Plan triggered without cross: {name}", event="PLAN")
         self.log.info(f"Plan selected: {name}", event="PLAN")
 
     def _set_auto_mode(self, enabled: bool):
@@ -173,7 +181,9 @@ class LineFollowerNode(Node):
             return
 
         now = time.time()
+        self._consume_autoline_action()
         result = self.follower.update(self._last_frame, now)
+        self._consume_autoline_action()
         if result is None:
             self._log_plan_status(now)
             self._check_and_publish_plan_completed()
@@ -183,6 +193,22 @@ class LineFollowerNode(Node):
         self.cmd_pub.publish(self._command_to_msg(direction, speed))
         self._log_plan_status(now)
         self._check_and_publish_plan_completed()
+
+    def _consume_autoline_action(self):
+        requested = self.follower.consume_requested_autoline()
+        if requested is None:
+            return
+        self._active_plan_autoline = bool(requested)
+        self._publish_plan_status_event(
+            "autoline_step",
+            status=self.follower.get_plan_status(),
+        )
+        if requested:
+            self.pick_pub.publish(String(data="1"))
+            self._set_auto_mode(True)
+        else:
+            self.pick_pub.publish(String(data="0"))
+            self._set_auto_mode(False)
 
     def _command_to_msg(self, direction, speed):
         command = format_command(direction, speed)

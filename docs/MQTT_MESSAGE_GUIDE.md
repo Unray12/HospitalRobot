@@ -18,14 +18,15 @@ Nguồn cấu hình: `robot_common/robot_common/config.json` -> `mqtt_bridge`.
 ### 2.1 `plan_select`
 
 - Khuyến nghị:
-  - `room:1` -> `plan_ntp`
-  - `room:2` -> `plan_straight`
-  - `room:3` -> `plan_turn_right`
-  - `room:4` -> `plan_stop`
+  - `room:a20` -> `plan_ntp`
+  - `room:a21` -> `plan_straight`
+  - `room:a22` -> `plan_turn_right`
+  - `room:a23` -> `plan_stop`
   - `room:0` hoặc `clear` -> clear plan
 
 - Tương thích ngược (vẫn hỗ trợ):
   - `1`, `2`, `3`, `4`
+  - `room:1..4`
   - `phong:1..4`
   - `plan:1..4`
   - tên plan trực tiếp, ví dụ: `plan_turn_right`
@@ -56,10 +57,10 @@ Payload hợp lệ:
 ### 3.1 Chọn phòng (plan)
 
 ```bash
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:1"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:2"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:3"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:4"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a20"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a21"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a22"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a23"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "clear"
 ```
 

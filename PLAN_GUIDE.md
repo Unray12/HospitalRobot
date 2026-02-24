@@ -94,6 +94,8 @@ Ví dụ quay theo thời gian:
   - Nếu không có `duration`: kết thúc plan theo `end_state`.
 - `Follow`: bám line trong `duration`.
 - `Auto`: trả lại chế độ mặc định (follow).
+- `AutoLine`: bật/tắt auto mode ngay tại step.
+  - Hỗ trợ tham số: `enabled`, `value`, hoặc `autoline` (true/false).
 
 Ví dụ:
 ```json
@@ -101,6 +103,9 @@ Ví dụ:
 ```
 ```json
 { "action": "Follow", "duration": 0.8 }
+```
+```json
+{ "action": "AutoLine", "enabled": false }
 ```
 
 ### 4.4 Nhóm điều hướng logic
@@ -292,6 +297,7 @@ Ví dụ:
 ## 9. Lựa chọn plan trong runtime
 
 - Topic chọn plan: `/plan_select` (`std_msgs/String`).
+- Chuẩn khuyến nghị mới: `room:a20`, `room:a21`, `room:a22`, `room:a23`.
 - Alias plan trong config:
   - `1` -> `plan_ntp`
   - `2` -> `plan_straight`
@@ -299,9 +305,9 @@ Ví dụ:
   - `4` -> `plan_stop`
   - `0` hoặc `clear` -> xóa plan hiện tại.
 - Chuẩn gửi qua MQTT (khuyến nghị):
-  - `room:1`, `room:2`, `room:3`, `room:4` (4 phòng = 4 plan).
+  - `room:a20`, `room:a21`, `room:a22`, `room:a23` (theo mã phòng).
   - `room:0` hoặc `clear` để clear plan.
-  - Tương thích thêm: `phong:1`, `plan:1`, hoặc gửi trực tiếp tên plan (vd `plan_turn_right`).
+  - Tương thích thêm: `room:1..4`, `phong:a20`, `plan:a20`, hoặc gửi trực tiếp tên plan (vd `plan_turn_right`).
 
 ## 10. Mẫu plan để dùng ngay
 

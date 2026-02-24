@@ -77,11 +77,11 @@ class MQTTBridgeNode(Node):
         self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
         self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
-        self.room_plan_map = {str(k).strip(): str(v).strip() for k, v in room_plans.items()}
+        self.room_plan_map = {str(k).strip().lower(): str(v).strip() for k, v in room_plans.items()}
         if not self.room_plan_map:
             # Backward compatible: if no room_plans, reuse numeric plan hotkeys.
             self.room_plan_map = {
-                str(k).strip(): str(v).strip()
+                str(k).strip().lower(): str(v).strip()
                 for k, v in self.plan_key_map.items()
                 if str(k).strip().isdigit()
             }
@@ -261,16 +261,19 @@ class MQTTBridgeNode(Node):
 
         if text in self.plan_key_map:
             return self.plan_key_map[text]
-        if text in self.room_plan_map:
-            return self.room_plan_map[text]
+        if lower in self.room_plan_map:
+            return self.room_plan_map[lower]
 
-        m = re.match(r"^(?:room|phong|plan)\s*[:/_-]?\s*(\d+)$", lower)
+        m = re.match(r"^(room|phong|plan)\s*[:/_-]?\s*([a-z0-9_-]+)$", lower)
         if m:
-            room_id = m.group(1)
-            if room_id == "0":
+            prefix = m.group(1).strip()
+            room_id = m.group(2).strip()
+            if room_id in {"0", "clear"}:
                 return "clear"
             if room_id in self.room_plan_map:
                 return self.room_plan_map[room_id]
+            if prefix == "plan" and room_id.startswith("plan_"):
+                return room_id
             self.log.warning(f"Room id has no mapped plan: {room_id}", event="PLAN_MQTT")
             return None
 
