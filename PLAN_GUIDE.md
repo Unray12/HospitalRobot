@@ -12,6 +12,7 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 ```json
 {
   "name": "plan_example",
+  "autoline": true,
   "steps": [
     { "action": "Wait", "duration": 0.2 },
     { "action": "RotateRight", "speed": 6, "until": "line", "timeout": 2.5 },
@@ -23,6 +24,9 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 
 - `name`: tên plan.
 - `steps`: danh sách bước thực thi.
+- `autoline` (optional): khi chọn plan sẽ tự bật auto mode (`pick_robot=1`).
+  - Nếu không khai báo, dùng mặc định từ config `line_follower.auto_on_plan_select` (hiện tại là `true`).
+  - Tương thích key cũ: `auto_on_select`.
 - `end_state`:
   - `follow`: xong plan thì quay về bám line.
   - `stop`: xong plan thì dừng.
@@ -263,6 +267,8 @@ Hệ thống tự map các alias sau:
 
 - `name` (required): tên định danh plan.
 - `steps` (required): mảng step.
+- `autoline` (optional): `true/false`.
+  - Tương thích key cũ: `auto_on_select`.
 - `end_state` (optional):
   - `follow` (khuyến nghị cho nhiệm vụ liên tục).
   - `stop` (dừng robot sau plan).
@@ -292,6 +298,10 @@ Ví dụ:
   - `3` -> `plan_turn_right`
   - `4` -> `plan_stop`
   - `0` hoặc `clear` -> xóa plan hiện tại.
+- Chuẩn gửi qua MQTT (khuyến nghị):
+  - `room:1`, `room:2`, `room:3`, `room:4` (4 phòng = 4 plan).
+  - `room:0` hoặc `clear` để clear plan.
+  - Tương thích thêm: `phong:1`, `plan:1`, hoặc gửi trực tiếp tên plan (vd `plan_turn_right`).
 
 ## 10. Mẫu plan để dùng ngay
 

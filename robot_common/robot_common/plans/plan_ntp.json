@@ -1,5 +1,6 @@
 {
     "name": "plan_ntp",
+    "autoline": true,
     "steps": [
         {
             "action": "Wait",

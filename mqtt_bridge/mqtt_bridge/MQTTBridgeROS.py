@@ -3,6 +3,7 @@ import sys
 import threading
 from threading import Event
 import os
+import re
 
 try:
     import paho.mqtt.client as mqtt
@@ -50,6 +51,7 @@ class MQTTBridgeNode(Node):
         topics_cfg = config.get("topics", {})
         keyboard_cfg = config.get("keyboard", {})
         plan_keys = config.get("plan_keys", {})
+        room_plans = config.get("room_plans", {})
 
         self.broker_address = broker_cfg.get("address", "127.0.0.1")
         self.broker_port = broker_cfg.get("port", 1883)
@@ -70,6 +72,15 @@ class MQTTBridgeNode(Node):
         self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
         self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
+        self.room_plan_map = {str(k).strip(): str(v).strip() for k, v in room_plans.items()}
+        if not self.room_plan_map:
+            # Backward compatible: if no room_plans, reuse numeric plan hotkeys.
+            self.room_plan_map = {
+                str(k).strip(): str(v).strip()
+                for k, v in self.plan_key_map.items()
+                if str(k).strip().isdigit()
+            }
+        self._known_plans = set(self.room_plan_map.values()) | set(self.plan_key_map.values())
         self._debug_logs_enabled = False
 
         # ROS 2 publisher
@@ -121,13 +132,21 @@ class MQTTBridgeNode(Node):
         self.log.info(f"MQTT -> ROS2: {data}", event="BRIDGE_IN")
 
         ros_msg = String()
-        ros_msg.data = data
         if msg.topic == self.topic_vr:
+            ros_msg.data = data
             self.ros_pub.publish(ros_msg)
         elif msg.topic == self.topic_pick:
+            ros_msg.data = data
             self.ros_pick_pub.publish(ros_msg)
         elif msg.topic == self.topic_plan:
+            resolved = self._resolve_plan_command(data)
+            if not resolved:
+                self.log.warning(f"Ignored invalid plan command: {data}", event="PLAN_MQTT")
+                return
+            ros_msg.data = resolved
             self.ros_plan_pub.publish(ros_msg)
+            if resolved != data:
+                self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
 
     # Keyboard → MQTT
     def keyboard_loop(self):
@@ -155,8 +174,9 @@ class MQTTBridgeNode(Node):
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
                 if self._mqtt_connected:
-                    self.client.publish(self.topic_plan, plan_name)
-                    self.log.info(f"ROS2 -> MQTT: {plan_name}", event="BRIDGE_OUT")
+                    mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
+                    self.client.publish(self.topic_plan, mqtt_plan_cmd)
+                    self.log.info(f"ROS2 -> MQTT: {mqtt_plan_cmd}", event="BRIDGE_OUT")
                 else:
                     # Fallback local publish so operator key still works when MQTT is down.
                     ros_msg = String()
@@ -185,6 +205,40 @@ class MQTTBridgeNode(Node):
         except Exception:
             pass
         super().destroy_node()
+
+    def _resolve_plan_command(self, payload: str):
+        text = (payload or "").strip()
+        if not text:
+            return None
+
+        lower = text.lower()
+        if lower in {"0", "clear", "room:0", "room/0"}:
+            return "clear"
+
+        if text in self.plan_key_map:
+            return self.plan_key_map[text]
+        if text in self.room_plan_map:
+            return self.room_plan_map[text]
+
+        m = re.match(r"^(?:room|phong|plan)\s*[:/_-]?\s*(\d+)$", lower)
+        if m:
+            room_id = m.group(1)
+            if room_id == "0":
+                return "clear"
+            if room_id in self.room_plan_map:
+                return self.room_plan_map[room_id]
+            self.log.warning(f"Room id has no mapped plan: {room_id}", event="PLAN_MQTT")
+            return None
+
+        if lower.startswith("plan:") or lower.startswith("plan/"):
+            plan_name = text.split(":", 1)[1].strip() if ":" in text else text.split("/", 1)[1].strip()
+            return plan_name or None
+
+        if text in self._known_plans:
+            return text
+
+        # Keep compatibility: allow direct plan names even if not listed in mappings.
+        return text
 
 
 

@@ -20,6 +20,7 @@ class LineFollowerNode(Node):
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
         self.plan_alias = config.get("plan_alias", {})
+        self.auto_on_plan_select_default = bool(config.get("auto_on_plan_select", True))
 
         self.base_speed = int(config.get("base_speed", 6))
         self.plan_select_debounce_sec = float(config.get("plan_select_debounce_sec", 0.35))
@@ -62,9 +63,11 @@ class LineFollowerNode(Node):
         frame_topic = topics_cfg.get("line_frame", "/line_sensors/frame")
         auto_topic = topics_cfg.get("auto_mode", "/auto_mode")
         plan_topic = topics_cfg.get("plan_select", "/plan_select")
+        pick_topic = topics_cfg.get("pick_robot", "/pick_robot")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
         self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
+        self.pick_pub = self.create_publisher(String, pick_topic, 10)
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
@@ -123,11 +126,21 @@ class LineFollowerNode(Node):
 
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
+        auto_flag_raw = (
+            plan_data.get("autoline")
+            if "autoline" in plan_data
+            else plan_data.get("auto_on_select")
+        )
+        auto_on_select = self._to_bool(auto_flag_raw, self.auto_on_plan_select_default)
         self.follower.set_plan(steps, end_state)
         self._active_plan_name = name
         self._last_plan_name = name
         self._last_plan_ts = now
-        if self.autoMode:
+        if auto_on_select:
+            self.pick_pub.publish(String(data="1"))
+            self._set_auto_mode(True)
+            self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
+        elif self.autoMode:
             self.follower.reset()
         self.log.info(f"Plan selected: {name}", event="PLAN")
 
@@ -183,6 +196,19 @@ class LineFollowerNode(Node):
             self.log.info(text, event="PLAN_STATUS")
             self._last_plan_status_text = text
             self._last_plan_status_log_ts = now
+
+    def _to_bool(self, value, default):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            text = value.strip().lower()
+            if text in {"1", "true", "yes", "on"}:
+                return True
+            if text in {"0", "false", "no", "off"}:
+                return False
+        return bool(value)
 
 
 

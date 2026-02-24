@@ -38,11 +38,13 @@
         "rotate_line_side_min_count": 1,
         "cross_plan_name": "plan_ntp",
         "plan_end_state": "stop",
+        "auto_on_plan_select": true,
         "topics": {
             "line_frame": "/line_sensors/frame",
             "cmd_vel": "/motor_cmd",
             "auto_mode": "/auto_mode",
-            "plan_select": "/plan_select"
+            "plan_select": "/plan_select",
+            "pick_robot": "/pick_robot"
         },
         "service": {
             "set_auto_mode": "/set_auto_mode"
@@ -105,6 +107,12 @@
         },
         "plan_keys": {
             "0": "clear",
+            "1": "plan_ntp",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
+        },
+        "room_plans": {
             "1": "plan_ntp",
             "2": "plan_straight",
             "3": "plan_turn_right",

@@ -18,6 +18,10 @@
     `vr_control`, `pick_robot`, `plan_select`
   - ROS publish:
     `/VR_control`, `/pick_robot`, `/plan_select`, `/debug_logs_toggle`
+  - Plan command format (recommended):
+    `room:1..4` (room -> mapped plan), `room:0` or `clear` to clear plan.
+  - Backward compatible plan command:
+    `1..4`, `phong:1..4`, `plan:1..4`, or direct plan name.
 
   #inline("Keyboard mapping")
   - Move:
@@ -27,7 +31,7 @@
   - Mode/debug:
     `k` toggle auto, `e` toggle debug logs
   - Plan hotkeys:
-    `1..4` select plan, `0` clear
+    `1..4` select room-plan, `0` clear
   - Quit:
     `q`
 
