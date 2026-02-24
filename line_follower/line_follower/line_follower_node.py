@@ -1,3 +1,4 @@
+import json
 import time
 
 import rclpy
@@ -32,6 +33,8 @@ class LineFollowerNode(Node):
         self._last_plan_status_text = None
         self._last_plan_status_log_ts = 0.0
         self.plan_status_log_period = float(config.get("plan_status_log_period", 0.8))
+        self._active_plan_autoline = None
+        self._plan_completion_reported = False
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_name = config.get("cross_plan_name")
@@ -64,10 +67,12 @@ class LineFollowerNode(Node):
         auto_topic = topics_cfg.get("auto_mode", "/auto_mode")
         plan_topic = topics_cfg.get("plan_select", "/plan_select")
         pick_topic = topics_cfg.get("pick_robot", "/pick_robot")
+        plan_status_topic = topics_cfg.get("plan_status", "/plan_status")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
         self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.pick_pub = self.create_publisher(String, pick_topic, 10)
+        self.plan_status_pub = self.create_publisher(String, plan_status_topic, 10)
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
@@ -104,7 +109,11 @@ class LineFollowerNode(Node):
             return
         if name == "0" or name.lower() == "clear":
             self.follower.clear_plan()
+            cleared_plan = self._active_plan_name
             self._active_plan_name = None
+            self._active_plan_autoline = None
+            self._plan_completion_reported = False
+            self._publish_plan_status_event("cleared", plan_name=cleared_plan, status=self.follower.get_plan_status())
             self.log.info("Plan cleared", event="PLAN")
             return
         if name in self.plan_alias:
@@ -134,11 +143,15 @@ class LineFollowerNode(Node):
         auto_on_select = self._to_bool(auto_flag_raw, self.auto_on_plan_select_default)
         self.follower.set_plan(steps, end_state)
         self._active_plan_name = name
+        self._active_plan_autoline = auto_on_select
+        self._plan_completion_reported = False
         self._last_plan_name = name
         self._last_plan_ts = now
+        self._publish_plan_status_event("selected", status=self.follower.get_plan_status())
         if auto_on_select:
             self.pick_pub.publish(String(data="1"))
             self._set_auto_mode(True)
+            self._publish_plan_status_event("autoline_enabled", status=self.follower.get_plan_status())
             self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
         elif self.autoMode:
             self.follower.reset()
@@ -163,11 +176,13 @@ class LineFollowerNode(Node):
         result = self.follower.update(self._last_frame, now)
         if result is None:
             self._log_plan_status(now)
+            self._check_and_publish_plan_completed()
             return
 
         direction, speed = result
         self.cmd_pub.publish(self._command_to_msg(direction, speed))
         self._log_plan_status(now)
+        self._check_and_publish_plan_completed()
 
     def _command_to_msg(self, direction, speed):
         command = format_command(direction, speed)
@@ -196,6 +211,43 @@ class LineFollowerNode(Node):
             self.log.info(text, event="PLAN_STATUS")
             self._last_plan_status_text = text
             self._last_plan_status_log_ts = now
+
+    def _check_and_publish_plan_completed(self):
+        if not self._active_plan_name or self._plan_completion_reported:
+            return
+
+        status = self.follower.get_plan_status()
+        total_steps = int(status.get("total_steps", 0))
+        next_step = int(status.get("next_step", 0))
+        done = (
+            total_steps > 0
+            and next_step >= total_steps
+            and status.get("current_action") is None
+            and status.get("state") in {"FOLLOWING", "STOPPED"}
+        )
+        if not done:
+            return
+
+        self._plan_completion_reported = True
+        self._publish_plan_status_event("completed", status=status)
+
+    def _publish_plan_status_event(self, event_name, status=None, plan_name=None):
+        payload = {
+            "event": str(event_name),
+            "plan": (plan_name if plan_name is not None else self._active_plan_name),
+            "autoline": bool(self._active_plan_autoline) if self._active_plan_autoline is not None else None,
+        }
+        if status:
+            payload["state"] = status.get("state")
+            payload["step"] = status.get("next_step")
+            payload["total_steps"] = status.get("total_steps")
+            payload["action"] = status.get("current_action")
+            payload["end_state"] = status.get("end_state")
+
+        msg = String()
+        msg.data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        self.plan_status_pub.publish(msg)
+        self.log.info(msg.data, event="PLAN_EVENT")
 
     def _to_bool(self, value, default):
         if value is None:

@@ -44,7 +44,8 @@
             "cmd_vel": "/motor_cmd",
             "auto_mode": "/auto_mode",
             "plan_select": "/plan_select",
-            "pick_robot": "/pick_robot"
+            "pick_robot": "/pick_robot",
+            "plan_status": "/plan_status"
         },
         "service": {
             "set_auto_mode": "/set_auto_mode"
@@ -92,7 +93,9 @@
             "pick_robot": "pick_robot",
             "plan_select": "plan_select",
             "debug_toggle": "/debug_logs_toggle",
-            "robot_logs": "robot_logs"
+            "robot_logs": "robot_logs",
+            "plan_status_ros": "/plan_status",
+            "plan_status_mqtt": "plan_status"
         },
         "keyboard": {
             "forward": "w",
