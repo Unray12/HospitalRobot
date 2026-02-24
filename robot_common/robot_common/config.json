@@ -11,7 +11,7 @@
     },
     "line_sensors": {
         "serial": {
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -31,9 +31,9 @@
         "cross_pre_forward_speed": 8,
         "cross_pre_forward_duration": 3.0,
         "cross_pre_stop_duration": 1.0,
-        "rotate_min_duration": 2,
+        "rotate_min_duration": 3,
         "rotate_line_mid_min_count": 1,
-        "rotate_line_side_max_count": 2,
+        "rotate_line_side_max_count": 3,
         "rotate_early_stop_on_side": true,
         "rotate_line_side_min_count": 1,
         "cross_plan_name": "plan_ntp",
@@ -52,7 +52,7 @@
         },
         "plan_alias": {
             "0": "clear",
-            "1": "plan_ntp",
+            "1": "a20",
             "2": "plan_straight",
             "3": "plan_turn_right",
             "4": "plan_stop"
@@ -111,13 +111,13 @@
         },
         "plan_keys": {
             "0": "clear",
-            "1": "plan_ntp",
+            "1": "a20",
             "2": "plan_straight",
             "3": "plan_turn_right",
             "4": "plan_stop"
         },
         "room_plans": {
-            "1": "plan_ntp",
+            "1": "a20",
             "2": "plan_straight",
             "3": "plan_turn_right",
             "4": "plan_stop"
