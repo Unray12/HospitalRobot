@@ -5,6 +5,7 @@
         {
             "label": "scan_right",
             "action": "RotateRight",
+            "until": "line",
             "speed": 5,
             "timeout": 10
         },
