@@ -390,7 +390,7 @@ class LineFollowerFSM:
             self._plan_action_until_line = False
             self._plan_action_min_until = None
             self._plan_action_timeout = None
-            return self._after_plan_action()
+            return self._after_plan_action(now)
 
         if self._plan_action_until_line:
             if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
@@ -400,7 +400,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
-                return self._after_plan_action()
+                return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
             if frame is not None and self._is_line_reacquired(frame, self._plan_action):
@@ -409,7 +409,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
-                return self._after_plan_action()
+                return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
         if self._plan_action_until is not None and now < self._plan_action_until:
@@ -422,13 +422,13 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
-        return self._after_plan_action()
+        return self._after_plan_action(now)
 
     def _follow_default(self):
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
 
-    def _after_plan_action(self):
+    def _after_plan_action(self, now):
         if self._plan_index >= len(self.cross_plan):
             self._log_info(f"[PLAN] Completed all steps (end_state={self.plan_end_state})")
             if self.plan_end_state == "follow":
@@ -436,6 +436,10 @@ class LineFollowerFSM:
                 return self._follow_default()
             self.stop()
             return "Stop", 0
+        # Allow immediate transition for control-only step AutoLine right after an action.
+        # This keeps sequence like RotateRight -> AutoLine immediate, then wait next cross.
+        if self._next_action_is_autoline():
+            return self._start_plan_action(now)
         self.state = self.STATE_FOLLOWING
         return self._follow_default()
 
@@ -556,6 +560,27 @@ class LineFollowerFSM:
             if action in ("LABEL", "GOTO"):
                 continue
             return action in ("ROTATELEFT", "ROTATERIGHT")
+        return False
+
+    def _next_action_is_autoline(self):
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL",):
+                continue
+            if action == "GOTO":
+                target = self._resolve_goto_target(step.get("target"))
+                if target is None:
+                    continue
+                idx = target
+                continue
+            return action == "AUTOLINE"
         return False
 
     def _resolve_goto_target(self, target):
