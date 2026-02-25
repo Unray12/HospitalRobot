@@ -3,12 +3,21 @@
 <package format="3">
   <name>robot</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Robot bringup package for launching core runtime nodes</description>
   <maintainer email="aclab@todo.todo">aclab</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
+  <depend>robot_common</depend>
+  <depend>line_sensors</depend>
+  <depend>line_follower</depend>
+  <depend>motor_driver</depend>
+  <depend>manual_control</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

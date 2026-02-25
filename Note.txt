@@ -1,16 +1,61 @@
-######### ROS2 #########
-source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
-ros2 topic echo /VR_control
-ros2 run mqtt_bridge mqtt_bridge
-ros2 run robot robot
-colcon build -> source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
-ros2 topic echo /VR_control
-add package: ros2 pkg create line_sensor --build-type ament_python --dependencies rclpy std_msgs sensor_msgs
-ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
-######### MQTT #########
+######################## ROS2 WORKSPACE ########################
+Workspace: ~/Desktop/workspaces/RobotROS2/ros2_ws
+Build + Source:
+  colcon build --symlink-install
+  source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
 
-Check package: ros2 pkg list | grep mqtt
-Test topic: mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
-ttyUSB0
-ttyACM0
+Check packages:
+  ros2 pkg list | grep -E "robot|line_sensors|line_follower|motor_driver|manual_control|mqtt_bridge"
+
+######################## RUN SYSTEM ########################
+1) MQTT bridge (keyboard -> MQTT -> ROS2 topics):
+  ros2 run mqtt_bridge mqtt_bridge
+
+2) Robot bringup (runs all driver nodes):
+  ros2 run robot robot
+
+######################## RUN SEPARATELY ########################
+Line sensor driver:
+  ros2 run line_sensors line_sensor_driver
+
+Line follower (FSM + PID):
+  ros2 run line_follower line_follower
+
+Motor driver:
+  ros2 run motor_driver motor_driver
+
+Manual control (VR_control + pick_robot):
+  ros2 run manual_control manual_control
+
+######################## TOPICS / SERVICES ########################
+Topics:
+  /VR_control           (std_msgs/String)   manual command
+  /pick_robot           (std_msgs/String)   auto mode on/off ("1"/"0")
+  /line_sensors/frame   (std_msgs/Int16MultiArray)
+  /motor_cmd            (std_msgs/String)   "Direction:Speed"
+  /auto_mode            (std_msgs/Bool)
+
+Service:
+  /set_auto_mode        (std_srvs/SetBool)
+
+Echo topics:
+  ros2 topic echo /VR_control
+  ros2 topic echo /line_sensors/frame
+  ros2 topic echo /motor_cmd
+  ros2 topic echo /auto_mode
+
+Auto mode ON/OFF (manual publish):
+  ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
+  ros2 topic pub /pick_robot std_msgs/msg/String "{data: '0'}" --once
+
+######################## MQTT ########################
+Check MQTT package:
+  ros2 pkg list | grep mqtt
+
+Test MQTT topic:
+  mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
+
+######################## SERIAL PORTS ########################
+Motor: /dev/ttyUSB0
+Line sensor: /dev/ttyACM0
 

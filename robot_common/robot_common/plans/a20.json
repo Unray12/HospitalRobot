@@ -1,0 +1,64 @@
+{
+    "name": "a20",
+    "start_without_cross": true,
+    "steps": [
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "until": "line",
+            "speed": 5,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say:hãy đi theo tôi để đến phòng khám"
+                }
+            ]
+        },
+        {
+            "action": "AutoLine",
+            "enabled": true
+        },
+        {
+            "label": "scan_left",
+            "action": "RotateLeft",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say:bạn còn ở đó chứ?"
+                }
+            ]
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "min_duration": 20,
+            "timeout": 25,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say:sắp tới rồi bạn nhé"
+                }
+            ]
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line"
+        },
+        {
+            "label": "scan_right",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "end_state": "true",
+            "strict_line": true,
+            "continue_immediately": true   
+        }
+    ],
+    "end_state": "stop"
+}

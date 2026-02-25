@@ -1,0 +1,20 @@
+{
+    "name": "plan_turn_right",
+    "steps": [
+        {
+            "action": "Wait",
+            "duration": 0.2
+        },
+        {
+            "action": "RotateRight",
+            "speed": 6,
+            "until": "line",
+            "timeout": 2.5
+        },
+        {
+            "action": "Follow",
+            "duration": 0.5
+        }
+    ],
+    "end_state": "follow"
+}

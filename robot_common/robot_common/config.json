@@ -1,0 +1,146 @@
+{
+    "robot": {
+        "bringup": {
+            "nodes": [
+                "line_sensor_driver",
+                "line_follower",
+                "motor_driver",
+                "manual_control"
+            ]
+        }
+    },
+    "line_sensors": {
+        "serial": {
+            "port": "/dev/ttyACM0",
+            "baudrate": 115200,
+            "timeout": 0.1
+        },
+        "publish": {
+            "topic": "/line_sensors/frame",
+            "rate_hz": 100
+        },
+        "topics": {
+            "debug_toggle": "/debug_logs_toggle"
+        }
+    },
+    "line_follower": {
+        "base_speed": 8,
+        "turn_speed_left": 6,
+        "turn_speed_right": 6,
+        "crossing_duration": 3.0,
+        "cross_pre_forward_speed": 8,
+        "cross_pre_forward_duration": 2.7,
+        "cross_pre_stop_duration": 1.0,
+        "rotate_min_duration": 5,
+        "rotate_line_mid_min_count": 1,
+        "rotate_line_side_max_count": 3,
+        "rotate_early_stop_on_side": true,
+        "rotate_line_side_min_count": 1,
+        "plan_lost_line_hold_sec": 1.2,
+        "plan_lost_line_warn_period": 0.6,
+        "cross_plan_name": "a20",
+        "plan_end_state": "stop",
+        "auto_on_plan_select": true,
+        "topics": {
+            "line_frame": "/line_sensors/frame",
+            "cmd_vel": "/motor_cmd",
+            "auto_mode": "/auto_mode",
+            "plan_select": "/plan_select",
+            "pick_robot": "/pick_robot",
+            "plan_status": "/plan_status",
+            "plan_callback": "/plan_callback"
+        },
+        "service": {
+            "set_auto_mode": "/set_auto_mode"
+        },
+        "plan_alias": {
+            "0": "clear",
+            "1": "a20",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
+        }
+    },
+    "motor_driver": {
+        "serial": {
+            "port": "/dev/ttyUSB0",
+            "baudrate": 115200,
+            "timeout": 0.1
+        },
+        "subscribe": {
+            "cmd_vel": "/motor_cmd"
+        },
+        "topics": {
+            "debug_toggle": "/debug_logs_toggle"
+        }
+    },
+    "manual_control": {
+        "base_speed": 10,
+        "topics": {
+            "vr_control": "/VR_control",
+            "pick_robot": "/pick_robot",
+            "cmd_vel": "/motor_cmd",
+            "auto_mode": "/auto_mode"
+        },
+        "service": {
+            "set_auto_mode": "/set_auto_mode"
+        }
+    },
+    "mqtt_bridge": {
+        "broker": {
+            "address": "127.0.0.1",
+            "port": 1883
+        },
+        "topics": {
+            "vr_control": "VR_control",
+            "pick_robot": "pick_robot",
+            "plan_select": "plan_select",
+            "debug_toggle": "/debug_logs_toggle",
+            "robot_logs": "robot_logs",
+            "plan_status_ros": "/plan_status",
+            "plan_status_mqtt": "plan_status",
+            "plan_message_ros": "/plan_message",
+            "plan_message_mqtt": "plan_message"
+        },
+        "keyboard": {
+            "forward": "w",
+            "backward": "s",
+            "left": "a",
+            "right": "d",
+            "stop": " ",
+            "rotate_left": "j",
+            "rotate_right": "p",
+            "toggle_debug_logs": "e",
+            "toggle_auto": "k",
+            "quit": "q"
+        },
+        "plan_keys": {
+            "0": "clear",
+            "1": "a20",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
+        },
+        "room_plans": {
+            "a20": "a20",
+            "a21": "plan_straight",
+            "a22": "plan_turn_right",
+            "a23": "plan_stop",
+            "1": "a20",
+            "2": "plan_straight",
+            "3": "plan_turn_right",
+            "4": "plan_stop"
+        },
+        "log_bridge": {
+            "enabled": true,
+            "ros_topic": "/rosout",
+            "source_nodes": [
+                "line_follower"
+            ],
+            "keywords": [
+                "[PLAN_STATUS]",
+                "[PLAN]"
+            ]
+        }
+    }
+}
