@@ -57,6 +57,8 @@ class LineFollowerNode(Node):
             rotate_line_side_max_count=config.get("rotate_line_side_max_count", 2),
             rotate_early_stop_on_side=config.get("rotate_early_stop_on_side", True),
             rotate_line_side_min_count=config.get("rotate_line_side_min_count", 1),
+            plan_lost_line_hold_sec=config.get("plan_lost_line_hold_sec", 0.8),
+            plan_lost_line_warn_period=config.get("plan_lost_line_warn_period", 0.5),
             logger=self.log,
         )
         if plan_name:

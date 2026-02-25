@@ -36,6 +36,8 @@
         "rotate_line_side_max_count": 3,
         "rotate_early_stop_on_side": true,
         "rotate_line_side_min_count": 1,
+        "plan_lost_line_hold_sec": 1.2,
+        "plan_lost_line_warn_period": 0.6,
         "cross_plan_name": "a20",
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
