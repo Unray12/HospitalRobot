@@ -59,6 +59,7 @@ class LineFollowerFSM:
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_continue_immediate = False
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
         self._cross_active = False
         self._plan_new_step = True
@@ -82,6 +83,7 @@ class LineFollowerFSM:
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_continue_immediate = False
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -109,6 +111,7 @@ class LineFollowerFSM:
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_continue_immediate = False
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -133,6 +136,7 @@ class LineFollowerFSM:
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_continue_immediate = False
         self._plan_new_step = True
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
@@ -157,6 +161,7 @@ class LineFollowerFSM:
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_continue_immediate = False
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
@@ -300,6 +305,10 @@ class LineFollowerFSM:
             duration = self._to_float(step.get("duration"), 0.0, "duration", step)
             until = str(step.get("until", "") or "").strip().lower()
             timeout = self._to_float(step.get("timeout"), None, "timeout", step)
+            continue_immediately = self._to_bool(
+                step.get("continue_immediately", step.get("no_wait_cross")),
+                False,
+            )
 
             if action in ("LABEL",):
                 continue
@@ -319,6 +328,7 @@ class LineFollowerFSM:
                     True,
                 )
                 self._requested_autoline = enabled
+                self._plan_continue_immediate = continue_immediately
                 self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
                 # After AutoLine step, return to FOLLOWING and wait next cross event
                 # before executing the next plan step.
@@ -332,6 +342,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._plan_continue_immediate = continue_immediately
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
                     self._plan_action_min_until = None
@@ -343,6 +354,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._plan_continue_immediate = continue_immediately
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
                     self._plan_action_min_until = None
@@ -362,6 +374,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = "AutoFollow"
                 self._plan_action_speed = self.base_speed
+                self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = now + duration
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
@@ -384,6 +397,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = None
                 self._plan_action_min_until = now + max(0.0, float(min_duration))
                 self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
@@ -404,6 +418,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = now + duration
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
@@ -487,10 +502,12 @@ class LineFollowerFSM:
                 return self._follow_default()
             self._enter_stopped(reset_plan_progress=False)
             return "Stop", 0
-        # Allow immediate transition for control-only step AutoLine right after an action.
-        # This keeps sequence like RotateRight -> AutoLine immediate, then wait next cross.
-        if self._next_action_is_autoline():
+        # Allow immediate transition for action steps that request no-wait-cross.
+        # Keep existing behavior where next AutoLine step executes immediately.
+        if self._plan_continue_immediate or self._next_action_is_autoline():
+            self._plan_continue_immediate = False
             return self._start_plan_action(now)
+        self._plan_continue_immediate = False
         self.state = self.STATE_FOLLOWING
         return self._follow_default()
 

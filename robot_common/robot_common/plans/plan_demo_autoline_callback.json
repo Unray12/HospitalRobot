@@ -1,0 +1,38 @@
+{
+    "name": "plan_demo_autoline_callback",
+    "start_without_cross": true,
+    "steps": [
+        {
+            "label": "rotate_start",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "min_duration": 1.8,
+            "timeout": 8,
+            "strict_line": true
+        },
+        {
+            "action": "AutoLine",
+            "enabled": true
+        },
+        {
+            "label": "rotate_after_cross",
+            "action": "RotateLeft",
+            "speed": 5,
+            "until": "line",
+            "timeout": 6
+        },
+        {
+            "action": "Follow",
+            "duration": 0.8
+        },
+        {
+            "action": "AutoLine",
+            "enabled": false
+        },
+        {
+            "action": "Stop"
+        }
+    ],
+    "end_state": "stop"
+}

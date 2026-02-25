@@ -47,7 +47,8 @@
             "auto_mode": "/auto_mode",
             "plan_select": "/plan_select",
             "pick_robot": "/pick_robot",
-            "plan_status": "/plan_status"
+            "plan_status": "/plan_status",
+            "plan_callback": "/plan_callback"
         },
         "service": {
             "set_auto_mode": "/set_auto_mode"

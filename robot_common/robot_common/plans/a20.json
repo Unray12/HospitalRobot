@@ -43,8 +43,7 @@
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "timeout": 8,
-            "strict_line": true
+            "end_state": "true"
         }
     ],
     "end_state": "stop"

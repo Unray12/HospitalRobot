@@ -1,0 +1,38 @@
+{
+    "name": "plan_sample_huong_dan",
+    "start_without_cross": true,
+    "steps": [
+        {
+            "label": "scan_right_start",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "min_duration": 1.5,
+            "timeout": 8,
+            "strict_line": true
+        },
+        {
+            "action": "AutoLine",
+            "enabled": true
+        },
+        {
+            "label": "wait_cross_then_scan_left",
+            "action": "RotateLeft",
+            "speed": 5,
+            "until": "line",
+            "timeout": 8
+        },
+        {
+            "action": "Follow",
+            "duration": 0.8
+        },
+        {
+            "action": "AutoLine",
+            "enabled": false
+        },
+        {
+            "action": "Stop"
+        }
+    ],
+    "end_state": "stop"
+}

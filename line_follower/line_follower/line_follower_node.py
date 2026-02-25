@@ -70,11 +70,13 @@ class LineFollowerNode(Node):
         plan_topic = topics_cfg.get("plan_select", "/plan_select")
         pick_topic = topics_cfg.get("pick_robot", "/pick_robot")
         plan_status_topic = topics_cfg.get("plan_status", "/plan_status")
+        plan_callback_topic = topics_cfg.get("plan_callback", "/plan_callback")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
 
         self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.pick_pub = self.create_publisher(String, pick_topic, 10)
         self.plan_status_pub = self.create_publisher(String, plan_status_topic, 10)
+        self.plan_callback_pub = self.create_publisher(String, plan_callback_topic, 10)
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
@@ -206,6 +208,7 @@ class LineFollowerNode(Node):
             return
         self._active_plan_autoline = bool(requested)
         self.follower.set_autoline_mode(bool(requested))
+        self._on_autoline_step_callback(bool(requested))
         self._publish_plan_status_event(
             "autoline_step",
             status=self.follower.get_plan_status(),
@@ -216,6 +219,44 @@ class LineFollowerNode(Node):
         else:
             self.pick_pub.publish(String(data="0"))
             self._set_auto_mode(False)
+
+    def _on_autoline_step_callback(self, enabled: bool):
+        """
+        Callback hook when plan step AutoLine is applied.
+        Add your custom function call here (service call, extra publish, etc.).
+        """
+        state = "ON" if enabled else "OFF"
+        self.log.info(
+            f"[CALLBACK] AutoLine step applied -> {state} (plan={self._active_plan_name})",
+            event="AUTOLINE_CALLBACK",
+        )
+        self._publish_plan_status_event(
+            "autoline_callback",
+            status=self.follower.get_plan_status(),
+        )
+        self._my_function_after_rotate_to_autoline(enabled)
+
+    def _my_function_after_rotate_to_autoline(self, enabled: bool):
+        """
+        Custom hook after Rotate...until-line transitions to AutoLine step.
+        Publishes structured callback payload to /plan_callback for MQTT bridge/UI/backend.
+        """
+        status = self.follower.get_plan_status()
+        payload = {
+            "event": "rotate_to_autoline",
+            "plan": self._active_plan_name,
+            "autoline_enabled": bool(enabled),
+            "state": status.get("state"),
+            "step": status.get("next_step"),
+            "total_steps": status.get("total_steps"),
+            "action": status.get("current_action"),
+            "end_state": status.get("end_state"),
+            "ts": round(time.time(), 3),
+        }
+        msg = String()
+        msg.data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        self.plan_callback_pub.publish(msg)
+        self.log.info(msg.data, event="PLAN_CALLBACK")
 
     def _command_to_msg(self, direction, speed):
         command = format_command(direction, speed)
