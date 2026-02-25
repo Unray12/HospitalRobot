@@ -93,9 +93,14 @@ class LineFollowerFSM:
         self._last_plan_lost_line_warn_ts = 0.0
 
     def stop(self):
+        # Preserve current plan progress when stopping so status does not jump to step 1/N.
+        self._enter_stopped(reset_plan_progress=False)
+
+    def _enter_stopped(self, reset_plan_progress=True):
         self.state = self.STATE_STOPPED
         self.crossing_start_time = None
-        self._plan_index = 0
+        if reset_plan_progress:
+            self._plan_index = 0
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
@@ -279,7 +284,8 @@ class LineFollowerFSM:
             if self._plan_index >= len(self.cross_plan):
                 if self.plan_end_state == "follow":
                     return self._follow_default()
-                self.stop()
+                # Keep plan progress at end so status remains completed (not step 1/N).
+                self._enter_stopped(reset_plan_progress=False)
                 return "Stop", 0
 
             step = self.cross_plan[self._plan_index]
@@ -346,7 +352,7 @@ class LineFollowerFSM:
                 if self.plan_end_state == "follow":
                     self._log_info("[PLAN] Stop step reached, returning to follow")
                     return self._follow_default()
-                self.stop()
+                self._enter_stopped(reset_plan_progress=False)
                 self._log_info("[PLAN] Stop step reached, robot stopped")
                 return "Stop", 0
 
@@ -479,7 +485,7 @@ class LineFollowerFSM:
             if self.plan_end_state == "follow":
                 self.state = self.STATE_FOLLOWING
                 return self._follow_default()
-            self.stop()
+            self._enter_stopped(reset_plan_progress=False)
             return "Stop", 0
         # Allow immediate transition for control-only step AutoLine right after an action.
         # This keeps sequence like RotateRight -> AutoLine immediate, then wait next cross.
@@ -690,7 +696,11 @@ class LineFollowerFSM:
             "next_step": next_step,
             "current_action": self._plan_action,
             "end_state": self.plan_end_state,
+            "plan_done": self.is_plan_done(),
         }
+
+    def is_plan_done(self):
+        return self._plan_index >= len(self.cross_plan) and self._plan_action is None
 
     def _state_name(self, state):
         names = {

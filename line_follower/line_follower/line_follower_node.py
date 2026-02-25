@@ -38,7 +38,7 @@ class LineFollowerNode(Node):
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_name = config.get("cross_plan_name")
-        plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
+        plan_data = cfg_mgr.load_plan(plan_name, force=True) if plan_name else None
         plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
         plan_end_state = plan_data.get("end_state", config.get("plan_end_state", "stop")) if plan_data else config.get("plan_end_state", "stop")
 
@@ -112,6 +112,8 @@ class LineFollowerNode(Node):
         if name == "0" or name.lower() == "clear":
             self.follower.clear_plan()
             self.follower.set_autoline_mode(False)
+            self.pick_pub.publish(String(data="0"))
+            self._set_auto_mode(False)
             cleared_plan = self._active_plan_name
             self._active_plan_name = None
             self._active_plan_autoline = None
@@ -131,7 +133,7 @@ class LineFollowerNode(Node):
             return
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
-        plan_data = cfg_mgr.load_plan(name)
+        plan_data = cfg_mgr.load_plan(name, force=True)
         if not plan_data:
             self.log.warning(f"Plan not found: {name}", event="PLAN")
             return
@@ -248,14 +250,7 @@ class LineFollowerNode(Node):
             return
 
         status = self.follower.get_plan_status()
-        total_steps = int(status.get("total_steps", 0))
-        next_step = int(status.get("next_step", 0))
-        done = (
-            total_steps > 0
-            and next_step >= total_steps
-            and status.get("current_action") is None
-            and status.get("state") in {"FOLLOWING", "STOPPED"}
-        )
+        done = bool(status.get("plan_done", False))
         if not done:
             return
 

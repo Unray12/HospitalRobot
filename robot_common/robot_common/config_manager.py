@@ -40,8 +40,8 @@ class ConfigManager:
                 merged[key] = value
         return merged
 
-    def load_plan(self, plan_name):
-        if plan_name in ConfigManager._plan_cache:
+    def load_plan(self, plan_name, force=False):
+        if (not force) and plan_name in ConfigManager._plan_cache:
             return ConfigManager._plan_cache[plan_name]
 
         try:

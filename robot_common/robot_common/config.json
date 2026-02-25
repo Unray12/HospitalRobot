@@ -24,7 +24,7 @@
         }
     },
     "line_follower": {
-        "base_speed": 8,
+        "base_speed": 12,
         "turn_speed_left": 6,
         "turn_speed_right": 6,
         "crossing_duration": 3.0,
