@@ -98,7 +98,9 @@
             "debug_toggle": "/debug_logs_toggle",
             "robot_logs": "robot_logs",
             "plan_status_ros": "/plan_status",
-            "plan_status_mqtt": "plan_status"
+            "plan_status_mqtt": "plan_status",
+            "plan_message_ros": "/plan_message",
+            "plan_message_mqtt": "plan_message"
         },
         "keyboard": {
             "forward": "w",

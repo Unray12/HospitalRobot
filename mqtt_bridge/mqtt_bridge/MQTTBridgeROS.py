@@ -64,6 +64,8 @@ class MQTTBridgeNode(Node):
         self.topic_log_out = topics_cfg.get("robot_logs", "robot_logs")
         self.topic_plan_status_ros = topics_cfg.get("plan_status_ros", "/plan_status")
         self.topic_plan_status_mqtt = topics_cfg.get("plan_status_mqtt", "plan_status")
+        self.topic_plan_message_ros = topics_cfg.get("plan_message_ros", "/plan_message")
+        self.topic_plan_message_mqtt = topics_cfg.get("plan_message_mqtt", "plan_message")
         self.keyboard_map = {
             str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
             str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
@@ -106,6 +108,7 @@ class MQTTBridgeNode(Node):
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
         self.ros_debug_pub = self.create_publisher(Bool, self.topic_debug_toggle, 10)
         self.create_subscription(String, self.topic_plan_status_ros, self._plan_status_cb, 20)
+        self.create_subscription(String, self.topic_plan_message_ros, self._plan_message_cb, 20)
         if self._log_bridge_enabled:
             self.create_subscription(Log, self._log_bridge_ros_topic, self._rosout_cb, 100)
 
@@ -249,6 +252,15 @@ class MQTTBridgeNode(Node):
             return
         self.client.publish(self.topic_plan_status_mqtt, payload)
         self.log.info(f"ROS2 -> MQTT plan status: {payload}", event="PLAN_STATUS_MQTT")
+
+    def _plan_message_cb(self, msg: String):
+        if not self._mqtt_connected:
+            return
+        payload = str(msg.data or "").strip()
+        if not payload:
+            return
+        self.client.publish(self.topic_plan_message_mqtt, payload)
+        self.log.info(f"ROS2 -> MQTT plan message: {payload}", event="PLAN_MESSAGE_MQTT")
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()
