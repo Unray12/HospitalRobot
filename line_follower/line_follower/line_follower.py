@@ -200,6 +200,10 @@ class LineFollowerFSM:
 
         # Lost line -> stop
         if total_black == 0:
+            if self._has_pending_plan():
+                self._log_warn("LOST LINE during active plan; hold STOP and wait line reacquire")
+                self.state = self.STATE_FOLLOWING
+                return "Stop", 0
             self.stop()
             self._log_info("===> LOST LINE: STOP")
             return "Stop", 0
@@ -492,6 +496,10 @@ class LineFollowerFSM:
 
         total_black = left_count + mid_count + right_count
         if total_black == 0:
+            if self._has_pending_plan():
+                self._log_warn("LOST LINE during active plan; hold STOP and wait line reacquire")
+                self.state = self.STATE_FOLLOWING
+                return "Stop", 0
             self.stop()
             self._log_info("===> LOST LINE: STOP")
             return "Stop", 0
@@ -600,6 +608,9 @@ class LineFollowerFSM:
                 continue
             return action == "AUTOLINE"
         return False
+
+    def _has_pending_plan(self):
+        return bool(self.cross_plan) and self._plan_index < len(self.cross_plan)
 
     def _resolve_goto_target(self, target):
         if isinstance(target, int):
