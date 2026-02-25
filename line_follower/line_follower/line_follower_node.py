@@ -188,6 +188,7 @@ class LineFollowerNode(Node):
 
     def _timer_cb(self):
         if not self.autoMode:
+            self._check_and_publish_plan_completed()
             return
 
         now = time.time()
@@ -337,8 +338,27 @@ class LineFollowerNode(Node):
         if not done:
             return
 
+        done_plan = self._active_plan_name
         self._plan_completion_reported = True
         self._publish_plan_status_event("completed", status=status)
+
+        # Return to normal idle behavior after completed stop-plan.
+        end_state = str(status.get("end_state", "") or "").strip().lower()
+        if end_state == "follow":
+            return
+
+        self._set_auto_mode(False)
+        self.follower.clear_plan()
+        self.follower.set_autoline_mode(False)
+        self.pick_pub.publish(String(data="0"))
+        self._active_plan_autoline = False
+        self._active_plan_name = None
+        self._publish_plan_status_event(
+            "completed_reset",
+            status=self.follower.get_plan_status(),
+            plan_name=done_plan,
+        )
+        self.log.info(f"Plan completed and reset: {done_plan}", event="PLAN")
 
     def _publish_plan_status_event(self, event_name, status=None, plan_name=None):
         payload = {
