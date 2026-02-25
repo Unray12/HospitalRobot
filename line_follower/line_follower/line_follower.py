@@ -52,6 +52,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
         self._cross_active = False
         self._plan_new_step = True
@@ -72,6 +73,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -91,6 +93,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
@@ -112,6 +115,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_new_step = True
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
@@ -133,6 +137,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._cross_active = False
         self.state = self.STATE_FOLLOWING
         self._cross_pre_phase = 0
@@ -338,12 +343,17 @@ class LineFollowerFSM:
 
             if action in ("ROTATELEFT", "ROTATERIGHT"):
                 move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
+                strict_line = self._to_bool(
+                    step.get("strict_line", step.get("center_only")),
+                    False,
+                )
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
                 self._plan_action_until = None
                 self._plan_action_min_until = now + self.rotate_min_duration
                 self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
+                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side) and (not strict_line)
                 if duration > 0:
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
@@ -390,6 +400,7 @@ class LineFollowerFSM:
             self._plan_action_until_line = False
             self._plan_action_min_until = None
             self._plan_action_timeout = None
+            self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
             return self._after_plan_action(now)
 
         if self._plan_action_until_line:
@@ -403,12 +414,17 @@ class LineFollowerFSM:
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
-            if frame is not None and self._is_line_reacquired(frame, self._plan_action):
+            if frame is not None and self._is_line_reacquired(
+                frame,
+                self._plan_action,
+                allow_side_stop=self._plan_rotate_allow_side_stop,
+            ):
                 self._plan_action = None
                 self._plan_action_speed = None
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
+                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
@@ -422,6 +438,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         return self._after_plan_action(now)
 
     def _follow_default(self):
@@ -453,10 +470,11 @@ class LineFollowerFSM:
             and right_count <= self.rotate_line_side_max_count
         )
 
-    def _is_line_reacquired(self, frame, rotate_action):
+    def _is_line_reacquired(self, frame, rotate_action, allow_side_stop=None):
         if self._is_centered(frame):
             return True
-        if not self.rotate_early_stop_on_side:
+        allow_side = self.rotate_early_stop_on_side if allow_side_stop is None else bool(allow_side_stop)
+        if not allow_side:
             return False
         if rotate_action == "RotateLeft":
             return frame["left_count"] >= self.rotate_line_side_min_count

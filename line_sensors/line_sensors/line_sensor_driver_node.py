@@ -23,6 +23,9 @@ class LineSensorDriverNode(Node):
         topic = pub_cfg.get("topic", "/line_sensors/frame")
         rate_hz = pub_cfg.get("rate_hz", 100)
         debug_toggle_topic = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
+        self.reconnect_period_sec = float(config.get("reconnect_period_sec", 2.0))
+        self.fallback_ports = config.get("fallback_ports", ["/dev/ttyACM1", "/dev/ttyACM0"])
+        self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyACM", "/dev/ttyUSB", "COM"])
         self.debug_log_period = float(config.get("debug_log_period", 0.2))
         self.debug_enabled = bool(config.get("debug_enabled_default", False))
         self._last_debug_log_ts = 0.0
@@ -38,6 +41,7 @@ class LineSensorDriverNode(Node):
         self.create_subscription(Bool, debug_toggle_topic, self._debug_toggle_cb, 10)
         period = 1.0 / max(rate_hz, 1)
         self.timer = self.create_timer(period, self._timer_cb)
+        self.reconnect_timer = self.create_timer(self.reconnect_period_sec, self._reconnect_cb)
 
     def _debug_toggle_cb(self, msg: Bool):
         self.debug_enabled = bool(msg.data)
@@ -60,6 +64,15 @@ class LineSensorDriverNode(Node):
         ]
         self.pub.publish(msg)
         self._log_sensor_debug(frame)
+
+    def _reconnect_cb(self):
+        if self.reader.is_connected():
+            return
+        if self.reader.reconnect(
+            fallback_ports=self.fallback_ports,
+            scan_prefixes=self.scan_prefixes,
+        ):
+            self.log.info("Line sensor serial reconnected", event="SERIAL")
 
     def _log_sensor_debug(self, frame):
         if not self.debug_enabled:

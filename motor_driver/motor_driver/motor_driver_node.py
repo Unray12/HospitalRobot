@@ -23,6 +23,9 @@ class MotorDriverNode(Node):
         timeout = serial_cfg.get("timeout", 0.1)
         cmd_topic = sub_cfg.get("cmd_vel", "/cmd_vel")
         debug_toggle_topic = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
+        self.reconnect_period_sec = float(config.get("reconnect_period_sec", 2.0))
+        self.fallback_ports = config.get("fallback_ports", ["/dev/ttyUSB1", "/dev/ttyUSB0"])
+        self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyUSB", "/dev/ttyACM", "COM"])
         self.debug_log_period = float(config.get("debug_log_period", 0.2))
         self.debug_enabled = bool(config.get("debug_enabled_default", False))
         self._last_debug_log_ts = 0.0
@@ -36,6 +39,7 @@ class MotorDriverNode(Node):
 
         self.create_subscription(String, cmd_topic, self._cmd_cb, 10)
         self.create_subscription(Bool, debug_toggle_topic, self._debug_toggle_cb, 10)
+        self.reconnect_timer = self.create_timer(self.reconnect_period_sec, self._reconnect_cb)
 
     def _debug_toggle_cb(self, msg: Bool):
         self.debug_enabled = bool(msg.data)
@@ -48,6 +52,15 @@ class MotorDriverNode(Node):
             return
         wheel_speeds = self.motor.move(direction, speed)
         self._log_motor_debug(direction, speed, wheel_speeds)
+
+    def _reconnect_cb(self):
+        if self.motor.is_connected():
+            return
+        if self.motor.reconnect(
+            fallback_ports=self.fallback_ports,
+            scan_prefixes=self.scan_prefixes,
+        ):
+            self.log.info("Motor serial reconnected", event="SERIAL")
 
     def _log_motor_debug(self, direction, speed, wheel_speeds):
         if not self.debug_enabled or wheel_speeds is None:
