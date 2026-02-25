@@ -9,8 +9,8 @@
             "speed": 5,
             "messages": [
                 {
-                    "topic": "/plan_status",
-                    "message": "hãy đi theo tôi để đến phòng khám"
+                    "topic": "/plan_message",
+                    "message": "say:hãy đi theo tôi để đến phòng khám"
                 }
             ]
         },
@@ -25,8 +25,8 @@
             "until": "line",
             "messages": [
                 {
-                    "topic": "/plan_status",
-                    "message": "bạn còn ở đó chứ?"
+                    "topic": "/plan_message",
+                    "message": "say:bạn còn ở đó chứ?"
                 }
             ]
         },
@@ -39,8 +39,8 @@
             "timeout": 25,
             "messages": [
                 {
-                    "topic": "/plan_status",
-                    "message": "sắp tới rồi bạn nhé"
+                    "topic": "/plan_message",
+                    "message": "say:sắp tới rồi bạn nhé"
                 }
             ]
         },
@@ -54,15 +54,9 @@
             "label": "scan_right",
             "action": "RotateRight",
             "speed": 5,
-            "until": "line"
-        },
-        {
-            "label": "scan_right",
-            "action": "RotateRight",
-            "speed": 5,
             "until": "line",
-            "min_duration": 10,
             "end_state": "true",
+            "strict_line": true,
             "continue_immediately": true   
         }
     ],
