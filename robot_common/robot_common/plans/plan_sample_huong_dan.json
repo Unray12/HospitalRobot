@@ -7,20 +7,38 @@
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "min_duration": 1.5,
-            "timeout": 8,
-            "strict_line": true
+            "min_duration": 20,
+            "timeout": 25,
+            "strict_line": true,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "a20_scan_right_1"
+                }
+            ]
         },
         {
             "action": "AutoLine",
-            "enabled": true
+            "enabled": true,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "a20_autoline_on"
+                }
+            ]
         },
         {
             "label": "wait_cross_then_scan_left",
             "action": "RotateLeft",
             "speed": 5,
             "until": "line",
-            "timeout": 8
+            "timeout": 8,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "a20_scan_left_1"
+                }
+            ]
         },
         {
             "action": "Follow",
@@ -28,10 +46,22 @@
         },
         {
             "action": "AutoLine",
-            "enabled": false
+            "enabled": false,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "a20_autoline_off"
+                }
+            ]
         },
         {
-            "action": "Stop"
+            "action": "Stop",
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "a20_plan_stop"
+                }
+            ]
         }
     ],
     "end_state": "stop"

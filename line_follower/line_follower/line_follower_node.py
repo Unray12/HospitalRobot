@@ -72,6 +72,8 @@ class LineFollowerNode(Node):
         plan_status_topic = topics_cfg.get("plan_status", "/plan_status")
         plan_callback_topic = topics_cfg.get("plan_callback", "/plan_callback")
         auto_service = service_cfg.get("set_auto_mode", "/set_auto_mode")
+        self.plan_status_topic = plan_status_topic
+        self._string_publishers = {}
 
         self.cmd_pub = self.create_publisher(String, cmd_topic, 10)
         self.pick_pub = self.create_publisher(String, pick_topic, 10)
@@ -190,8 +192,10 @@ class LineFollowerNode(Node):
 
         now = time.time()
         self._consume_autoline_action()
+        self._consume_step_messages()
         result = self.follower.update(self._last_frame, now)
         self._consume_autoline_action()
+        self._consume_step_messages()
         if result is None:
             self._log_plan_status(now)
             self._check_and_publish_plan_completed()
@@ -219,6 +223,44 @@ class LineFollowerNode(Node):
         else:
             self.pick_pub.publish(String(data="0"))
             self._set_auto_mode(False)
+
+    def _consume_step_messages(self):
+        entries = self.follower.consume_requested_step_messages()
+        if not entries:
+            return
+        status = self.follower.get_plan_status()
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            topic = str(item.get("topic") or "").strip()
+            if not topic:
+                continue
+            message = item.get("message")
+            if message is None:
+                message = item.get("payload", "")
+            if isinstance(message, (dict, list)):
+                payload = json.dumps(message, ensure_ascii=False, separators=(",", ":"))
+            else:
+                payload = str(message)
+            pub = self._get_string_publisher(topic)
+            pub.publish(String(data=payload))
+            self.log.info(
+                f"[PLAN_MSG] topic={topic} payload={payload}",
+                event="PLAN_MESSAGE",
+            )
+            if topic == self.plan_status_topic:
+                self.log.info(
+                    f"ROS2 -> MQTT plan status: {payload}",
+                    event="PLAN_STATUS_MQTT",
+                )
+        self._publish_plan_status_event("step_message_sent", status=status)
+
+    def _get_string_publisher(self, topic: str):
+        pub = self._string_publishers.get(topic)
+        if pub is None:
+            pub = self.create_publisher(String, topic, 10)
+            self._string_publishers[topic] = pub
+        return pub
 
     def _on_autoline_step_callback(self, enabled: bool):
         """

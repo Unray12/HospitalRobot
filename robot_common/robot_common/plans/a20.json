@@ -6,7 +6,13 @@
             "label": "scan_right",
             "action": "RotateRight",
             "until": "line",
-            "speed": 5
+            "speed": 5,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "hãy đi theo tôi để đến phòng khám"
+                }
+            ]
         },
         {
             "action": "AutoLine",
@@ -16,7 +22,13 @@
             "label": "scan_left",
             "action": "RotateLeft",
             "speed": 5,
-            "until": "line"
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "bạn còn ở đó chứ?"
+                }
+            ]
         },
         {
             "label": "scan_right",
@@ -24,7 +36,13 @@
             "speed": 5,
             "until": "line",
             "min_duration": 20,
-            "timeout": 25
+            "timeout": 25,
+            "messages": [
+                {
+                    "topic": "/plan_status",
+                    "message": "sắp tới rồi bạn nhé"
+                }
+            ]
         },
         {
             "label": "scan_right",

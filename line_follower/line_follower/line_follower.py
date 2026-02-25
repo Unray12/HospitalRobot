@@ -66,6 +66,7 @@ class LineFollowerFSM:
         self._cross_pre_phase = 0
         self._cross_pre_until = None
         self._requested_autoline = None
+        self._requested_step_messages = None
         self._plan_start_requested = False
         self._autoline_mode = False
         self._plan_lost_line_since = None
@@ -89,6 +90,7 @@ class LineFollowerFSM:
         self._cross_pre_phase = 0
         self._cross_pre_until = None
         self._requested_autoline = None
+        self._requested_step_messages = None
         self._plan_start_requested = False
         self._autoline_mode = False
         self._plan_lost_line_since = None
@@ -117,6 +119,7 @@ class LineFollowerFSM:
         self._cross_pre_phase = 0
         self._cross_pre_until = None
         self._requested_autoline = None
+        self._requested_step_messages = None
         self._plan_start_requested = False
         self._autoline_mode = False
         self._plan_lost_line_since = None
@@ -143,6 +146,7 @@ class LineFollowerFSM:
         self._cross_pre_phase = 0
         self._cross_pre_until = None
         self._requested_autoline = None
+        self._requested_step_messages = None
         self._plan_start_requested = False
         self._autoline_mode = False
         self._plan_lost_line_since = None
@@ -167,6 +171,7 @@ class LineFollowerFSM:
         self._cross_pre_phase = 0
         self._cross_pre_until = None
         self._requested_autoline = None
+        self._requested_step_messages = None
         self._plan_start_requested = False
         self._autoline_mode = False
         self._plan_lost_line_since = None
@@ -328,6 +333,7 @@ class LineFollowerFSM:
                     True,
                 )
                 self._requested_autoline = enabled
+                self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
                 # After AutoLine step, return to FOLLOWING and wait next cross event
@@ -342,6 +348,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._queue_step_messages(step)
                     self._plan_continue_immediate = continue_immediately
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
@@ -354,6 +361,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._queue_step_messages(step)
                     self._plan_continue_immediate = continue_immediately
                     self._plan_action_until = now + duration
                     self._plan_action_until_line = False
@@ -374,6 +382,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = "AutoFollow"
                 self._plan_action_speed = self.base_speed
+                self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = now + duration
                 self._plan_action_until_line = False
@@ -397,6 +406,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = None
                 self._plan_action_min_until = now + max(0.0, float(min_duration))
@@ -418,6 +428,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_action_until = now + duration
                 self._plan_action_until_line = False
@@ -610,6 +621,11 @@ class LineFollowerFSM:
         self._requested_autoline = None
         return value
 
+    def consume_requested_step_messages(self):
+        value = self._requested_step_messages
+        self._requested_step_messages = None
+        return value
+
     def request_plan_start(self):
         if not self.cross_plan:
             return False
@@ -779,3 +795,9 @@ class LineFollowerFSM:
         if text in {"0", "false", "no", "off", "disable", "disabled"}:
             return False
         return bool(default)
+
+    def _queue_step_messages(self, step):
+        raw = step.get("messages")
+        if not isinstance(raw, list) or not raw:
+            return
+        self._requested_step_messages = raw
