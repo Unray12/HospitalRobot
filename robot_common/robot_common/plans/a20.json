@@ -23,8 +23,8 @@
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "min_duration": 15,
-            "timeout": 20
+            "min_duration": 20,
+            "timeout": 25
         },
         {
             "label": "scan_right",
@@ -43,7 +43,9 @@
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
-            "end_state": "true"
+            "min_duration": 10,
+            "end_state": "true",
+            "continue_immediately": true   
         }
     ],
     "end_state": "stop"
