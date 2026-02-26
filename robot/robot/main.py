@@ -15,7 +15,7 @@ def main():
     config = _load_config()
     nodes_cfg = config.get("bringup", {}).get(
         "nodes",
-        ["line_sensor_driver", "line_follower", "motor_driver", "manual_control"],
+        ["line_sensor_driver", "line_follower", "motor_driver", "manual_control", "camera_sensor"],
     )
 
     node_map = {
@@ -23,6 +23,7 @@ def main():
         "line_follower": ("line_follower", "line_follower"),
         "motor_driver": ("motor_driver", "motor_driver"),
         "manual_control": ("manual_control", "manual_control"),
+        "camera_sensor": ("camera_sensor", "camera_sensor"),
     }
 
     actions = []
