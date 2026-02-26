@@ -1,0 +1,294 @@
+{
+  "name": "plan_master_reference_non_a",
+  "version": "1.0.0",
+  "description": "Comprehensive reference that combines all non-a* plans and documents every field usage found in those plans.",
+  "source_files": [
+    "robot_common/robot_common/plans/plan_demo_autoline_callback.json",
+    "robot_common/robot_common/plans/plan_sample_huong_dan.json",
+    "robot_common/robot_common/plans/plan_stop.json",
+    "robot_common/robot_common/plans/plan_straight.json",
+    "robot_common/robot_common/plans/plan_turn_right.json",
+    "robot_common/robot_common/plans/plan_u_turn.json"
+  ],
+  "schema_reference": {
+    "plan_level_fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Plan identifier. Should match file naming intent."
+      },
+      "start_without_cross": {
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "If true, allows plan to start without waiting for first cross event."
+      },
+      "steps": {
+        "type": "array<object>",
+        "required": true,
+        "description": "Ordered step list executed by FSM."
+      },
+      "end_state": {
+        "type": "string",
+        "required": false,
+        "allowed": ["follow", "stop"],
+        "default": "stop",
+        "description": "Behavior after plan completion."
+      }
+    },
+    "step_level_fields": {
+      "label": {
+        "type": "string",
+        "required": false,
+        "description": "Optional symbolic name for a step, useful for readability and future Goto usage."
+      },
+      "action": {
+        "type": "string",
+        "required": true,
+        "description": "FSM action to execute."
+      },
+      "speed": {
+        "type": "integer",
+        "required": false,
+        "description": "Speed argument for motion/rotate actions."
+      },
+      "duration": {
+        "type": "number",
+        "required": false,
+        "description": "Time-based execution length in seconds."
+      },
+      "until": {
+        "type": "string",
+        "required": false,
+        "allowed_examples": ["line"],
+        "description": "Condition-based execution mode, typically for rotate until line reacquire."
+      },
+      "min_duration": {
+        "type": "number",
+        "required": false,
+        "description": "Minimum execution duration before condition completion can stop the step."
+      },
+      "timeout": {
+        "type": "number",
+        "required": false,
+        "description": "Max allowed time for condition-based execution."
+      },
+      "strict_line": {
+        "type": "boolean",
+        "required": false,
+        "default": false,
+        "description": "If true, use strict centered-line condition when finishing rotate-until-line."
+      },
+      "enabled": {
+        "type": "boolean",
+        "required": false,
+        "description": "Used by AutoLine action to toggle autoline mode."
+      },
+      "messages": {
+        "type": "array<object>",
+        "required": false,
+        "description": "Optional side-channel messages emitted at step execution."
+      }
+    },
+    "message_object_fields": {
+      "topic": {
+        "type": "string",
+        "required": true,
+        "description": "ROS topic where message payload is published."
+      },
+      "message": {
+        "type": "string",
+        "required": true,
+        "description": "Payload string emitted to the target topic."
+      }
+    },
+    "actions_covered_by_sources": [
+      "Wait",
+      "RotateLeft",
+      "RotateRight",
+      "Follow",
+      "Stop",
+      "AutoLine"
+    ]
+  },
+  "plans": [
+    {
+      "name": "plan_demo_autoline_callback",
+      "start_without_cross": true,
+      "steps": [
+        {
+          "label": "rotate_start",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line",
+          "min_duration": 1.8,
+          "timeout": 8,
+          "strict_line": true
+        },
+        {
+          "action": "AutoLine",
+          "enabled": true
+        },
+        {
+          "label": "rotate_after_cross",
+          "action": "RotateLeft",
+          "speed": 5,
+          "until": "line",
+          "timeout": 6
+        },
+        {
+          "action": "Follow",
+          "duration": 0.8
+        },
+        {
+          "action": "AutoLine",
+          "enabled": false
+        },
+        {
+          "action": "Stop"
+        }
+      ],
+      "end_state": "stop"
+    },
+    {
+      "name": "plan_sample_huong_dan",
+      "start_without_cross": true,
+      "steps": [
+        {
+          "label": "scan_right_start",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line",
+          "min_duration": 20,
+          "timeout": 25,
+          "strict_line": true,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a20_scan_right_1"
+            }
+          ]
+        },
+        {
+          "action": "AutoLine",
+          "enabled": true,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a20_autoline_on"
+            }
+          ]
+        },
+        {
+          "label": "wait_cross_then_scan_left",
+          "action": "RotateLeft",
+          "speed": 5,
+          "until": "line",
+          "timeout": 8,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a20_scan_left_1"
+            }
+          ]
+        },
+        {
+          "action": "Follow",
+          "duration": 0.8
+        },
+        {
+          "action": "AutoLine",
+          "enabled": false,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a20_autoline_off"
+            }
+          ]
+        },
+        {
+          "action": "Stop",
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a20_plan_stop"
+            }
+          ]
+        }
+      ],
+      "end_state": "stop"
+    },
+    {
+      "name": "plan_straight",
+      "steps": [
+        {
+          "action": "Follow",
+          "duration": 1.2
+        },
+        {
+          "action": "Stop",
+          "duration": 0.2
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "plan_turn_right",
+      "steps": [
+        {
+          "action": "Wait",
+          "duration": 0.2
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "until": "line",
+          "timeout": 2.5
+        },
+        {
+          "action": "Follow",
+          "duration": 0.5
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "plan_u_turn",
+      "steps": [
+        {
+          "action": "Wait",
+          "duration": 0.2
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "duration": 1.8
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "until": "line",
+          "timeout": 2.0
+        },
+        {
+          "action": "Follow",
+          "duration": 0.6
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "plan_stop",
+      "steps": [
+        {
+          "action": "Stop",
+          "duration": 0.5
+        },
+        {
+          "action": "Stop"
+        }
+      ],
+      "end_state": "stop"
+    }
+  ]
+}

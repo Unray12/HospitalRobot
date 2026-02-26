@@ -33,11 +33,11 @@
     `/face/camera`
 
   #inline("Runtime behavior")
-  - Node mở serial với `exclusive=True` để tránh nhiều process mở chung cổng.
-  - Worker thread đọc `readline()` liên tục và normalize từng frame.
+  - Node mở serial với `exclusive=True` (nếu pyserial hỗ trợ) để tránh nhiều process mở chung cổng.
+  - Timer callback đọc `readline()` theo chu kỳ `publish.rate_hz`, rồi normalize từng frame.
   - Frame malformed bị drop, có đếm số lượng drop để log định kỳ.
-  - Khi `SerialException`:
-    đóng cổng, ngủ ngắn, và thử reconnect theo chu kỳ.
+  - Khi lỗi serial:
+    đóng cổng và reconnect bằng timer định kỳ.
 
   #inline("Normalization behavior")
   - Làm sạch text:
