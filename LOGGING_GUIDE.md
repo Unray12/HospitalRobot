@@ -1,16 +1,16 @@
-# Logging Standard - HospitalRobot
+# Logging Guide - HospitalRobot
 
-Tài liệu này định nghĩa chuẩn log đồng bộ cho toàn hệ thống ROS2.
+Tài liệu này định nghĩa chuẩn log thống nhất cho toàn bộ node trong workspace.
 
 ## 1. Mục tiêu
 
-- Log phải đọc nhanh, lọc nhanh, và truy vết được luồng xử lý.
-- Cùng một format cho tất cả node.
-- Có màu theo mức log để vận hành dễ theo dõi.
+- Log phải dễ đọc cho vận hành và đủ dữ liệu cho debug kỹ thuật.
+- Cùng một format giữa các package để grep/lọc nhanh.
+- Tối ưu signal-to-noise: tránh spam nhưng vẫn giữ mốc quan trọng.
 
-## 2. Format chuẩn
+## 2. Format chuẩn bắt buộc
 
-Mỗi log dùng format:
+Mẫu log:
 
 ```text
 [component] [event] message | key=value key2=value2
@@ -20,24 +20,38 @@ Ví dụ:
 
 ```text
 [line_follower] [MODE] Auto Mode Enabled
-[line_follower] [PLAN] Plan selected: plan_ntp
-[line_follower] [PLAN_STATUS] plan_ntp | state=PLAN | step=2/5 | action=RotateRight | end_state=follow
+[line_follower] [PLAN] Plan selected: a20
+[line_follower] [PLAN_STATUS] a20 | state=PLAN | step=2/7 | action=RotateRight | end_state=stop
 [mqtt_bridge] [MQTT] Connected to MQTT broker
-[manual_control] [AUTO_SYNC] set_auto_mode rejected: ...
+[manual_control] [AUTO_SYNC] set_auto_mode rejected: service unavailable
 ```
 
-## 3. Màu theo level
+## 3. Thành phần API dùng chung
 
-- `INFO`: Cyan
-- `WARNING`: Yellow
-- `ERROR`: Red
+File dùng chung:
+- `robot_common/robot_common/logging_utils.py`
 
-## 4. Bật/tắt màu
+Khởi tạo trong node:
 
-- Mặc định: bật màu.
-- Tắt màu bằng một trong các cách:
-  - set env `NO_COLOR=1`
-  - hoặc set env `ROBOT_LOG_COLOR=0`
+```python
+from robot_common.logging_utils import LogAdapter
+
+self.log = LogAdapter(self.get_logger(), "line_follower")
+self.log.info("Auto Mode Enabled", event="MODE")
+self.log.warning("Plan not found: a99", event="PLAN")
+self.log.error("Serial write error", event="SERIAL")
+```
+
+## 4. Màu log và env control
+
+Color mapping:
+- `INFO`: cyan
+- `WARNING`: yellow
+- `ERROR`: red
+
+Tắt màu:
+- `NO_COLOR=1`
+- hoặc `ROBOT_LOG_COLOR=0`
 
 Ví dụ:
 
@@ -45,72 +59,106 @@ Ví dụ:
 export NO_COLOR=1
 ```
 
-## 5. Event code chuẩn nên dùng
+## 5. Event taxonomy theo package
 
-### line_follower
+### 5.1 line_follower
 
-- `MODE`: trạng thái auto/manual.
-- `PLAN`: chọn/xóa/duplicate plan.
-- `PLAN_STATUS`: trạng thái runtime của plan (state/step/action).
-- `FRAME`: frame cảm biến không hợp lệ.
+- `MODE`: bật/tắt auto mode
+- `PLAN`: chọn/clear/not-found/duplicate
+- `PLAN_STATUS`: state machine status (throttle)
+- `PLAN_EVENT`: JSON event publish `/plan_status`
+- `PLAN_CALLBACK`: callback publish `/plan_callback`
+- `PLAN_MESSAGE`: step message publish theo topic
+- `PLAN_STATUS_MQTT`: trạng thái plan chuyển sang MQTT
+- `FRAME`: dữ liệu frame đầu vào không hợp lệ
 
-### mqtt_bridge
+### 5.2 line_sensors
 
-- `BOOT`: khởi động node.
-- `MQTT`: kết nối/mất kết nối broker.
-- `BRIDGE_IN`: MQTT -> ROS.
-- `BRIDGE_OUT`: ROS -> MQTT.
-- `BRIDGE_FALLBACK`: fallback local khi MQTT lỗi.
-- `KEYBOARD`: thao tác keyboard.
-- `DEBUG_TOGGLE`: bật/tắt debug log bằng phím `e`.
+- `SERIAL`: connect/reconnect trạng thái serial
+- `SENSOR`: frame cảm biến (khi debug ON)
+- `DEBUG_TOGGLE`: bật/tắt debug log
 
-### manual_control
+### 5.3 motor_driver
 
-- `AUTO_SYNC`: đồng bộ service `/set_auto_mode`.
+- `SERIAL`: connect/reconnect và lỗi serial
+- `MOTOR`: tốc độ 4 bánh (khi debug ON)
+- `DEBUG_TOGGLE`: bật/tắt debug log
 
-### line_sensors / motor_driver
+### 5.4 manual_control
 
-- `INFO/WARN/ERR`: kết nối serial, lỗi parse/thiết bị.
-- `SENSOR`: log giá trị cảm biến line (khi debug bật).
-- `MOTOR`: log tốc độ 4 bánh (khi debug bật).
+- `MODE`: manual override và đổi mode
+- `AUTO_SYNC`: retry/send/give-up khi sync service `/set_auto_mode`
+
+### 5.5 mqtt_bridge
+
+- `BOOT`: node startup
+- `MQTT`: connect/disconnect broker
+- `BRIDGE_IN`: MQTT -> ROS2
+- `BRIDGE_OUT`: ROS2 -> MQTT
+- `BRIDGE_FALLBACK`: fallback local khi MQTT down
+- `PLAN_MQTT`: normalize/validate payload plan
+- `PLAN_STATUS_MQTT`: publish plan status ra MQTT
+- `PLAN_MESSAGE_MQTT`: publish plan message ra MQTT
+- `KEYBOARD`: sự kiện vận hành từ bàn phím
+- `DEBUG_TOGGLE`: đổi trạng thái debug logs runtime
+
+### 5.6 camera_sensor
+
+- `BOOT`: startup serial reader
+- `SERIAL`: open/read/reconnect error
+- `FRAME`: drop frame malformed
 
 ## 6. Quy tắc nội dung message
 
-- Viết ngắn, đúng thông tin cần debug.
-- Ưu tiên có dữ liệu chẩn đoán:
-  - tên plan
-  - step hiện tại/tổng step
-  - action hiện tại
-  - end_state
-  - mã lỗi hoặc exception
+- Message ngắn, rõ và có context ngay trong dòng log.
+- Ưu tiên bổ sung trường chẩn đoán trong `key=value`:
+  - `plan`
+  - `step`, `total_steps`
+  - `state`
+  - `action`
+  - `end_state`
+  - `topic`, `payload`
+- Không log payload nhạy cảm hoặc quá dài liên tục.
 
-## 7. Log quá nhiều (anti-spam)
+## 7. Chống spam log
 
-- Trạng thái plan đã có throttle (`plan_status_log_period`) để tránh spam.
-- Chỉ log khi:
-  - trạng thái đổi
-  - hoặc hết chu kỳ log định kỳ.
+Cơ chế hiện có:
+- `line_follower` throttle `PLAN_STATUS` theo `plan_status_log_period`
+- `line_sensors` throttle debug theo `debug_log_period`
+- `motor_driver` throttle debug theo `debug_log_period`
+- `camera_sensor` chỉ log drop malformed theo chu kỳ đếm
 
-## 8. API dùng chung
+Khuyến nghị:
+- Dùng event code cố định trước khi tăng tần suất log.
+- Khi cần trace sâu, bật debug tạm thời qua `/debug_logs_toggle`.
 
-Dùng `LogAdapter` trong:
+## 8. Cầu nối log ROS2 -> MQTT
 
-- `robot_common/robot_common/logging_utils.py`
+`mqtt_bridge` có chế độ log bridge:
+- subscribe `/rosout`
+- lọc theo `source_nodes` và `keywords`
+- publish sang MQTT topic `robot_logs`
 
-Node khởi tạo:
+Mục tiêu:
+- dashboard/UI có thể nhận sự kiện plan quan trọng không cần đọc trực tiếp ROS logs.
 
-```python
-self.log = LogAdapter(self.get_logger(), "line_follower")
-self.log.info("Plan selected: plan_ntp", event="PLAN")
-self.log.warning("Plan not found", event="PLAN")
-self.log.error("Serial open failed", event="SERIAL")
-```
+## 9. Checklist review log khi thêm tính năng mới
 
-## 9. Khuyến nghị vận hành
+1. Có `component` rõ ràng theo package.
+2. Có `event` nhất quán, không đặt tên tự do trùng nghĩa.
+3. Có đủ key-value để debug từ xa.
+4. Không spam ở vòng lặp nhanh.
+5. Có ít nhất một log cho state transition quan trọng.
 
-- Khi debug plan: lọc theo `PLAN` và `PLAN_STATUS`.
-- Khi debug bridge: lọc theo `MQTT`, `BRIDGE_IN`, `BRIDGE_OUT`.
-- Khi debug auto mode: lọc theo `MODE`, `AUTO_SYNC`.
-- Bật/tắt debug sensor + motor:
-  - Nhấn phím `e` trong `mqtt_bridge`.
-  - Topic toggle: `/debug_logs_toggle` (`std_msgs/Bool`).
+## 10. Quy trình debug nhanh theo tình huống
+
+- Robot không đi:
+  - xem `line_follower [MODE]` và `/auto_mode`
+  - xem `line_follower [PLAN]` và `plan not found`
+  - xem `motor_driver [SERIAL]`
+- Plan không chạy đúng bước:
+  - xem `PLAN_STATUS`, `PLAN_EVENT`, `PLAN_MESSAGE`
+- MQTT điều khiển không vào ROS:
+  - xem `mqtt_bridge [MQTT]` và `BRIDGE_IN`
+- Manual override không hoạt động:
+  - xem `manual_control [MODE]` và `AUTO_SYNC`
