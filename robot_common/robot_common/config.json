@@ -93,6 +93,7 @@
     },
     "manual_control": {
         "base_speed": 10,
+        "manual_override_on_input": true,
         "topics": {
             "vr_control": "/VR_control",
             "pick_robot": "/pick_robot",
@@ -133,6 +134,7 @@
             "toggle_auto": "k",
             "quit": "q"
         },
+        "echo_suppress_window_sec": 0.35,
         "plan_keys": {
             "0": "clear",
             "1": "a20",

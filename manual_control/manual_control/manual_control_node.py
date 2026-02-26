@@ -20,6 +20,7 @@ class ManualControlNode(Node):
         self.base_speed = int(config.get("base_speed", 6))
         self.auto_sync_retry_period = float(config.get("auto_mode_service_retry_period", 0.2))
         self.auto_sync_max_attempts = int(config.get("auto_mode_service_max_attempts", 30))
+        self.manual_override_on_input = bool(config.get("manual_override_on_input", True))
         self.autoMode = False
         self._auto_sync = AutoModeSync(max_attempts=self.auto_sync_max_attempts)
 
@@ -38,12 +39,20 @@ class ManualControlNode(Node):
         self._sync_timer = self.create_timer(self.auto_sync_retry_period, self._sync_auto_mode_timer_cb)
 
     def _manual_cb(self, msg: String):
-        if self.autoMode:
-            return
         cmd = msg.data.strip()
-        msg = self._command_to_msg(cmd, self.base_speed)
-        if msg:
-            self.cmd_pub.publish(msg)
+        out_msg = self._command_to_msg(cmd, self.base_speed)
+        if out_msg is None:
+            return
+
+        if self.autoMode:
+            if not self.manual_override_on_input:
+                return
+            self.autoMode = False
+            self.auto_pub.publish(Bool(data=False))
+            self._auto_sync.queue(False)
+            self.log.info("Manual override: auto mode disabled by operator input", event="MODE")
+
+        self.cmd_pub.publish(out_msg)
 
     def _pick_cb(self, msg: String):
         data = msg.data.strip()

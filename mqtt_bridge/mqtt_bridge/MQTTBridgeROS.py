@@ -4,6 +4,7 @@ import threading
 from threading import Event
 import os
 import re
+import time
 
 try:
     import paho.mqtt.client as mqtt
@@ -91,6 +92,8 @@ class MQTTBridgeNode(Node):
             }
         self._known_plans = set(self.room_plan_map.values()) | set(self.plan_key_map.values())
         self._debug_logs_enabled = False
+        self._echo_suppress_window_sec = float(config.get("echo_suppress_window_sec", 0.35))
+        self._recent_local_pub = {}
         self._log_bridge_enabled = bool(log_bridge_cfg.get("enabled", True))
         self._log_bridge_ros_topic = str(log_bridge_cfg.get("ros_topic", "/rosout"))
         self._log_bridge_sources = {
@@ -155,6 +158,8 @@ class MQTTBridgeNode(Node):
 
     def on_message(self, client, userdata, msg):
         data = msg.payload.decode()
+        if self._is_recent_local_echo(msg.topic, data):
+            return
         self.log.info(f"MQTT -> ROS2: {data}", event="BRIDGE_IN")
 
         ros_msg = String()
@@ -187,7 +192,9 @@ class MQTTBridgeNode(Node):
             elif key == self.key_toggle_auto:
                 autoMode = not autoMode
                 mode_msg = "1" if autoMode else "0"
+                self.ros_pick_pub.publish(String(data=mode_msg))
                 self.client.publish(self.topic_pick, mode_msg)
+                self._mark_local_publish(self.topic_pick, mode_msg)
                 self.log.info(f"ROS2 -> MQTT: {mode_msg}", event="BRIDGE_OUT")
             elif key == self.key_toggle_debug_logs:
                 self._debug_logs_enabled = not self._debug_logs_enabled
@@ -201,7 +208,9 @@ class MQTTBridgeNode(Node):
                 plan_name = self.plan_key_map[key]
                 if self._mqtt_connected:
                     mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
+                    self.ros_plan_pub.publish(String(data=plan_name))
                     self.client.publish(self.topic_plan, mqtt_plan_cmd)
+                    self._mark_local_publish(self.topic_plan, mqtt_plan_cmd)
                     self.log.info(f"ROS2 -> MQTT: {mqtt_plan_cmd}", event="BRIDGE_OUT")
                 else:
                     # Fallback local publish so operator key still works when MQTT is down.
@@ -219,7 +228,9 @@ class MQTTBridgeNode(Node):
                 break
 
             if cmd:
+                self.ros_pub.publish(String(data=cmd))
                 self.client.publish(self.topic_vr, cmd)
+                self._mark_local_publish(self.topic_vr, cmd)
                 self.log.info(f"ROS2 -> MQTT: {cmd}", event="BRIDGE_OUT")
 
         self.client.disconnect()
@@ -309,6 +320,20 @@ class MQTTBridgeNode(Node):
 
         # Keep compatibility: allow direct plan names even if not listed in mappings.
         return text
+
+    def _mark_local_publish(self, topic: str, payload: str):
+        self._recent_local_pub[(topic, payload)] = time.time()
+
+    def _is_recent_local_echo(self, topic: str, payload: str):
+        now = time.time()
+        key = (topic, payload)
+        ts = self._recent_local_pub.get(key)
+        if ts is None:
+            return False
+        if (now - ts) <= self._echo_suppress_window_sec:
+            return True
+        del self._recent_local_pub[key]
+        return False
 
 
 
