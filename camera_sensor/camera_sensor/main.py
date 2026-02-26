@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -24,6 +25,7 @@ class SerialReader(Node):
         self.read_timeout = float(serial_cfg.get("timeout", 0.2))
 
         self.pub = self.create_publisher(String, self.topic, 10)
+        self._drop_count = 0
 
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -69,9 +71,18 @@ class SerialReader(Node):
                 if text == '':
                     continue
 
+                normalized = self._normalize_face_payload(text)
+                if normalized is None:
+                    self._drop_count += 1
+                    if self._drop_count % 20 == 1:
+                        self.log.warning(
+                            f"Dropped malformed camera frame: {text}",
+                            event="FRAME",
+                        )
+                    continue
+
                 msg = String()
-                msg.data = text
-                # self._log_info(text)
+                msg.data = normalized
                 self.pub.publish(msg)
 
             except serial.SerialException as e:
@@ -80,6 +91,76 @@ class SerialReader(Node):
             except Exception as e:
                 self.log.error(f"Read error: {e}", event="SERIAL")
                 time.sleep(0.2)
+
+    def _normalize_face_payload(self, raw):
+        text = (raw or "").strip()
+        if not text:
+            return None
+
+        text = text.upper().replace(" ", "")
+        text = text.replace("Ư", "")
+
+        if "<" in text and ">" in text:
+            start = text.find("<")
+            end = text.find(">", start + 1)
+            if end > start:
+                text = text[start + 1:end]
+        text = text.strip("<>")
+        text = re.sub(r"[^A-Z0-9_,]", "", text)
+        if not text:
+            return None
+
+        parts = [p for p in text.split(",") if p]
+        if len(parts) < 2:
+            return None
+
+        dev_raw = parts[0]
+        state_raw = parts[1]
+        rest = ",".join(parts[2:]) if len(parts) > 2 else ""
+
+        dev = self._normalize_device(dev_raw)
+        state = self._normalize_state(state_raw)
+        if dev is None or state is None:
+            return None
+
+        if state == "NO_OBJECT":
+            return f"<{dev},NO_OBJECT>"
+
+        score = self._extract_score(rest)
+        return f"<{dev},FACE,{score}>"
+
+    def _normalize_device(self, token):
+        t = (token or "").strip()
+        if not t:
+            return None
+        if t.startswith("DEV") and len(t) > 3 and t[3:].isdigit():
+            return t
+        if t in {"DEV", "DV1", "EV1", "D1", "V1", "DV", "EV", "DEV1"}:
+            return "DEV1"
+        if any(ch in t for ch in "DEV") and "1" in t:
+            return "DEV1"
+        return None
+
+    def _normalize_state(self, token):
+        t = (token or "").strip()
+        if not t:
+            return None
+        if "FACE" in t or t == "ACE":
+            return "FACE"
+        if (
+            t in {"NO_OBJECT", "NOOBJECT", "NO_OBECT", "NO_BJECT", "O_OBJECT"}
+            or ("NO" in t and "OBJECT" in t)
+        ):
+            return "NO_OBJECT"
+        return None
+
+    def _extract_score(self, token):
+        if not token:
+            return 0
+        m = re.search(r"[01]", token)
+        if not m:
+            return 0
+        return int(m.group(0))
 
     def destroy_node(self):
         self._stop.set()
