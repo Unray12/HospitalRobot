@@ -20,8 +20,8 @@ Ví dụ:
 
 ```text
 [line_follower] [MODE] Auto Mode Enabled
-[line_follower] [PLAN] Plan selected: plan_ntp
-[line_follower] [PLAN_STATUS] plan_ntp | state=PLAN | step=2/5 | action=RotateRight | end_state=follow
+[line_follower] [PLAN] Plan selected: a20
+[line_follower] [PLAN_STATUS] a20 | state=PLAN | step=2/6 | action=RotateRight | label=scan_right | end_state=stop
 [mqtt_bridge] [MQTT] Connected to MQTT broker
 [manual_control] [AUTO_SYNC] set_auto_mode rejected: ...
 ```
@@ -51,7 +51,12 @@ export NO_COLOR=1
 
 - `MODE`: trạng thái auto/manual.
 - `PLAN`: chọn/xóa/duplicate plan.
-- `PLAN_STATUS`: trạng thái runtime của plan (state/step/action).
+- `PLAN_STATUS`: trạng thái runtime của plan (state/step/action/label).
+- `PLAN_EVENT`: event JSON publish ra `/plan_status`.
+- `PLAN_MESSAGE`: step messages publish ra topic.
+- `PLAN_STATUS_MQTT`: log khi publish step message vào `/plan_status`.
+- `PLAN_CALLBACK`: callback payload publish ra `/plan_callback`.
+- `AUTOLINE_CALLBACK`: callback AutoLine hook.
 - `FRAME`: frame cảm biến không hợp lệ.
 
 ### mqtt_bridge
@@ -61,6 +66,9 @@ export NO_COLOR=1
 - `BRIDGE_IN`: MQTT -> ROS.
 - `BRIDGE_OUT`: ROS -> MQTT.
 - `BRIDGE_FALLBACK`: fallback local khi MQTT lỗi.
+- `PLAN_MQTT`: normalize/invalid plan command.
+- `PLAN_STATUS_MQTT`: ROS plan status -> MQTT.
+- `PLAN_MESSAGE_MQTT`: ROS plan message -> MQTT.
 - `KEYBOARD`: thao tác keyboard.
 - `DEBUG_TOGGLE`: bật/tắt debug log bằng phím `e`.
 
@@ -68,10 +76,16 @@ export NO_COLOR=1
 
 - `AUTO_SYNC`: đồng bộ service `/set_auto_mode`.
 
-### line_sensors / motor_driver
+### line_sensors
 
-- `INFO/WARN/ERR`: kết nối serial, lỗi parse/thiết bị.
-- `SENSOR`: log giá trị cảm biến line (khi debug bật).
+- `SERIAL`: kết nối/mất kết nối serial.
+- `DEBUG_TOGGLE`: bật/tắt debug log.
+- `SENSOR`: log frame cảm biến (khi debug bật).
+
+### motor_driver
+
+- `SERIAL`: kết nối/mất kết nối serial.
+- `DEBUG_TOGGLE`: bật/tắt debug log.
 - `MOTOR`: log tốc độ 4 bánh (khi debug bật).
 
 ## 6. Quy tắc nội dung message
@@ -81,6 +95,7 @@ export NO_COLOR=1
   - tên plan
   - step hiện tại/tổng step
   - action hiện tại
+  - label hiện tại (nếu có)
   - end_state
   - mã lỗi hoặc exception
 
@@ -101,15 +116,15 @@ Node khởi tạo:
 
 ```python
 self.log = LogAdapter(self.get_logger(), "line_follower")
-self.log.info("Plan selected: plan_ntp", event="PLAN")
+self.log.info("Plan selected: a20", event="PLAN")
 self.log.warning("Plan not found", event="PLAN")
 self.log.error("Serial open failed", event="SERIAL")
 ```
 
 ## 9. Khuyến nghị vận hành
 
-- Khi debug plan: lọc theo `PLAN` và `PLAN_STATUS`.
-- Khi debug bridge: lọc theo `MQTT`, `BRIDGE_IN`, `BRIDGE_OUT`.
+- Khi debug plan: lọc theo `PLAN`, `PLAN_STATUS`, `PLAN_EVENT`.
+- Khi debug bridge: lọc theo `MQTT`, `BRIDGE_IN`, `BRIDGE_OUT`, `PLAN_MQTT`.
 - Khi debug auto mode: lọc theo `MODE`, `AUTO_SYNC`.
 - Bật/tắt debug sensor + motor:
   - Nhấn phím `e` trong `mqtt_bridge`.

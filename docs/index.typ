@@ -49,7 +49,7 @@
   #v(0.7cm)
   #text(12pt, weight: "semibold")[ROS2 Technical Report]
   #v(0.6cm)
-  #text(10pt)[Version: 2026-02-23]
+  #text(10pt)[Version: 2026-02-26]
   #linebreak()
   #text(10pt)[Team: ACLAB]
   #v(0.8cm)
@@ -83,6 +83,8 @@
     `/pick_robot -> manual_control -> /auto_mode -> line_follower`
   - Plan select path:
     `/plan_select -> line_follower -> plan files`
+  - Plan status/message path:
+    `/plan_status, /plan_message -> mqtt_bridge -> MQTT`
 
   #inline("Core service interface")
   `/set_auto_mode` (`std_srvs/SetBool`) for mode synchronization.
@@ -99,6 +101,9 @@
   - `/VR_control` (`std_msgs/String`): manual command input
   - `/pick_robot` (`std_msgs/String`): auto mode trigger
   - `/plan_select` (`std_msgs/String`): plan runtime selection
+  - `/plan_status` (`std_msgs/String`): plan status event JSON
+  - `/plan_callback` (`std_msgs/String`): plan callback JSON
+  - `/plan_message` (`std_msgs/String`): custom message from plan steps
   - `/debug_logs_toggle` (`std_msgs/Bool`): runtime debug toggle
 
   #inline("Services")

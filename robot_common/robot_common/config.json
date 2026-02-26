@@ -56,9 +56,11 @@
         "plan_alias": {
             "0": "clear",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a21",
+            "3": "a22",
+            "4": "a23",
+            "5": "a24",
+            "6": "a25"
         }
     },
     "motor_driver": {
@@ -117,19 +119,25 @@
         "plan_keys": {
             "0": "clear",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a21",
+            "3": "a22",
+            "4": "a23",
+            "5": "a24",
+            "6": "a25"
         },
         "room_plans": {
             "a20": "a20",
-            "a21": "plan_straight",
-            "a22": "plan_turn_right",
-            "a23": "plan_stop",
+            "a21": "a21",
+            "a22": "a22",
+            "a23": "a23",
+            "a24": "a24",
+            "a25": "a25",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a21",
+            "3": "a22",
+            "4": "a23",
+            "5": "a24",
+            "6": "a25"
         },
         "log_bridge": {
             "enabled": true,

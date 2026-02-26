@@ -5,7 +5,7 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 ## 1. Vị trí file plan
 
 - Thư mục: `robot_common/robot_common/plans/`
-- Mỗi plan là 1 file JSON, ví dụ: `plan_ntp.json`, `plan_turn_right.json`.
+- Mỗi plan là 1 file JSON, ví dụ: `a20.json`, `a21.json`.
 
 ## 2. Cấu trúc plan
 
@@ -13,6 +13,7 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 {
   "name": "plan_example",
   "autoline": true,
+  "start_without_cross": false,
   "steps": [
     { "action": "Wait", "duration": 0.2 },
     { "action": "RotateRight", "speed": 6, "until": "line", "timeout": 2.5 },
@@ -27,6 +28,9 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 - `autoline` (optional): khi chọn plan sẽ tự bật auto mode (`pick_robot=1`).
   - Nếu không khai báo, dùng mặc định từ config `line_follower.auto_on_plan_select` (hiện tại là `true`).
   - Tương thích key cũ: `auto_on_select`.
+- `start_without_cross` (optional): chạy plan ngay khi select, không cần gặp giao cắt.
+  - Tương thích key cũ: `start_immediately`.
+  - Lưu ý: vẫn chạy pha `cross_pre` (forward -> stop) trừ khi step đầu là `Rotate...` và `autoline` đang tắt.
 - `end_state`:
   - `follow`: xong plan thì quay về bám line.
   - `stop`: xong plan thì dừng.
@@ -35,7 +39,7 @@ Tài liệu này hướng dẫn cách viết file plan JSON cho `line_follower`.
 
 - `steps` là mảng object JSON, thực thi tuần tự từ trên xuống.
 - Mỗi step nên có `action`.
-- Tất cả key đều phân biệt chữ hoa/thường theo JSON, nhưng giá trị `action` được hệ thống normalize (có alias).
+- Tất cả key phân biệt chữ hoa/thường theo JSON, nhưng giá trị `action` được hệ thống normalize (có alias).
 - Nếu step thiếu `action`, hệ thống sẽ xem như `Stop`.
 - Nếu action không hợp lệ: step đó bị bỏ qua, log warning và chạy step kế tiếp.
 
@@ -66,6 +70,7 @@ Chế độ hỗ trợ:
 - Quay theo line:
   - Đặt `until: "line"` (hoặc bỏ qua `until`).
   - Có thể đặt `timeout` để tránh quay vô hạn.
+  - Có thể đặt `min_duration` để ép quay tối thiểu trước khi xét line (mặc định `rotate_min_duration`).
 - Quay theo thời gian:
   - Đặt `duration` > 0.
 
@@ -74,6 +79,8 @@ Tham số:
 - `duration` (tùy chọn)
 - `until` (tùy chọn, giá trị đúng: `"line"`)
 - `timeout` (tùy chọn, giây)
+- `min_duration` (tùy chọn, giây)
+- `strict_line` (tùy chọn, bool): chỉ cho phép dừng khi line ở giữa (alias `center_only`).
 
 Ví dụ quay theo line:
 ```json
@@ -96,6 +103,7 @@ Ví dụ quay theo thời gian:
 - `Auto`: trả lại chế độ mặc định (follow).
 - `AutoLine`: bật/tắt auto mode ngay tại step.
   - Hỗ trợ tham số: `enabled`, `value`, hoặc `autoline` (true/false).
+  - Sau step `AutoLine`, FSM quay về FOLLOWING và chờ giao cắt tiếp theo để chạy step kế tiếp.
 
 Ví dụ:
 ```json
@@ -137,9 +145,26 @@ Ví dụ:
 }
 ```
 
+### 4.6 Step messages (ROS topic publish)
+
+- Mỗi step có thể gửi message ra ROS topic ngay khi bắt đầu step:
+  - `messages`: danh sách object `{ topic, message }` hoặc `{ topic, payload }`.
+  - Nếu `message` là object/list, hệ thống sẽ JSON-encode trước khi publish.
+
+Ví dụ:
+```json
+{
+  "action": "RotateRight",
+  "messages": [
+    { "topic": "/plan_message", "message": "say:sap toi roi" },
+    { "topic": "/plan_status", "payload": { "tag": "scan_right" } }
+  ]
+}
+```
+
 ## 5. Bảng tham số chi tiết theo action
 
-### 5.0 Quy ước thời gian (`duration`, `timeout`)
+### 5.0 Quy ước thời gian (`duration`, `timeout`, `min_duration`)
 
 - Đơn vị: **giây**.
 - Kiểu dữ liệu: `float` hoặc `int`.
@@ -176,11 +201,13 @@ Ví dụ:
   - `duration` (optional): `float` (giây).
   - `until` (optional): `"line"` để xoay đến khi line centered.
   - `timeout` (optional): `float` (giây), chỉ dùng tốt nhất khi `until: "line"`.
+  - `min_duration` (optional): ép quay tối thiểu trước khi xét line.
+  - `strict_line` (optional): chỉ cho phép dừng khi line vào giữa (alias `center_only`).
 - Luật hoạt động:
   - Nếu có `duration` > 0: ưu tiên chế độ theo thời gian.
   - Nếu không có `duration`: dùng chế độ `until line`.
   - Nếu có `timeout` và quá thời gian: tự thoát step để tránh quay vô hạn.
-  - Trong chế độ `until line`, hệ thống vẫn ép quay tối thiểu `rotate_min_duration` trước khi được phép kết thúc (tránh dừng quá sớm do nhiễu cảm biến).
+  - Trong chế độ `until line`, hệ thống vẫn ép quay tối thiểu `min_duration` trước khi được phép kết thúc.
 
 Hành vi mặc định:
 - Không có `duration` -> quay theo line.
@@ -234,12 +261,18 @@ Ví dụ:
 
 Với ví dụ thứ 2, robot sẽ follow trong **0.6s**.
 
-### 5.6 `Auto`
+### 5.6 `AutoLine`
+
+- Mục đích: bật/tắt auto mode trong plan.
+- Tham số:
+  - `enabled` / `value` / `autoline`: `true/false`.
+
+### 5.7 `Auto`
 
 - Mục đích: thoát nhanh khỏi plan step hiện tại về hành vi mặc định follow.
 - Tham số: không cần.
 
-### 5.7 `Goto`
+### 5.8 `Goto`
 
 - Mục đích: nhảy tới step khác trong cùng plan.
 - Tham số:
@@ -262,11 +295,16 @@ Hệ thống tự map các alias sau:
 - `Sleep` -> `Wait`
 - `Go` -> `Forward`
 - `Straight` -> `Forward`
+- `Auto_Line` / `AutoLine_On` / `AutoLine_Off` -> `AutoLine`
 
 ## 7. Tham số metadata của step
 
 - `label` (optional): tên nhãn của step để `Goto` trỏ tới.
-- Các key không được dùng sẽ bị bỏ qua.
+- `messages` (optional): list message publish khi step bắt đầu.
+- `continue_immediately` (optional): chạy step kế ngay sau khi action kết thúc, không chờ giao cắt.
+  - Alias: `no_wait_cross`.
+- `end_state` (optional, bool): ép kết thúc plan sau step hiện tại.
+- `min_duration` / `strict_line` (optional): tham số riêng cho rotate.
 
 ## 8. Tham số cấp plan
 
@@ -274,6 +312,8 @@ Hệ thống tự map các alias sau:
 - `steps` (required): mảng step.
 - `autoline` (optional): `true/false`.
   - Tương thích key cũ: `auto_on_select`.
+- `start_without_cross` (optional): chạy plan ngay khi chọn.
+  - Tương thích key cũ: `start_immediately`.
 - `end_state` (optional):
   - `follow` (khuyến nghị cho nhiệm vụ liên tục).
   - `stop` (dừng robot sau plan).
@@ -288,7 +328,7 @@ Giải thích rõ `end_state`:
 
 Ví dụ:
 ```json
-{ "name": "plan_turn_right", "steps": [...], "end_state": "follow" }
+{ "name": "plan_example", "steps": [...], "end_state": "follow" }
 ```
 ```json
 { "name": "plan_parking", "steps": [...], "end_state": "stop" }
@@ -297,34 +337,50 @@ Ví dụ:
 ## 9. Lựa chọn plan trong runtime
 
 - Topic chọn plan: `/plan_select` (`std_msgs/String`).
-- Chuẩn khuyến nghị mới: `room:a20`, `room:a21`, `room:a22`, `room:a23`.
-- Alias plan trong config:
-  - `1` -> `plan_ntp`
-  - `2` -> `plan_straight`
-  - `3` -> `plan_turn_right`
-  - `4` -> `plan_stop`
+- Chuẩn khuyến nghị mới: `room:a20`, `room:a21`, `room:a22`, `room:a23`, `room:a24`, `room:a25`.
+- Alias plan trong config `line_follower.plan_alias`:
+  - `1` -> `a20`
+  - `2` -> `a21`
+  - `3` -> `a22`
+  - `4` -> `a23`
+  - `5` -> `a24`
+  - `6` -> `a25`
   - `0` hoặc `clear` -> xóa plan hiện tại.
 - Chuẩn gửi qua MQTT (khuyến nghị):
-  - `room:a20`, `room:a21`, `room:a22`, `room:a23` (theo mã phòng).
+  - `room:a20`, `room:a21`, `room:a22`, `room:a23`, `room:a24`, `room:a25`.
   - `room:0` hoặc `clear` để clear plan.
-  - Tương thích thêm: `room:1..4`, `phong:a20`, `plan:a20`, hoặc gửi trực tiếp tên plan (vd `plan_turn_right`).
+- Tương thích thêm:
+  - `room:1..6`, `phong:1..6`, `plan:1..6`
+  - gửi trực tiếp tên plan (vd `a20`, `a25`).
 
 ## 10. Mẫu plan để dùng ngay
 
-- `plan_ntp.json`: scan trái/phải + follow ngắn
-- `plan_straight.json`: đi thẳng qua giao
-- `plan_turn_right.json`: rẽ phải theo line + timeout an toàn
-- `plan_u_turn.json`: quay đầu
-- `plan_stop.json`: dừng robot
+- `a20.json`: plan hướng dẫn phòng, có AutoLine + message
+- `a21.json`: đi thẳng qua giao cắt
+- `a22.json`: rẽ phải theo line + timeout an toàn
+- `a23.json`: dừng robot
+- `a24.json`: quay đầu
+- `a25.json`: demo AutoLine + message
+- Tham khảo thêm ví dụ tổng hợp: `docs/plan_examples.json`
 
-## 11. Ví dụ đầy đủ (có label + goto + timeout)
+## 11. Ví dụ đầy đủ (label + goto + timeout + messages)
 
 ```json
 {
   "name": "plan_demo_full",
+  "start_without_cross": true,
   "steps": [
     { "action": "Wait", "duration": 0.2 },
-    { "label": "scan_start", "action": "RotateLeft", "speed": 5, "until": "line", "timeout": 1.5 },
+    {
+      "label": "scan_start",
+      "action": "RotateLeft",
+      "speed": 5,
+      "until": "line",
+      "timeout": 1.5,
+      "messages": [
+        { "topic": "/plan_message", "message": "say:bat dau scan" }
+      ]
+    },
     { "action": "Follow", "duration": 0.4 },
     { "action": "Goto", "target": "finish" },
     { "action": "RotateRight", "speed": 6, "duration": 0.8 },
@@ -376,7 +432,7 @@ Timeline:
 ## 15. Quy trình thêm plan mới
 
 1. Tạo file JSON mới trong `robot_common/robot_common/plans/`.
-2. Nếu cần gọi bằng phím số, thêm alias vào:
+2. Nếu cần gọi bằng phím số hoặc room code, thêm mapping vào:
    - `robot_common/robot_common/config.json`
-   - mục `line_follower.plan_alias` và `mqtt_bridge.plan_keys`
+   - mục `line_follower.plan_alias`, `mqtt_bridge.plan_keys`, `mqtt_bridge.room_plans`
 3. Chạy lại node và publish tên plan lên `/plan_select` để test.

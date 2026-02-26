@@ -15,12 +15,11 @@
     `manual_control/auto_mode_sync.py`
 
   #inline("I/O contract")
-  - Subscribe:
-    `/VR_control` (`std_msgs/String`), `/pick_robot` (`std_msgs/String`)
-  - Publish:
-    `/motor_cmd` (`std_msgs/String`), `/auto_mode` (`std_msgs/Bool`)
-  - Service client:
-    `/set_auto_mode` (`std_srvs/SetBool`)
+  - Subscribe: `/VR_control` (`std_msgs/String`)
+  - Subscribe: `/pick_robot` (`std_msgs/String`)
+  - Publish: `/motor_cmd` (`std_msgs/String`)
+  - Publish: `/auto_mode` (`std_msgs/Bool`)
+  - Service client: `/set_auto_mode` (`std_srvs/SetBool`)
 
   #inline("Runtime behavior")
   - `autoMode=true` -> bỏ qua command manual `/VR_control`.
@@ -29,16 +28,15 @@
     publish `/auto_mode` và queue sync service với retry logic.
 
   #inline("Config defaults (current)")
-  - Section:
-    `robot_common/robot_common/config.json -> manual_control`
-  - `base_speed=10`
-  - Topics:
-    `vr_control=/VR_control`, `pick_robot=/pick_robot`,
-    `cmd_vel=/motor_cmd`, `auto_mode=/auto_mode`
-  - Service:
-    `set_auto_mode=/set_auto_mode`
-  - Optional retry:
-    `auto_mode_service_retry_period`, `auto_mode_service_max_attempts`
+  - Section: `robot_common/robot_common/config.json -> manual_control`
+  - Speed: `base_speed=10`
+  - Topic: `vr_control=/VR_control`
+  - Topic: `pick_robot=/pick_robot`
+  - Topic: `cmd_vel=/motor_cmd`
+  - Topic: `auto_mode=/auto_mode`
+  - Service: `set_auto_mode=/set_auto_mode`
+  - Optional retry: `auto_mode_service_retry_period`
+  - Optional retry: `auto_mode_service_max_attempts`
 
   #inline("AutoModeSync states")
   - `idle`: không có pending request.

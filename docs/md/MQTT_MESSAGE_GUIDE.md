@@ -6,10 +6,14 @@ Tài liệu này hướng dẫn gửi MQTT message để điều khiển robot.
 
 - Broker: `127.0.0.1`
 - Port: `1883`
-- Topics:
+- Topics điều khiển:
   - `VR_control`: lệnh di chuyển tay
   - `pick_robot`: bật/tắt auto mode
   - `plan_select`: chọn plan theo phòng
+- Topics phản hồi (bridge từ ROS2):
+  - `plan_status`: trạng thái plan dạng JSON
+  - `plan_message`: message tùy biến từ plan step
+  - `robot_logs`: log filtered từ `/rosout`
 
 Nguồn cấu hình: `robot_common/robot_common/config.json` -> `mqtt_bridge`.
 
@@ -18,18 +22,20 @@ Nguồn cấu hình: `robot_common/robot_common/config.json` -> `mqtt_bridge`.
 ### 2.1 `plan_select`
 
 - Khuyến nghị:
-  - `room:a20` -> `plan_ntp`
-  - `room:a21` -> `plan_straight`
-  - `room:a22` -> `plan_turn_right`
-  - `room:a23` -> `plan_stop`
+  - `room:a20` -> `a20`
+  - `room:a21` -> `a21`
+  - `room:a22` -> `a22`
+  - `room:a23` -> `a23`
+  - `room:a24` -> `a24`
+  - `room:a25` -> `a25`
   - `room:0` hoặc `clear` -> clear plan
 
 - Tương thích ngược (vẫn hỗ trợ):
-  - `1`, `2`, `3`, `4`
-  - `room:1..4`
-  - `phong:1..4`
-  - `plan:1..4`
-  - tên plan trực tiếp, ví dụ: `plan_turn_right`
+  - `1`, `2`, `3`, `4`, `5`, `6`
+  - `room:1..6`
+  - `phong:1..6`
+  - `plan:1..6`
+  - tên plan trực tiếp, ví dụ: `a20`, `a25`
 
 Lưu ý:
 - Khi chọn plan, hệ thống sẽ tự bật auto mode (`pick_robot=1`) theo cấu hình mặc định hiện tại.
@@ -61,6 +67,8 @@ mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a20"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a21"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a22"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a23"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a24"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a25"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "clear"
 ```
 
@@ -87,6 +95,14 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -t pick_robot -v
 mosquitto_sub -h 127.0.0.1 -p 1883 -t VR_control -v
 ```
 
+Theo dõi phản hồi từ ROS2:
+
+```bash
+mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_status -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_message -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t robot_logs -v
+```
+
 Nếu cần theo dõi tất cả:
 
 ```bash
@@ -101,10 +117,13 @@ Trong lúc publish MQTT, mở terminal khác để check ROS2 topics:
 ros2 topic echo /plan_select
 ros2 topic echo /pick_robot
 ros2 topic echo /VR_control
+ros2 topic echo /plan_status
+ros2 topic echo /plan_message
 ```
 
 Kỳ vọng:
-- Khi gửi `plan_select = room:2`, ROS `/plan_select` nhận `plan_straight`.
+- Khi gửi `plan_select = room:a20`, ROS `/plan_select` nhận `a20`.
+- Khi gửi `plan_select = room:a25`, ROS `/plan_select` nhận `a25`.
 - Khi gửi `pick_robot = 1`, node auto mode chuyển sang bật.
 - Khi gửi `VR_control = Forward`, manual_control publish lệnh sang `/motor_cmd`.
 
@@ -116,17 +135,17 @@ import paho.mqtt.client as mqtt
 client = mqtt.Client()
 client.connect("127.0.0.1", 1883, 60)
 
-client.publish("pick_robot", "1")      # bật auto
-client.publish("plan_select", "room:3")# chọn phòng 3
-client.publish("VR_control", "Stop")   # lệnh tay
+client.publish("pick_robot", "1")        # bật auto
+client.publish("plan_select", "room:a20") # chọn phòng a20
+client.publish("VR_control", "Stop")     # lệnh tay
 
 client.disconnect()
 ```
 
 ## 7. Lỗi thường gặp
 
-- Gửi `room:5` nhưng không chạy:
-  - Hiện tại config chỉ map phòng `1..4`.
+- Gửi `room:a26` nhưng không chạy:
+  - Hiện tại config chỉ map `a20..a25`.
 - Gửi plan nhưng line_follower báo `Plan not found`:
   - Kiểm tra tên file plan trong `robot_common/robot_common/plans/`.
 - Gửi MQTT có message nhưng ROS không nhận:

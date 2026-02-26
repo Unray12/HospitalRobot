@@ -15,12 +15,14 @@
     `line_follower/line_follower.py`
 
   #inline("I/O contract")
-  - Subscribe topics:
-    `/line_sensors/frame`, `/auto_mode`, `/plan_select`
-  - Publish topic:
-    `/motor_cmd` (`std_msgs/String`, format `Direction:Speed`)
-  - Service server:
-    `/set_auto_mode` (`std_srvs/SetBool`)
+  - Subscribe topics: `/line_sensors/frame`
+  - Subscribe topics: `/auto_mode`
+  - Subscribe topics: `/plan_select`
+  - Publish topics: `/motor_cmd` (`std_msgs/String`, format `Direction:Speed`)
+  - Publish topics: `/pick_robot` (`std_msgs/String`)
+  - Publish topics: `/plan_status` (`std_msgs/String`)
+  - Publish topics: `/plan_callback` (`std_msgs/String`)
+  - Service server: `/set_auto_mode` (`std_srvs/SetBool`)
 
   #inline("FSM states")
   - `FOLLOWING`, `TURN_LEFT`, `TURN_RIGHT`
@@ -34,36 +36,46 @@
     `Forward`, `Backward`, `Left`, `Right` (`speed`, `duration`).
   - Rotate:
     `RotateLeft`, `RotateRight` (theo `duration` hoặc `until: "line"` + `timeout`).
+    Hỗ trợ `min_duration`, `strict_line`.
   - Control:
-    `Wait`, `Stop`, `Follow`, `Goto`, `Auto`.
-  - Metadata:
-    hỗ trợ `label` + `Goto` target theo index hoặc label.
+    `Wait`, `Stop`, `Follow`, `Auto`, `AutoLine`.
+  - Logic:
+    `Goto`, `label`.
+  - Step extras:
+    `messages`, `continue_immediately` (alias `no_wait_cross`).
 
   #inline("Config defaults (current)")
-  - Section:
-    `robot_common/robot_common/config.json -> line_follower`
-  - Speed:
-    `base_speed=8`, `turn_speed_left=6`, `turn_speed_right=6`
-  - Crossing/pre-cross:
-    `crossing_duration=3.0`,
-    `cross_pre_forward_speed=8`,
-    `cross_pre_forward_duration=3.0`,
-    `cross_pre_stop_duration=1.0`
-  - Rotate reacquire:
-    `rotate_min_duration=2`,
-    `rotate_line_mid_min_count=1`,
-    `rotate_line_side_max_count=2`,
-    `rotate_early_stop_on_side=true`,
-    `rotate_line_side_min_count=1`
-  - Plan:
-    `cross_plan_name=plan_ntp`,
-    `plan_end_state=stop`,
-    alias `1/2/3/4` tương ứng các plan chính.
+  - Section: `robot_common/robot_common/config.json -> line_follower`
+  - Speed: `base_speed=8`
+  - Speed: `turn_speed_left=6`
+  - Speed: `turn_speed_right=6`
+  - Crossing: `crossing_duration=3.0`
+  - Pre-cross: `cross_pre_forward_speed=8`
+  - Pre-cross: `cross_pre_forward_duration=2.7`
+  - Pre-cross: `cross_pre_stop_duration=1.0`
+  - Rotate: `rotate_min_duration=5`
+  - Rotate: `rotate_line_mid_min_count=1`
+  - Rotate: `rotate_line_side_max_count=3`
+  - Rotate: `rotate_early_stop_on_side=true`
+  - Rotate: `rotate_line_side_min_count=1`
+  - Plan: `cross_plan_name=a20`
+  - Plan: `plan_end_state=stop`
+  - Plan: `auto_on_plan_select=true`
+  - Plan: `plan_lost_line_hold_sec=1.2`
+  - Plan: `plan_lost_line_warn_period=0.6`
+  - Plan alias: `1->a20`
+  - Plan alias: `2->a21`
+  - Plan alias: `3->a22`
+  - Plan alias: `4->a23`
+  - Plan alias: `5->a24`
+  - Plan alias: `6->a25`
 
   #inline("Operational logs")
   - `MODE`: bật/tắt auto mode.
   - `PLAN`: selected, cleared, duplicate ignored, not found.
   - `PLAN_STATUS`: state/step/action/end_state (đã throttle).
+  - `PLAN_EVENT`: payload JSON publish `/plan_status`.
+  - `PLAN_CALLBACK`: callback JSON publish `/plan_callback`.
   - `FRAME`: frame cảm biến sai định dạng.
 
   #inline("Troubleshooting checklist")

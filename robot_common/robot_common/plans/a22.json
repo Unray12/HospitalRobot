@@ -1,0 +1,84 @@
+{
+  "name": "a22",
+  "start_without_cross": true,
+  "steps": [
+    {
+      "label": "S1_INTRO",
+      "action": "RotateRight",
+      "until": "line",
+      "speed": 5,
+      "messages": [
+        {
+          "topic": "/plan_message",
+          "message": "say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú, anh chị đến phòng khám A20 theo đúng lộ trình an toàn. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ thêm, cô chú có thể báo cho nhân viên y tế gần nhất. Bây giờ chúng ta bắt đầu di chuyển."
+        }
+      ]
+    },
+    {
+      "label": "S2_AUTOLINE",
+      "action": "AutoLine",
+      "enabled": true
+    },
+    {
+      "label": "S2_1_FORWARD",
+      "action": "Forward",
+      "speed": 8,
+      "duration": 2,
+      "continue_immediately": true
+    },
+    {
+      "label": "S3_CHECK_FOLLOW",
+      "action": "RotateLeft",
+      "speed": 5,
+      "until": "line",
+      "messages": [
+        {
+          "topic": "/plan_message",
+          "message": "say: Con vẫn đang hỗ trợ cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con để đến phòng khám A20."
+        }
+      ]
+    },
+    {
+      "label": "S4_WAIT_TIMEOUT",
+      "action": "RotateRight",
+      "speed": 5,
+      "until": "line",
+      "min_duration": 20,
+      "timeout": 25,
+      "messages": [
+        {
+          "topic": "/plan_message",
+          "message": "done"
+        }
+      ]
+    },
+    {
+      "label": "S5_RETURNING",
+      "action": "RotateRight",
+      "speed": 5,
+      "until": "line",
+      "messages": [
+        {
+          "topic": "/plan_message",
+          "message": "say: Con đang quay về vị trí hỗ trợ."
+        }
+      ]
+    },
+    {
+      "label": "S6_RETURN_DONE",
+      "action": "RotateRight",
+      "speed": 5,
+      "until": "line",
+      "messages": [
+        {
+          "topic": "/plan_message",
+          "message": "say: Con đã về vị trí hỗ trợ. Nếu cần hướng dẫn đến phòng khám A20, con sẵn sàng hỗ trợ ạ."
+        }
+      ],
+      "end_state": "true",
+      "strict_line": true,
+      "continue_immediately": true
+    }
+  ],
+  "end_state": "stop"
+}

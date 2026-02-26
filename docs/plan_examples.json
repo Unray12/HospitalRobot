@@ -1,0 +1,198 @@
+{
+  "description": "HospitalRobot plan examples (combined)",
+  "source_dir": "robot_common/robot_common/plans",
+  "note": "Runtime currently keeps a20..a25 in plans/",
+  "plans": [
+    {
+      "name": "a20",
+      "start_without_cross": true,
+      "steps": [
+        {
+          "label": "scan_right",
+          "action": "RotateRight",
+          "until": "line",
+          "speed": 5,
+          "messages": [
+            {
+              "topic": "/plan_message",
+              "message": "say:hãy đi theo tôi để đến phòng khám"
+            }
+          ]
+        },
+        {
+          "action": "AutoLine",
+          "enabled": true
+        },
+        {
+          "label": "scan_left",
+          "action": "RotateLeft",
+          "speed": 5,
+          "until": "line",
+          "messages": [
+            {
+              "topic": "/plan_message",
+              "message": "say:bạn còn ở đó chứ?"
+            }
+          ]
+        },
+        {
+          "label": "scan_right",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line",
+          "min_duration": 20,
+          "timeout": 25,
+          "messages": [
+            {
+              "topic": "/plan_message",
+              "message": "say:sắp tới rồi bạn nhé"
+            }
+          ]
+        },
+        {
+          "label": "scan_right",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line"
+        },
+        {
+          "label": "scan_right",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line",
+          "end_state": "true",
+          "strict_line": true,
+          "continue_immediately": true
+        }
+      ],
+      "end_state": "stop"
+    },
+    {
+      "name": "a21",
+      "steps": [
+        {
+          "action": "Follow",
+          "duration": 1.2
+        },
+        {
+          "action": "Stop",
+          "duration": 0.2
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "a22",
+      "steps": [
+        {
+          "action": "Wait",
+          "duration": 0.2
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "until": "line",
+          "timeout": 2.5
+        },
+        {
+          "action": "Follow",
+          "duration": 0.5
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "a23",
+      "steps": [
+        {
+          "action": "Stop",
+          "duration": 0.5
+        },
+        {
+          "action": "Stop"
+        }
+      ],
+      "end_state": "stop"
+    },
+    {
+      "name": "a24",
+      "steps": [
+        {
+          "action": "Wait",
+          "duration": 0.2
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "duration": 1.8
+        },
+        {
+          "action": "RotateRight",
+          "speed": 6,
+          "until": "line",
+          "timeout": 2.0
+        },
+        {
+          "action": "Follow",
+          "duration": 0.6
+        }
+      ],
+      "end_state": "follow"
+    },
+    {
+      "name": "a25",
+      "start_without_cross": true,
+      "steps": [
+        {
+          "label": "scan_right",
+          "action": "RotateRight",
+          "speed": 5,
+          "until": "line",
+          "min_duration": 1.5,
+          "timeout": 6,
+          "strict_line": true,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a25_scan_right"
+            }
+          ]
+        },
+        {
+          "action": "AutoLine",
+          "enabled": true,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a25_autoline_on"
+            }
+          ]
+        },
+        {
+          "action": "Follow",
+          "duration": 1.0
+        },
+        {
+          "action": "AutoLine",
+          "enabled": false,
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a25_autoline_off"
+            }
+          ]
+        },
+        {
+          "action": "Stop",
+          "messages": [
+            {
+              "topic": "/plan_status",
+              "message": "a25_plan_stop"
+            }
+          ]
+        }
+      ],
+      "end_state": "stop"
+    }
+  ]
+}

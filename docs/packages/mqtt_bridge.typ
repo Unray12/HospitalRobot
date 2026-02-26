@@ -14,41 +14,58 @@
     `mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py`
 
   #inline("I/O contract")
-  - MQTT subscribe:
-    `vr_control`, `pick_robot`, `plan_select`
-  - ROS publish:
-    `/VR_control`, `/pick_robot`, `/plan_select`, `/debug_logs_toggle`
-  - Plan command format (recommended):
-    `room:1..4` (room -> mapped plan), `room:0` or `clear` to clear plan.
-  - Backward compatible plan command:
-    `1..4`, `phong:1..4`, `plan:1..4`, or direct plan name.
+  - MQTT subscribe: `vr_control`
+  - MQTT subscribe: `pick_robot`
+  - MQTT subscribe: `plan_select`
+  - MQTT publish: `plan_status`
+  - MQTT publish: `plan_message`
+  - MQTT publish: `robot_logs`
+  - ROS publish: `/VR_control`
+  - ROS publish: `/pick_robot`
+  - ROS publish: `/plan_select`
+  - ROS publish: `/debug_logs_toggle`
+  - ROS subscribe: `/plan_status`
+  - ROS subscribe: `/plan_message`
+  - ROS subscribe: `/rosout` (filtered)
+  - Plan command format (recommended): `room:a20..a25`
+  - Plan command format (recommended): `room:0` hoặc `clear` để clear plan.
+  - Backward compatible plan command: `1..6`
+  - Backward compatible plan command: `room:1..6`
+  - Backward compatible plan command: `phong:1..6`
+  - Backward compatible plan command: `plan:1..6`
+  - Backward compatible plan command: direct plan name
 
   #inline("Keyboard mapping")
-  - Move:
-    `w/s/a/d`, stop `space`
-  - Rotate:
-    `j` (left), `p` (right)
-  - Mode/debug:
-    `k` toggle auto, `e` toggle debug logs
-  - Plan hotkeys:
-    `1..4` select room-plan, `0` clear
-  - Quit:
-    `q`
+  - Move: `w`
+  - Move: `s`
+  - Move: `a`
+  - Move: `d`
+  - Move: `space` (stop)
+  - Rotate: `j` (left)
+  - Rotate: `p` (right)
+  - Mode/debug: `k` toggle auto
+  - Mode/debug: `e` toggle debug logs
+  - Plan hotkeys: `1..6` select room-plan
+  - Plan hotkeys: `0` clear
+  - Quit: `q`
 
   #inline("Config defaults (current)")
-  - Section:
-    `robot_common/robot_common/config.json -> mqtt_bridge`
-  - Broker:
-    `address=127.0.0.1`, `port=1883`
-  - Topic names:
-    `VR_control`, `pick_robot`, `plan_select`
-  - Debug topic:
-    `/debug_logs_toggle`
+  - Section: `robot_common/robot_common/config.json -> mqtt_bridge`
+  - Broker: `address=127.0.0.1`
+  - Broker: `port=1883`
+  - Topic names: `VR_control`
+  - Topic names: `pick_robot`
+  - Topic names: `plan_select`
+  - Topic names: `plan_status`
+  - Topic names: `plan_message`
+  - Topic names: `robot_logs`
+  - Debug topic: `/debug_logs_toggle`
 
   #inline("Runtime architecture")
   - MQTT network loop chạy thread riêng.
   - Keyboard loop chạy worker thread riêng.
   - Khi MQTT mất kết nối, plan key có fallback publish local ROS topic.
+  - Log bridge lọc `/rosout` theo keyword (mặc định `PLAN`/`PLAN_STATUS`).
 
   #inline("Troubleshooting checklist")
   - Bridge không lên:

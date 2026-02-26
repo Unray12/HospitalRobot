@@ -58,6 +58,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         self._plan_continue_immediate = False
@@ -85,6 +86,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         self._plan_continue_immediate = False
@@ -116,6 +118,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         self._plan_continue_immediate = False
@@ -144,6 +147,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         self._plan_continue_immediate = False
@@ -172,6 +176,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         self._plan_continue_immediate = False
@@ -316,6 +321,11 @@ class LineFollowerFSM:
                 continue
 
             action = self._normalize_action(step.get("action", "Stop"))
+            label = step.get("label")
+            if isinstance(label, str):
+                label = label.strip() or None
+            else:
+                label = None
             speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
             duration = self._to_float(step.get("duration"), 0.0, "duration", step)
             until = str(step.get("until", "") or "").strip().lower()
@@ -360,6 +370,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._plan_action_label = label
                     self._queue_step_messages(step)
                     self._plan_continue_immediate = continue_immediately
                     self._plan_force_complete = end_after_step
@@ -374,6 +385,7 @@ class LineFollowerFSM:
                     self.state = self.STATE_PLAN
                     self._plan_action = "Stop"
                     self._plan_action_speed = 0
+                    self._plan_action_label = label
                     self._queue_step_messages(step)
                     self._plan_continue_immediate = continue_immediately
                     self._plan_force_complete = end_after_step
@@ -396,6 +408,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = "AutoFollow"
                 self._plan_action_speed = self.base_speed
+                self._plan_action_label = label
                 self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_force_complete = end_after_step
@@ -421,6 +434,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._plan_action_label = label
                 self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_force_complete = end_after_step
@@ -445,6 +459,7 @@ class LineFollowerFSM:
                 self.state = self.STATE_PLAN
                 self._plan_action = move_action
                 self._plan_action_speed = speed
+                self._plan_action_label = label
                 self._queue_step_messages(step)
                 self._plan_continue_immediate = continue_immediately
                 self._plan_force_complete = end_after_step
@@ -478,6 +493,7 @@ class LineFollowerFSM:
             self._plan_action_until_line = False
             self._plan_action_min_until = None
             self._plan_action_timeout = None
+            self._plan_action_label = None
             self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
             self._plan_rotate_strict_center = False
             return self._after_plan_action(now)
@@ -490,6 +506,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
+                self._plan_action_label = None
                 self._plan_rotate_strict_center = False
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
@@ -505,6 +522,7 @@ class LineFollowerFSM:
                 self._plan_action_until_line = False
                 self._plan_action_min_until = None
                 self._plan_action_timeout = None
+                self._plan_action_label = None
                 self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
                 self._plan_rotate_strict_center = False
                 return self._after_plan_action(now)
@@ -520,6 +538,7 @@ class LineFollowerFSM:
         self._plan_action_until_line = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
+        self._plan_action_label = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
         self._plan_rotate_strict_center = False
         return self._after_plan_action(now)
@@ -760,6 +779,7 @@ class LineFollowerFSM:
             "total_steps": total,
             "next_step": next_step,
             "current_action": self._plan_action,
+            "current_label": self._plan_action_label,
             "end_state": self.plan_end_state,
             "plan_done": self.is_plan_done(),
         }
@@ -782,13 +802,19 @@ class LineFollowerFSM:
 
     def _log_plan_step(self, step_index_1_based, step, mode):
         action = step.get("action", "Stop")
+        label = step.get("label")
+        if isinstance(label, str):
+            label = label.strip() or None
+        else:
+            label = None
         speed = step.get("speed", self.base_speed)
         duration = step.get("duration")
         until = step.get("until")
         timeout = step.get("timeout")
         total = len(self.cross_plan)
+        label_text = f", label={label}" if label else ""
         self._log_info(
-            f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}, "
+            f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}{label_text}, "
             f"speed={speed}, duration={duration}, until={until}, timeout={timeout}"
         )
 

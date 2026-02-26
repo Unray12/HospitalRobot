@@ -293,6 +293,7 @@ class LineFollowerNode(Node):
             "step": status.get("next_step"),
             "total_steps": status.get("total_steps"),
             "action": status.get("current_action"),
+            "label": status.get("current_label"),
             "end_state": status.get("end_state"),
             "ts": round(time.time(), 3),
         }
@@ -317,10 +318,12 @@ class LineFollowerNode(Node):
         if not status.get("has_plan"):
             return
         plan_name = self._active_plan_name or "unknown"
+        label = status.get("current_label")
+        label_text = f" | label={label}" if label else ""
         text = (
             f"{plan_name} | state={status['state']} | "
             f"step={status['next_step']}/{status['total_steps']} | "
-            f"action={status['current_action']} | end_state={status['end_state']}"
+            f"action={status['current_action']}{label_text} | end_state={status['end_state']}"
         )
         period_ok = (now - self._last_plan_status_log_ts) >= self.plan_status_log_period
         changed = text != self._last_plan_status_text
@@ -371,6 +374,7 @@ class LineFollowerNode(Node):
             payload["step"] = status.get("next_step")
             payload["total_steps"] = status.get("total_steps")
             payload["action"] = status.get("current_action")
+            payload["label"] = status.get("current_label")
             payload["end_state"] = status.get("end_state")
 
         msg = String()

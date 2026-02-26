@@ -37,11 +37,13 @@
     `NO_COLOR=1` hoặc `ROBOT_LOG_COLOR=0`.
 
   #inline("Plans currently packaged")
-  - `plan_ntp`
-  - `plan_straight`
-  - `plan_turn_right`
-  - `plan_u_turn`
-  - `plan_stop`
+  - `a20`
+  - `a21`
+  - `a22`
+  - `a23`
+  - `a24`
+  - `a25`
+  - Tham khảo ví dụ tổng hợp: `docs/plan_examples.json`
 
   #inline("Troubleshooting")
   - `Plan not found`:

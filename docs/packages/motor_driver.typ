@@ -15,8 +15,8 @@
     `motor_driver/motor_controller.py`
 
   #inline("I/O contract")
-  - Subscribe:
-    `/motor_cmd` (`std_msgs/String`), `/debug_logs_toggle` (`std_msgs/Bool`)
+  - Subscribe: `/motor_cmd` (`std_msgs/String`)
+  - Subscribe: `/debug_logs_toggle` (`std_msgs/Bool`)
   - Command input format:
     `Direction:Speed`
   - Serial output format:
@@ -32,18 +32,22 @@
   - `Stop`: `(0,0,0,0)`
 
   #inline("Config defaults (current)")
-  - Section:
-    `robot_common/robot_common/config.json -> motor_driver`
-  - Serial:
-    `port=/dev/ttyUSB0`, `baudrate=115200`, `timeout=0.1`
-  - Command topic:
-    `/motor_cmd`
-  - Debug toggle topic:
-    `/debug_logs_toggle`
+  - Section: `robot_common/robot_common/config.json -> motor_driver`
+  - Serial: `port=/dev/ttyUSB0`
+  - Serial: `baudrate=115200`
+  - Serial: `timeout=0.1`
+  - Command topic: `/motor_cmd`
+  - Debug toggle topic: `/debug_logs_toggle`
+  - Reconnect: `reconnect_period_sec=2.0`
+  - Reconnect: `fallback_ports=[/dev/ttyUSB1,/dev/ttyUSB0]`
+  - Reconnect: `scan_prefixes=[/dev/ttyUSB,/dev/ttyACM,COM]`
+  - Debug: `debug_log_period=0.2`
+  - Debug: `debug_enabled_default=false`
 
   #inline("Operational logs")
   - `DEBUG_TOGGLE`: trạng thái debug log ON/OFF.
   - `MOTOR`: log wheel speed `fl/fr/rl/rr` khi debug bật.
+  - `SERIAL`: kết nối/reconnect serial.
 
   #inline("Troubleshooting checklist")
   - Có `/motor_cmd` nhưng motor không chạy:

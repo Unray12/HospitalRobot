@@ -10,7 +10,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú tới a20, anh chị đến phòng khám theo đúng lộ trình an toàn. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ thêm, cô chú có thể báo cho nhân viên y tế gần nhất. Bây giờ chúng ta bắt đầu di chuyển."
+                    "message": "say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú, anh chị đến phòng khám A20 theo đúng lộ trình an toàn. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ thêm, cô chú có thể báo cho nhân viên y tế gần nhất. Bây giờ chúng ta bắt đầu di chuyển."
                 }
             ]
         },
@@ -20,6 +20,13 @@
             "enabled": true
         },
         {
+            "label": "S2_1_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "continue_immediately": true
+        },
+        {
             "label": "S3_CHECK_FOLLOW",
             "action": "RotateLeft",
             "speed": 5,
@@ -27,7 +34,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Con vẫn đang hỗ trợ cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con để đến phòng khám. Nếu cần hỗ trợ, cô chú có thể ra hiệu hoặc gọi con."
+                    "message": "say: Con vẫn đang hỗ trợ cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con để đến phòng khám A20."
                 }
             ]
         },
@@ -53,7 +60,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Con đang quay về vị trí hỗ trợ. Nếu cô chú, anh chị cần hướng dẫn, xin vui lòng đứng gần khu vực này để con hỗ trợ."
+                    "message": "say: Con đang quay về vị trí hỗ trợ."
                 }
             ]
         },
@@ -65,7 +72,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Con đã về vị trí hỗ trợ. Nếu cô chú, anh chị cần hướng dẫn, con sẵn sàng hỗ trợ ạ."
+                    "message": "say: Con đã về vị trí hỗ trợ. Nếu cần hướng dẫn đến phòng khám A20, con sẵn sàng hỗ trợ ạ."
                 }
             ],
             "end_state": "true",

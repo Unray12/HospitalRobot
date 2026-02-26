@@ -21,26 +21,29 @@
   - Subscribe: `/debug_logs_toggle` (`std_msgs/Bool`)
 
   #inline("Config defaults (current)")
-  - Section:
-    `robot_common/robot_common/config.json -> line_sensors`
-  - Serial:
-    `port=/dev/ttyACM1`, `baudrate=115200`, `timeout=0.1`
-  - Publish:
-    `topic=/line_sensors/frame`, `rate_hz=100`
-  - Debug toggle topic:
-    `/debug_logs_toggle`
-  - Optional:
-    `debug_log_period`, `debug_enabled_default`
+  - Section: `robot_common/robot_common/config.json -> line_sensors`
+  - Serial: `port=/dev/ttyACM0`
+  - Serial: `baudrate=115200`
+  - Serial: `timeout=0.1`
+  - Publish: `topic=/line_sensors/frame`
+  - Publish: `rate_hz=100`
+  - Debug toggle topic: `/debug_logs_toggle`
+  - Reconnect: `reconnect_period_sec=2.0`
+  - Reconnect: `fallback_ports=[/dev/ttyACM1,/dev/ttyACM0]`
+  - Reconnect: `scan_prefixes=[/dev/ttyACM,/dev/ttyUSB,COM]`
+  - Debug: `debug_log_period=0.2`
+  - Debug: `debug_enabled_default=false`
 
   #inline("Parser guarantees")
   - JSON lỗi -> bỏ frame (không crash node).
   - Thiếu key `LineSensor` -> warning + bỏ frame.
   - Dict sensor rỗng -> không đánh dấu full-black sai.
-  - Reader decode có `errors=\"ignore\"` để chịu lỗi byte từ serial.
+  - Reader decode có `errors="ignore"` để chịu lỗi byte từ serial.
 
   #inline("Operational logs")
   - Event `SENSOR`: log frame định kỳ khi debug bật.
   - Event `DEBUG_TOGGLE`: báo trạng thái ON/OFF log.
+  - Event `SERIAL`: kết nối/reconnect serial.
   - Warning phổ biến:
     `Corrupted JSON skipped`, `LineSensor key missing`.
 

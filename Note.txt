@@ -18,7 +18,7 @@ Check packages:
 Line sensor driver:
   ros2 run line_sensors line_sensor_driver
 
-Line follower (FSM + PID):
+Line follower (FSM + plan engine):
   ros2 run line_follower line_follower
 
 Motor driver:
@@ -34,6 +34,9 @@ Topics:
   /line_sensors/frame   (std_msgs/Int16MultiArray)
   /motor_cmd            (std_msgs/String)   "Direction:Speed"
   /auto_mode            (std_msgs/Bool)
+  /plan_select          (std_msgs/String)
+  /plan_status          (std_msgs/String)   JSON event from line_follower
+  /plan_message         (std_msgs/String)   custom message from plan steps
 
 Service:
   /set_auto_mode        (std_srvs/SetBool)
@@ -43,19 +46,40 @@ Echo topics:
   ros2 topic echo /line_sensors/frame
   ros2 topic echo /motor_cmd
   ros2 topic echo /auto_mode
+  ros2 topic echo /plan_status
 
 Auto mode ON/OFF (manual publish):
   ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
   ros2 topic pub /pick_robot std_msgs/msg/String "{data: '0'}" --once
 
+Plan select (ROS direct):
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a20'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a21'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a22'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a23'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a24'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'a25'}" --once
+  ros2 topic pub /plan_select std_msgs/msg/String "{data: 'clear'}" --once
+
 ######################## MQTT ########################
-Check MQTT package:
-  ros2 pkg list | grep mqtt
+Broker:
+  127.0.0.1:1883
 
 Test MQTT topic:
-  mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t VR_control -v
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_status -v
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_message -v
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t robot_logs -v
+
+Plan select via MQTT:
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a20"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a21"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a22"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a23"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a24"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a25"
+  mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "clear"
 
 ######################## SERIAL PORTS ########################
 Motor: /dev/ttyUSB0
 Line sensor: /dev/ttyACM0
-
