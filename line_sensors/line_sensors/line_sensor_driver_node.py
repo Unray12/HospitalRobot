@@ -16,6 +16,7 @@ class LineSensorDriverNode(Node):
         serial_cfg = config.get("serial", {})
         pub_cfg = config.get("publish", {})
         topics_cfg = config.get("topics", {})
+        filter_cfg = config.get("filter", {})
 
         port = serial_cfg.get("port", "/dev/ttyACM0")
         baudrate = serial_cfg.get("baudrate", 115200)
@@ -28,7 +29,13 @@ class LineSensorDriverNode(Node):
         self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyACM", "/dev/ttyUSB", "COM"])
         self.debug_log_period = float(config.get("debug_log_period", 0.2))
         self.debug_enabled = bool(config.get("debug_enabled_default", False))
+        self.zero_hold_sec = float(filter_cfg.get("zero_hold_sec", 0.15))
+        self.zero_min_streak = int(max(1, filter_cfg.get("zero_min_streak", 3)))
         self._last_debug_log_ts = 0.0
+        self._zero_streak = 0
+        self._last_nonzero_frame = None
+        self._last_nonzero_ts = 0.0
+        self._last_published_frame = None
 
         self.reader = LineSensorReader(
             port=port,
@@ -52,6 +59,7 @@ class LineSensorDriverNode(Node):
         frame = self.reader.read_frame()
         if frame is None:
             return
+        frame = self._filter_frame(frame)
 
         msg = Int16MultiArray()
         msg.data = [
@@ -63,6 +71,7 @@ class LineSensorDriverNode(Node):
             int(frame["right_full"]),
         ]
         self.pub.publish(msg)
+        self._last_published_frame = dict(frame)
         self._log_sensor_debug(frame)
 
     def _reconnect_cb(self):
@@ -91,6 +100,33 @@ class LineSensorDriverNode(Node):
             mid_full=int(frame["mid_full"]),
             right_full=int(frame["right_full"]),
         )
+
+    def _filter_frame(self, frame):
+        now = self.get_clock().now().nanoseconds / 1e9
+        is_zero = (
+            int(frame.get("left_count", 0)) == 0
+            and int(frame.get("mid_count", 0)) == 0
+            and int(frame.get("right_count", 0)) == 0
+            and not bool(frame.get("left_full", False))
+            and not bool(frame.get("mid_full", False))
+            and not bool(frame.get("right_full", False))
+        )
+
+        if not is_zero:
+            self._zero_streak = 0
+            self._last_nonzero_frame = dict(frame)
+            self._last_nonzero_ts = now
+            return frame
+
+        self._zero_streak += 1
+        if (
+            self._last_nonzero_frame is not None
+            and (now - self._last_nonzero_ts) < self.zero_hold_sec
+        ):
+            return dict(self._last_nonzero_frame)
+        if self._zero_streak < self.zero_min_streak and self._last_published_frame is not None:
+            return dict(self._last_published_frame)
+        return frame
 
     def destroy_node(self):
         self.reader.close()

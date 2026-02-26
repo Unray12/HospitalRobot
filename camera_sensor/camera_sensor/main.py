@@ -23,11 +23,13 @@ class SerialReader(Node):
         self.baud = int(serial_cfg.get("baudrate", 115200))
         self.topic = str(pub_cfg.get("topic", "/face/camera"))
         self.read_timeout = float(serial_cfg.get("timeout", 0.2))
+        self.reconnect_period_sec = float(serial_cfg.get("reconnect_period_sec", 2.0))
 
         self.pub = self.create_publisher(String, self.topic, 10)
         self._drop_count = 0
 
         self._stop = threading.Event()
+        self._serial_lock = threading.Lock()
         self._thread = threading.Thread(target=self._read_loop, daemon=True)
 
         self.ser = None
@@ -42,28 +44,54 @@ class SerialReader(Node):
     def _open_serial(self):
         try:
             # exclusive=True giúp tránh 2 process mở cùng lúc (pyserial>=3.5)
-            self.ser = serial.Serial(
-                port=self.port,
-                baudrate=int(self.baud),
-                timeout=self.read_timeout,
-                exclusive=True
-            )
-            # Optional: flush
-            self.ser.reset_input_buffer()
-            self.ser.reset_output_buffer()
+            with self._serial_lock:
+                self.ser = serial.Serial(
+                    port=self.port,
+                    baudrate=int(self.baud),
+                    timeout=self.read_timeout,
+                    exclusive=True
+                )
+                # Optional: flush
+                self.ser.reset_input_buffer()
+                self.ser.reset_output_buffer()
             # self._log_info(f"Serial Line Sensors connected: {self.port}")
         except Exception as e:
             self.log.error(f"Cannot open serial {self.port}: {e}", event="SERIAL")
             raise
 
+    def _close_serial(self):
+        with self._serial_lock:
+            try:
+                if self.ser and self.ser.is_open:
+                    self.ser.close()
+            except Exception:
+                pass
+            self.ser = None
+
+    def _reconnect_serial(self):
+        try:
+            self._open_serial()
+            self.log.info(f"Camera serial reconnected: {self.port}", event="SERIAL")
+            return True
+        except Exception:
+            return False
+
     def _read_loop(self):
+        next_reconnect = 0.0
         while rclpy.ok() and not self._stop.is_set():
             try:
-                if self.ser is None or not self.ser.is_open:
+                with self._serial_lock:
+                    ser = self.ser
+
+                if ser is None or not ser.is_open:
+                    now = time.time()
+                    if now >= next_reconnect:
+                        self._reconnect_serial()
+                        next_reconnect = now + self.reconnect_period_sec
                     time.sleep(0.2)
                     continue
 
-                line = self.ser.readline()  # bytes, ends with \n if present
+                line = ser.readline()  # bytes, ends with \n if present
                 if not line:
                     continue
 
@@ -86,10 +114,13 @@ class SerialReader(Node):
                 self.pub.publish(msg)
 
             except serial.SerialException as e:
-                self.log.error(f"SerialException: {e}", event="SERIAL")
+                if rclpy.ok():
+                    self.log.error(f"SerialException: {e}", event="SERIAL")
+                self._close_serial()
                 time.sleep(0.5)
             except Exception as e:
-                self.log.error(f"Read error: {e}", event="SERIAL")
+                if rclpy.ok():
+                    self.log.error(f"Read error: {e}", event="SERIAL")
                 time.sleep(0.2)
 
     def _normalize_face_payload(self, raw):
@@ -111,6 +142,10 @@ class SerialReader(Node):
             return None
 
         parts = [p for p in text.split(",") if p]
+        if len(parts) == 2:
+            m = re.match(r"^(DEV1|DEV|DV1|EV1|D1|V1|DV|EV)(FACE|ACE|NO_OBJECT|NOOBJECT|NO_OBECT|NO_BJECT|O_OBJECT)$", parts[0])
+            if m:
+                parts = [m.group(1), m.group(2), parts[1]]
         if len(parts) < 2:
             return None
 
@@ -164,11 +199,7 @@ class SerialReader(Node):
 
     def destroy_node(self):
         self._stop.set()
-        try:
-            if self.ser and self.ser.is_open:
-                self.ser.close()
-        except Exception:
-            pass
+        self._close_serial()
         super().destroy_node()
 
 
@@ -181,7 +212,8 @@ def main():
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

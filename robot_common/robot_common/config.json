@@ -26,6 +26,10 @@
             "baudrate": 115200,
             "timeout": 0.1
         },
+        "filter": {
+            "zero_hold_sec": 0.15,
+            "zero_min_streak": 3
+        },
         "publish": {
             "topic": "/line_sensors/frame",
             "rate_hz": 100
