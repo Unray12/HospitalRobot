@@ -1,0 +1,13 @@
+{
+    "name": "a15",
+    "steps": [
+        {
+            "action": "Stop",
+            "duration": 0.5
+        },
+        {
+            "action": "Stop"
+        }
+    ],
+    "end_state": "stop"
+}

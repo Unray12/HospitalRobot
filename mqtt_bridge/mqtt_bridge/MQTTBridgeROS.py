@@ -62,6 +62,8 @@ class MQTTBridgeNode(Node):
         self.topic_plan = topics_cfg.get("plan_select", "plan_select")
         self.topic_debug_toggle = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
         self.topic_log_out = topics_cfg.get("robot_logs", "robot_logs")
+        self.topic_camera_ros = topics_cfg.get("camera_face_ros", "/face/camera")
+        self.topic_camera_mqtt = topics_cfg.get("camera_face_mqtt", "face/camera")
         self.topic_plan_status_ros = topics_cfg.get("plan_status_ros", "/plan_status")
         self.topic_plan_status_mqtt = topics_cfg.get("plan_status_mqtt", "plan_status")
         self.topic_plan_message_ros = topics_cfg.get("plan_message_ros", "/plan_message")
@@ -107,6 +109,7 @@ class MQTTBridgeNode(Node):
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
         self.ros_debug_pub = self.create_publisher(Bool, self.topic_debug_toggle, 10)
+        self.create_subscription(String, self.topic_camera_ros, self._camera_cb, 20)
         self.create_subscription(String, self.topic_plan_status_ros, self._plan_status_cb, 20)
         self.create_subscription(String, self.topic_plan_message_ros, self._plan_message_cb, 20)
         if self._log_bridge_enabled:
@@ -261,6 +264,14 @@ class MQTTBridgeNode(Node):
             return
         self.client.publish(self.topic_plan_message_mqtt, payload)
         self.log.info(f"ROS2 -> MQTT plan message: {payload}", event="PLAN_MESSAGE_MQTT")
+
+    def _camera_cb(self, msg: String):
+        if not self._mqtt_connected:
+            return
+        payload = str(msg.data or "")
+        if payload == "":
+            return
+        self.client.publish(self.topic_camera_mqtt, payload)
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()

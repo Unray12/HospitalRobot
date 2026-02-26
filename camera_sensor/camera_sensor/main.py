@@ -5,22 +5,23 @@ from std_msgs.msg import String
 import serial
 import threading
 import time
+from robot_common.config_manager import ConfigManager
+from robot_common.logging_utils import LogAdapter
 
 
 class SerialReader(Node):
     def __init__(self):
         super().__init__('camera_sensor')
+        self.log = LogAdapter(self.get_logger(), "camera_sensor")
 
-        # Parameters
-        self.declare_parameter('port', '/dev/ttyACM0')
-        self.declare_parameter('baud', 115200)
-        self.declare_parameter('topic', 'serial_line')
-        self.declare_parameter('read_timeout', 0.2)  # seconds
+        config = ConfigManager("camera_sensor", logger=self.log).load()
+        serial_cfg = config.get("serial", {})
+        pub_cfg = config.get("publish", {})
 
-        self.port = self.get_parameter('port').get_parameter_value().string_value
-        self.baud = self.get_parameter('baud').get_parameter_value().integer_value
-        self.topic = self.get_parameter('topic').get_parameter_value().string_value
-        self.read_timeout = float(self.get_parameter('read_timeout').value)
+        self.port = str(serial_cfg.get("port", "/dev/ttyACM0"))
+        self.baud = int(serial_cfg.get("baudrate", 115200))
+        self.topic = str(pub_cfg.get("topic", "/face/camera"))
+        self.read_timeout = float(serial_cfg.get("timeout", 0.2))
 
         self.pub = self.create_publisher(String, self.topic, 10)
 
@@ -31,7 +32,10 @@ class SerialReader(Node):
         self._open_serial()
 
         self._thread.start()
-        self.get_logger().info(f"Reading serial from {self.port} @ {self.baud} -> topic '{self.topic}'")
+        self.log.info(
+            f"Reading serial from {self.port} @ {self.baud} -> topic '{self.topic}'",
+            event="BOOT",
+        )
 
     def _open_serial(self):
         try:
@@ -47,7 +51,7 @@ class SerialReader(Node):
             self.ser.reset_output_buffer()
             # self._log_info(f"Serial Line Sensors connected: {self.port}")
         except Exception as e:
-            self.get_logger().error(f"Cannot open serial {self.port}: {e}")
+            self.log.error(f"Cannot open serial {self.port}: {e}", event="SERIAL")
             raise
 
     def _read_loop(self):
@@ -71,10 +75,10 @@ class SerialReader(Node):
                 self.pub.publish(msg)
 
             except serial.SerialException as e:
-                self.get_logger().error(f"SerialException: {e}")
+                self.log.error(f"SerialException: {e}", event="SERIAL")
                 time.sleep(0.5)
             except Exception as e:
-                self.get_logger().error(f"Read error: {e}")
+                self.log.error(f"Read error: {e}", event="SERIAL")
                 time.sleep(0.2)
 
     def destroy_node(self):

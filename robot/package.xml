@@ -18,6 +18,7 @@
   <depend>line_follower</depend>
   <depend>motor_driver</depend>
   <depend>manual_control</depend>
+  <depend>camera_sensor</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

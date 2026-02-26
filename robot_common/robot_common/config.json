@@ -5,8 +5,19 @@
                 "line_sensor_driver",
                 "line_follower",
                 "motor_driver",
-                "manual_control"
+                "manual_control",
+                "camera_sensor"
             ]
+        }
+    },
+    "camera_sensor": {
+        "serial": {
+            "port": "/dev/ttyACM0",
+            "baudrate": 115200,
+            "timeout": 0.2
+        },
+        "publish": {
+            "topic": "/face/camera"
         }
     },
     "line_sensors": {
@@ -56,9 +67,11 @@
         "plan_alias": {
             "0": "clear",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a19",
+            "3": "a18",
+            "4": "a17",
+            "5": "a16",
+            "6": "a15"
         }
     },
     "motor_driver": {
@@ -97,6 +110,8 @@
             "plan_select": "plan_select",
             "debug_toggle": "/debug_logs_toggle",
             "robot_logs": "robot_logs",
+            "camera_face_ros": "/face/camera",
+            "camera_face_mqtt": "face/camera",
             "plan_status_ros": "/plan_status",
             "plan_status_mqtt": "plan_status",
             "plan_message_ros": "/plan_message",
@@ -117,19 +132,25 @@
         "plan_keys": {
             "0": "clear",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a19",
+            "3": "a18",
+            "4": "a17",
+            "5": "a16",
+            "6": "a15"
         },
         "room_plans": {
             "a20": "a20",
-            "a21": "plan_straight",
-            "a22": "plan_turn_right",
-            "a23": "plan_stop",
+            "a19": "a19",
+            "a18": "a18",
+            "a17": "a17",
+            "a16": "a16",
+            "a15": "a15",
             "1": "a20",
-            "2": "plan_straight",
-            "3": "plan_turn_right",
-            "4": "plan_stop"
+            "2": "a19",
+            "3": "a18",
+            "4": "a17",
+            "5": "a16",
+            "6": "a15"
         },
         "log_bridge": {
             "enabled": true,

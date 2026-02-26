@@ -1,0 +1,25 @@
+{
+    "name": "a16",
+    "steps": [
+        {
+            "action": "Wait",
+            "duration": 0.2
+        },
+        {
+            "action": "RotateRight",
+            "speed": 6,
+            "duration": 1.8
+        },
+        {
+            "action": "RotateRight",
+            "speed": 6,
+            "until": "line",
+            "timeout": 2.0
+        },
+        {
+            "action": "Follow",
+            "duration": 0.6
+        }
+    ],
+    "end_state": "follow"
+}
