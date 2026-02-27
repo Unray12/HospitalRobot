@@ -1,5 +1,5 @@
 {
-    "name": "a18",
+    "name": "a16",
     "start_without_cross": true,
     "steps": [
         {
@@ -10,7 +10,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Xin chào cô chú, anh chị. Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn đến phòng khám A18 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con. Bây giờ chúng ta bắt đầu di chuyển ạ."
+                    "message": "say: Xin chào cô chú, anh chị. Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn đến phòng khám A16 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con. Bây giờ chúng ta bắt đầu di chuyển ạ."
                 }
             ]
         },
@@ -63,12 +63,12 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Con xin kiểm tra lại ạ. Nếu cô chú, anh chị đang ở phía sau, vui lòng tiếp tục đi theo con để đến phòng khám A18. Nếu cần đi chậm lại, xin hãy báo để con điều chỉnh tốc độ."
+                    "message": "say: Con xin kiểm tra lại ạ. Nếu cô chú, anh chị đang ở phía sau, vui lòng tiếp tục đi theo con để đến phòng khám A16. Nếu cần đi chậm lại, xin hãy báo để con điều chỉnh tốc độ."
                 }
             ]
         },
         {
-            "label": "S5_ARRIVED_A18",
+            "label": "S5_ARRIVED_A16",
             "action": "RotateRight",
             "speed": 5,
             "until": "line",
@@ -76,7 +76,7 @@
             "messages": [
                 {
                     "topic": "/plan_message",
-                    "message": "say: Chúng ta đã đến phòng khám A18. Cô chú, anh chị vui lòng kiểm tra thông tin khám và làm theo hướng dẫn của nhân viên y tế tại đây. Chúc cô chú, anh chị thăm khám thuận lợi."
+                    "message": "say: Chúng ta đã đến phòng khám A16. Cô chú, anh chị vui lòng kiểm tra thông tin khám và làm theo hướng dẫn của nhân viên y tế tại đây. Chúc cô chú, anh chị thăm khám thuận lợi."
                 }
             ]
         },

@@ -12,7 +12,7 @@
     },
     "camera_sensor": {
         "serial": {
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
             "baudrate": 115200,
             "timeout": 0.2
         },
@@ -22,7 +22,7 @@
     },
     "line_sensors": {
         "serial": {
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -46,7 +46,7 @@
         "cross_pre_forward_speed": 8,
         "cross_pre_forward_duration": 2.7,
         "cross_pre_stop_duration": 1.0,
-        "rotate_min_duration": 15,
+        "rotate_min_duration": 5,
         "rotate_line_mid_min_count": 1,
         "rotate_line_side_max_count": 3,
         "rotate_early_stop_on_side": true,
@@ -79,7 +79,7 @@
     },
     "motor_driver": {
         "serial": {
-            "port": "/dev/ttyUSB1",
+            "port": "/dev/ttyUSB0",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -155,12 +155,13 @@
             "5": "a15"
         },
         "camera_face_plan_message": {
-            "enabled": true,
+            "enabled": false,
             "id_messages": {
-                "1": "say: Da nhan dien ID 1 tu camera",
-                "2": "say: Da nhan dien ID 2 tu camera",
-                "3": "say: Da nhan dien ID 3 tu camera",
-                "4": "say: Da nhan dien ID 4 tu camera"
+                "0": "say: Xin chào bạn. Con là robot hỗ trợ của bệnh viện. Rất vui được gặp bạn. Con có thể hỗ trợ dẫn đường từ phòng A19 đến phòng A15. Nếu bạn cần, xin vui lòng đi theo con.",
+                "1": "say: Con kính chào bác Chiến. Chúc Giám đốc một ngày làm việc hiệu quả và nhiều sức khỏe.",
+                "2": "say: Con Kính chào Bác Minh. Chúc Bác một ngày làm việc thành công.",
+                "3": "say: Con chào Thầy Thơ. Chúc Thầy một ngày làm việc hiệu quả và nhiều năng lượng.",
+                "4": "say: Con chào Thầy Nhân. Chúc Thầy một ngày làm việc thành công và nhiều sức khỏe."
             }
         },
         "log_bridge": {
