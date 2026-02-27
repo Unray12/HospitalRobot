@@ -154,6 +154,15 @@
             "4": "a16",
             "5": "a15"
         },
+        "camera_face_plan_message": {
+            "enabled": true,
+            "id_messages": {
+                "1": "say: Da nhan dien ID 1 tu camera",
+                "2": "say: Da nhan dien ID 2 tu camera",
+                "3": "say: Da nhan dien ID 3 tu camera",
+                "4": "say: Da nhan dien ID 4 tu camera"
+            }
+        },
         "log_bridge": {
             "enabled": true,
             "ros_topic": "/rosout",

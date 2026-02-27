@@ -55,6 +55,7 @@ class MQTTBridgeNode(Node):
         plan_keys = config.get("plan_keys", {})
         room_plans = config.get("room_plans", {})
         log_bridge_cfg = config.get("log_bridge", {})
+        camera_plan_cfg = config.get("camera_face_plan_message", {})
 
         self.broker_address = broker_cfg.get("address", "127.0.0.1")
         self.broker_port = broker_cfg.get("port", 1883)
@@ -106,6 +107,12 @@ class MQTTBridgeNode(Node):
             for word in log_bridge_cfg.get("keywords", ["[PLAN_STATUS]", "[PLAN]"])
             if str(word)
         ]
+        self._camera_face_plan_enabled = bool(camera_plan_cfg.get("enabled", False))
+        self._camera_face_plan_messages = {
+            str(k).strip(): str(v)
+            for k, v in camera_plan_cfg.get("id_messages", {}).items()
+            if str(k).strip() and str(v).strip()
+        }
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
@@ -283,6 +290,34 @@ class MQTTBridgeNode(Node):
         if payload == "":
             return
         self.client.publish(self.topic_camera_mqtt, payload)
+        self._publish_camera_plan_message(payload)
+
+    def _publish_camera_plan_message(self, payload: str):
+        if not self._camera_face_plan_enabled:
+            return
+        face_id = self._extract_face_id(payload)
+        if face_id is None:
+            return
+        message = self._camera_face_plan_messages.get(str(face_id))
+        if not message:
+            return
+        self.client.publish(self.topic_plan_message_mqtt, message)
+        self.log.info(
+            f"Camera FACE id={face_id} -> MQTT {self.topic_plan_message_mqtt}: {message}",
+            event="CAMERA_PLAN_MSG",
+        )
+
+    def _extract_face_id(self, payload: str):
+        text = (payload or "").strip().upper()
+        if "FACE" not in text:
+            return None
+        m = re.search(r"FACE\s*,\s*(\d+)", text)
+        if not m:
+            return None
+        try:
+            return int(m.group(1))
+        except ValueError:
+            return None
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()

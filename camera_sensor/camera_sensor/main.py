@@ -113,8 +113,8 @@ class CameraSensorNode(Node):
         if state == "NO_OBJECT":
             return f"<{dev},NO_OBJECT>"
 
-        score = self._extract_score(rest)
-        return f"<{dev},FACE,{score}>"
+        face_id = self._extract_face_id(rest)
+        return f"<{dev},FACE,{face_id}>"
 
     def _normalize_device(self, token):
         t = (token or "").strip()
@@ -141,10 +141,10 @@ class CameraSensorNode(Node):
             return "NO_OBJECT"
         return None
 
-    def _extract_score(self, token):
+    def _extract_face_id(self, token):
         if not token:
             return 0
-        m = re.search(r"[01]", token)
+        m = re.search(r"\d+", token)
         if not m:
             return 0
         return int(m.group(0))
