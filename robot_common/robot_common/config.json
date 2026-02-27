@@ -154,10 +154,14 @@
             "4": "a16",
             "5": "a15"
         },
+        "camera_face_forward": {
+            "enabled": false
+        },
         "camera_face_plan_message": {
-            "enabled": false,
+            "enabled": true,
+            "require_plan_autoline": true,
             "id_messages": {
-                "0": "say: Xin chào bạn. Con là robot hỗ trợ của bệnh viện. Rất vui được gặp bạn. Con có thể hỗ trợ dẫn đường từ phòng A19 đến phòng A15. Nếu bạn cần, xin vui lòng đi theo con.",
+               "0": "say: Xin vui lòng nhường đường giúp con di chuyển ạ. Con xin cảm ơn.",
                 "1": "say: Con kính chào bác Chiến. Chúc Giám đốc một ngày làm việc hiệu quả và nhiều sức khỏe.",
                 "2": "say: Con Kính chào Bác Minh. Chúc Bác một ngày làm việc thành công.",
                 "3": "say: Con chào Thầy Thơ. Chúc Thầy một ngày làm việc hiệu quả và nhiều năng lượng.",
