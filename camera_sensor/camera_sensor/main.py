@@ -1,127 +1,76 @@
 #!/usr/bin/env python3
 import re
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-import serial
-import threading
-import time
+
+from .camera_sensor_reader import CameraSensorReader
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
 
-class SerialReader(Node):
+class CameraSensorNode(Node):
     def __init__(self):
-        super().__init__('camera_sensor')
+        super().__init__("camera_sensor")
         self.log = LogAdapter(self.get_logger(), "camera_sensor")
 
         config = ConfigManager("camera_sensor", logger=self.log).load()
         serial_cfg = config.get("serial", {})
         pub_cfg = config.get("publish", {})
 
-        self.port = str(serial_cfg.get("port", "/dev/ttyACM0"))
-        self.baud = int(serial_cfg.get("baudrate", 115200))
-        self.topic = str(pub_cfg.get("topic", "/face/camera"))
-        self.read_timeout = float(serial_cfg.get("timeout", 0.2))
-        self.reconnect_period_sec = float(serial_cfg.get("reconnect_period_sec", 2.0))
+        port = str(serial_cfg.get("port", "/dev/ttyACM0"))
+        baudrate = int(serial_cfg.get("baudrate", 115200))
+        read_timeout = float(serial_cfg.get("timeout", 0.2))
+        topic = str(pub_cfg.get("topic", "/face/camera"))
+        rate_hz = float(pub_cfg.get("rate_hz", 30.0))
 
-        self.pub = self.create_publisher(String, self.topic, 10)
+        self.reconnect_period_sec = float(
+            config.get("reconnect_period_sec", serial_cfg.get("reconnect_period_sec", 2.0))
+        )
+        self.fallback_ports = config.get("fallback_ports", ["/dev/ttyACM1", "/dev/ttyACM0"])
+        self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyACM", "/dev/ttyUSB", "COM"])
+        self.malformed_log_every = int(max(1, config.get("malformed_log_every", 20)))
         self._drop_count = 0
 
-        self._stop = threading.Event()
-        self._serial_lock = threading.Lock()
-        self._thread = threading.Thread(target=self._read_loop, daemon=True)
+        self.reader = CameraSensorReader(
+            port=port,
+            baudrate=baudrate,
+            timeout=read_timeout,
+            logger=self.log,
+        )
 
-        self.ser = None
-        self._open_serial()
-
-        self._thread.start()
+        self.pub = self.create_publisher(String, topic, 10)
+        period = 1.0 / max(rate_hz, 1.0)
+        self.timer = self.create_timer(period, self._timer_cb)
+        self.reconnect_timer = self.create_timer(self.reconnect_period_sec, self._reconnect_cb)
         self.log.info(
-            f"Reading serial from {self.port} @ {self.baud} -> topic '{self.topic}'",
+            f"Reading camera serial from {port} @ {baudrate} -> topic '{topic}'",
             event="BOOT",
         )
 
-    def _open_serial(self):
-        try:
-            # exclusive=True giúp tránh 2 process mở cùng lúc (pyserial>=3.5)
-            with self._serial_lock:
-                self.ser = serial.Serial(
-                    port=self.port,
-                    baudrate=int(self.baud),
-                    timeout=self.read_timeout,
-                    exclusive=True
-                )
-                # Optional: flush
-                self.ser.reset_input_buffer()
-                self.ser.reset_output_buffer()
-            # self._log_info(f"Serial Line Sensors connected: {self.port}")
-        except Exception as e:
-            self.log.error(f"Cannot open serial {self.port}: {e}", event="SERIAL")
-            raise
+    def _timer_cb(self):
+        line = self.reader.read_line()
+        if line is None:
+            return
 
-    def _close_serial(self):
-        with self._serial_lock:
-            try:
-                if self.ser and self.ser.is_open:
-                    self.ser.close()
-            except Exception:
-                pass
-            self.ser = None
+        normalized = self._normalize_face_payload(line)
+        if normalized is None:
+            self._drop_count += 1
+            if self._drop_count % self.malformed_log_every == 1:
+                self.log.warning(f"Dropped malformed camera frame: {line}", event="FRAME")
+            return
 
-    def _reconnect_serial(self):
-        try:
-            self._open_serial()
-            self.log.info(f"Camera serial reconnected: {self.port}", event="SERIAL")
-            return True
-        except Exception:
-            return False
+        self.pub.publish(String(data=normalized))
 
-    def _read_loop(self):
-        next_reconnect = 0.0
-        while rclpy.ok() and not self._stop.is_set():
-            try:
-                with self._serial_lock:
-                    ser = self.ser
-
-                if ser is None or not ser.is_open:
-                    now = time.time()
-                    if now >= next_reconnect:
-                        self._reconnect_serial()
-                        next_reconnect = now + self.reconnect_period_sec
-                    time.sleep(0.2)
-                    continue
-
-                line = ser.readline()  # bytes, ends with \n if present
-                if not line:
-                    continue
-
-                text = line.decode('utf-8', errors='replace').strip()
-                if text == '':
-                    continue
-
-                normalized = self._normalize_face_payload(text)
-                if normalized is None:
-                    self._drop_count += 1
-                    if self._drop_count % 20 == 1:
-                        self.log.warning(
-                            f"Dropped malformed camera frame: {text}",
-                            event="FRAME",
-                        )
-                    continue
-
-                msg = String()
-                msg.data = normalized
-                self.pub.publish(msg)
-
-            except serial.SerialException as e:
-                if rclpy.ok():
-                    self.log.error(f"SerialException: {e}", event="SERIAL")
-                self._close_serial()
-                time.sleep(0.5)
-            except Exception as e:
-                if rclpy.ok():
-                    self.log.error(f"Read error: {e}", event="SERIAL")
-                time.sleep(0.2)
+    def _reconnect_cb(self):
+        if self.reader.is_connected():
+            return
+        if self.reader.reconnect(
+            fallback_ports=self.fallback_ports,
+            scan_prefixes=self.scan_prefixes,
+        ):
+            self.log.info("Camera serial reconnected", event="SERIAL")
 
     def _normalize_face_payload(self, raw):
         text = (raw or "").strip()
@@ -143,7 +92,10 @@ class SerialReader(Node):
 
         parts = [p for p in text.split(",") if p]
         if len(parts) == 2:
-            m = re.match(r"^(DEV1|DEV|DV1|EV1|D1|V1|DV|EV)(FACE|ACE|NO_OBJECT|NOOBJECT|NO_OBECT|NO_BJECT|O_OBJECT)$", parts[0])
+            m = re.match(
+                r"^(DEV1|DEV|DV1|EV1|D1|V1|DV|EV)(FACE|ACE|NO_OBJECT|NOOBJECT|NO_OBECT|NO_BJECT|O_OBJECT)$",
+                parts[0],
+            )
             if m:
                 parts = [m.group(1), m.group(2), parts[1]]
         if len(parts) < 2:
@@ -161,8 +113,8 @@ class SerialReader(Node):
         if state == "NO_OBJECT":
             return f"<{dev},NO_OBJECT>"
 
-        score = self._extract_score(rest)
-        return f"<{dev},FACE,{score}>"
+        face_id = self._extract_face_id(rest)
+        return f"<{dev},FACE,{face_id}>"
 
     def _normalize_device(self, token):
         t = (token or "").strip()
@@ -189,23 +141,22 @@ class SerialReader(Node):
             return "NO_OBJECT"
         return None
 
-    def _extract_score(self, token):
+    def _extract_face_id(self, token):
         if not token:
             return 0
-        m = re.search(r"[01]", token)
+        m = re.search(r"\d+", token)
         if not m:
             return 0
         return int(m.group(0))
 
     def destroy_node(self):
-        self._stop.set()
-        self._close_serial()
+        self.reader.close()
         super().destroy_node()
 
 
-def main():
-    rclpy.init()
-    node = SerialReader()
+def main(args=None):
+    rclpy.init(args=args)
+    node = CameraSensorNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -216,5 +167,5 @@ def main():
             rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

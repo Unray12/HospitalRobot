@@ -1,47 +1,37 @@
-# Hướng Dẫn Gửi MQTT Message (HospitalRobot)
+# MQTT Message Guide (HospitalRobot)
 
-Tài liệu này hướng dẫn gửi MQTT message để điều khiển robot.
+Tài liệu này mô tả đầy đủ cách điều khiển robot bằng MQTT, bám theo code hiện tại trong:
+- `mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py`
+- `robot_common/robot_common/config.json`
 
-## 1. Thông tin MQTT mặc định
+## 1. Mục đích
 
-- Broker: `127.0.0.1`
-- Port: `1883`
-- Topics:
-  - `VR_control`: lệnh di chuyển tay
-  - `pick_robot`: bật/tắt auto mode
-  - `plan_select`: chọn plan theo phòng
+- Chuẩn hóa payload MQTT để điều khiển robot ổn định.
+- Giảm lỗi tích hợp giữa app điều khiển, MQTT broker và ROS2 runtime.
+- Cung cấp checklist test nhanh cho vận hành và QA.
 
-Nguồn cấu hình: `robot_common/robot_common/config.json` -> `mqtt_bridge`.
+## 2. Thông số broker và topic
 
-## 2. Chuẩn payload khuyến nghị
+Thông số mặc định:
+- Broker host: `127.0.0.1`
+- Broker port: `1883`
 
-### 2.1 `plan_select`
+Topic điều khiển (MQTT -> ROS2):
+- `VR_control`
+- `pick_robot`
+- `plan_select`
 
-- Khuyến nghị:
-  - `room:a20` -> `plan_ntp`
-  - `room:a21` -> `plan_straight`
-  - `room:a22` -> `plan_turn_right`
-  - `room:a23` -> `plan_stop`
-  - `room:0` hoặc `clear` -> clear plan
+Topic trạng thái (ROS2 -> MQTT):
+- `plan_status`
+- `plan_message`
+- `face/camera`
+- `robot_logs` (lọc từ `/rosout` theo cấu hình log bridge)
 
-- Tương thích ngược (vẫn hỗ trợ):
-  - `1`, `2`, `3`, `4`
-  - `room:1..4`
-  - `phong:1..4`
-  - `plan:1..4`
-  - tên plan trực tiếp, ví dụ: `plan_turn_right`
+## 3. Contract chi tiết từng topic điều khiển
 
-Lưu ý:
-- Khi chọn plan, hệ thống sẽ tự bật auto mode (`pick_robot=1`) theo cấu hình mặc định hiện tại.
-- Có thể ghi đè theo từng plan bằng key `autoline` trong file JSON plan.
-  - Tương thích key cũ: `auto_on_select`.
+### 3.1 Topic `VR_control`
 
-### 2.2 `pick_robot` (auto mode)
-
-- `1`: bật auto mode
-- `0`: tắt auto mode
-
-### 2.3 `VR_control` (manual command)
+Ý nghĩa: gửi lệnh điều khiển tay.
 
 Payload hợp lệ:
 - `Forward`
@@ -52,63 +42,125 @@ Payload hợp lệ:
 - `RotateLeft`
 - `RotateRight`
 
-## 3. Gửi message bằng `mosquitto_pub`
+ROS2 tương ứng:
+- Bridge publish sang `/VR_control` (`std_msgs/String`)
+- `manual_control` chuyển thành `/motor_cmd` theo `base_speed`
 
-### 3.1 Chọn phòng (plan)
+### 3.2 Topic `pick_robot`
+
+Ý nghĩa: bật/tắt auto mode toàn cục.
+
+Payload hợp lệ:
+- `1`: bật auto mode
+- `0`: tắt auto mode
+
+ROS2 tương ứng:
+- Bridge publish sang `/pick_robot` (`std_msgs/String`)
+- `manual_control` đồng bộ sang `/auto_mode` (`std_msgs/Bool`)
+- `manual_control` gọi service `/set_auto_mode`
+
+### 3.3 Topic `plan_select`
+
+Ý nghĩa: chọn plan cho `line_follower`.
+
+Payload khuyến nghị:
+- `room:a20`, `room:a19`, `room:a18`, `room:a17`, `room:a16`, `room:a15`
+- `room:1` đến `room:6`
+- `clear` hoặc `room:0` để clear plan
+
+Payload tương thích:
+- `1..6`
+- `phong:1..6`
+- `plan:1..6`
+- tên plan trực tiếp như `a20`, `plan_turn_right`
+
+Map mặc định:
+- `1 -> a20`
+- `2 -> a19`
+- `3 -> a18`
+- `4 -> a17`
+- `5 -> a16`
+- `6 -> a15`
+
+Lưu ý:
+- Bridge normalize payload trước khi publish ROS topic `/plan_select`.
+- Nếu room id không map được sẽ bị bỏ qua và warning log.
+
+## 4. Ví dụ publish chuẩn
+
+### 4.1 Chọn plan
 
 ```bash
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:1"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a20"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a21"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a22"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a23"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "clear"
 ```
 
-### 3.2 Bật/tắt auto
+### 4.2 Bật/tắt auto mode
 
 ```bash
 mosquitto_pub -h 127.0.0.1 -p 1883 -t pick_robot -m "1"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t pick_robot -m "0"
 ```
 
-### 3.3 Điều khiển tay
+### 4.3 Điều khiển tay
 
 ```bash
 mosquitto_pub -h 127.0.0.1 -p 1883 -t VR_control -m "Forward"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t VR_control -m "Left"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t VR_control -m "RotateLeft"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t VR_control -m "Stop"
 ```
 
-## 4. Theo dõi message để debug
+## 5. Subscribe để theo dõi realtime
 
 ```bash
-mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_select -v
-mosquitto_sub -h 127.0.0.1 -p 1883 -t pick_robot -v
 mosquitto_sub -h 127.0.0.1 -p 1883 -t VR_control -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t pick_robot -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_select -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_status -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_message -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t face/camera -v
 ```
 
-Nếu cần theo dõi tất cả:
+## 6. Kiểm tra ROS2 song song
 
 ```bash
-mosquitto_sub -h 127.0.0.1 -p 1883 -t "#" -v
-```
-
-## 5. Kiểm tra từ phía ROS2
-
-Trong lúc publish MQTT, mở terminal khác để check ROS2 topics:
-
-```bash
-ros2 topic echo /plan_select
-ros2 topic echo /pick_robot
 ros2 topic echo /VR_control
+ros2 topic echo /pick_robot
+ros2 topic echo /plan_select
+ros2 topic echo /auto_mode
+ros2 topic echo /plan_status
+ros2 topic echo /plan_message
+ros2 topic echo /face/camera
+ros2 topic echo /motor_cmd
 ```
 
 Kỳ vọng:
-- Khi gửi `plan_select = room:2`, ROS `/plan_select` nhận `plan_straight`.
-- Khi gửi `pick_robot = 1`, node auto mode chuyển sang bật.
-- Khi gửi `VR_control = Forward`, manual_control publish lệnh sang `/motor_cmd`.
+- `plan_select=room:1` -> `/plan_select` nhận `a20`
+- `pick_robot=1` -> `/auto_mode` chuyển `True`
+- `VR_control=Forward` -> `/motor_cmd` xuất `Forward:<speed>`
 
-## 6. Python nhanh (paho-mqtt)
+## 7. Keyboard teleop tích hợp trong mqtt_bridge
+
+Mapping mặc định:
+- `w/s/a/d`: `Forward/Backward/Left/Right`
+- `space`: `Stop`
+- `j/p`: `RotateLeft/RotateRight`
+- `k`: toggle auto mode
+- `e`: toggle debug logs
+- `1..6`: chọn plan
+- `0`: clear plan
+- `q`: quit node
+
+## 8. Echo suppression (tránh loop MQTT)
+
+Bridge có cơ chế đánh dấu local publish và suppress message echo trong:
+- `echo_suppress_window_sec = 0.35`
+
+Mục đích:
+- tránh lặp command khi bridge vừa publish vừa subscribe cùng topic.
+
+## 9. Python client mẫu
 
 ```python
 import paho.mqtt.client as mqtt
@@ -116,18 +168,24 @@ import paho.mqtt.client as mqtt
 client = mqtt.Client()
 client.connect("127.0.0.1", 1883, 60)
 
-client.publish("pick_robot", "1")      # bật auto
-client.publish("plan_select", "room:3")# chọn phòng 3
-client.publish("VR_control", "Stop")   # lệnh tay
+client.publish("pick_robot", "1")
+client.publish("plan_select", "room:1")
+client.publish("VR_control", "Stop")
 
 client.disconnect()
 ```
 
-## 7. Lỗi thường gặp
+## 10. Lỗi thường gặp và cách xử lý
 
-- Gửi `room:5` nhưng không chạy:
-  - Hiện tại config chỉ map phòng `1..4`.
-- Gửi plan nhưng line_follower báo `Plan not found`:
-  - Kiểm tra tên file plan trong `robot_common/robot_common/plans/`.
-- Gửi MQTT có message nhưng ROS không nhận:
-  - Kiểm tra `mqtt_bridge` đang chạy và kết nối đúng broker.
+- `plan_select` gửi rồi nhưng robot không chạy:
+  - kiểm tra `line_follower` có load được plan file không
+  - kiểm tra payload sau normalize có đúng tên plan
+- MQTT có message nhưng ROS2 không thấy:
+  - kiểm tra `mqtt_bridge` đang chạy
+  - kiểm tra đúng topic name phân biệt hoa/thường (`VR_control` là chữ hoa)
+- Auto mode không đổi:
+  - kiểm tra `/pick_robot` và service `/set_auto_mode`
+  - xem log `AUTO_SYNC` từ `manual_control`
+- Message bị lặp:
+  - kiểm tra client ngoài có publish trùng
+  - kiểm tra không có nhiều bridge chạy song song

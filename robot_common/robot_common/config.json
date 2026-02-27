@@ -12,7 +12,7 @@
     },
     "camera_sensor": {
         "serial": {
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
             "baudrate": 115200,
             "timeout": 0.2
         },
@@ -22,7 +22,7 @@
     },
     "line_sensors": {
         "serial": {
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM0",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -53,7 +53,7 @@
         "rotate_line_side_min_count": 1,
         "plan_lost_line_hold_sec": 1.2,
         "plan_lost_line_warn_period": 0.6,
-        "cross_plan_name": "a20",
+        "cross_plan_name": "a19",
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
         "topics": {
@@ -70,17 +70,16 @@
         },
         "plan_alias": {
             "0": "clear",
-            "1": "a20",
-            "2": "a19",
-            "3": "a18",
-            "4": "a17",
-            "5": "a16",
-            "6": "a15"
+            "1": "a19",
+            "2": "a18",
+            "3": "a17",
+            "4": "a16",
+            "5": "a15"
         }
     },
     "motor_driver": {
         "serial": {
-            "port": "/dev/ttyUSB1",
+            "port": "/dev/ttyUSB0",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -137,26 +136,37 @@
         "echo_suppress_window_sec": 0.35,
         "plan_keys": {
             "0": "clear",
-            "1": "a20",
-            "2": "a19",
-            "3": "a18",
-            "4": "a17",
-            "5": "a16",
-            "6": "a15"
+            "1": "a19",
+            "2": "a18",
+            "3": "a17",
+            "4": "a16",
+            "5": "a15"
         },
         "room_plans": {
-            "a20": "a20",
             "a19": "a19",
             "a18": "a18",
             "a17": "a17",
             "a16": "a16",
             "a15": "a15",
-            "1": "a20",
-            "2": "a19",
-            "3": "a18",
-            "4": "a17",
-            "5": "a16",
-            "6": "a15"
+            "1": "a19",
+            "2": "a18",
+            "3": "a17",
+            "4": "a16",
+            "5": "a15"
+        },
+        "camera_face_forward": {
+            "enabled": false
+        },
+        "camera_face_plan_message": {
+            "enabled": true,
+            "require_plan_autoline": true,
+            "id_messages": {
+               "0": "say: Xin vui lòng nhường đường giúp con di chuyển ạ. Con xin cảm ơn.",
+                "1": "say: Con kính chào bác Chiến. Chúc Giám đốc một ngày làm việc hiệu quả và nhiều sức khỏe.",
+                "2": "say: Con Kính chào Bác Minh. Chúc Bác một ngày làm việc thành công.",
+                "3": "say: Con chào Thầy Thơ. Chúc Thầy một ngày làm việc hiệu quả và nhiều năng lượng.",
+                "4": "say: Con chào Thầy Nhân. Chúc Thầy một ngày làm việc thành công và nhiều sức khỏe."
+            }
         },
         "log_bridge": {
             "enabled": true,

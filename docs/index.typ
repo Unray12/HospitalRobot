@@ -49,7 +49,7 @@
   #v(0.7cm)
   #text(12pt, weight: "semibold")[ROS2 Technical Report]
   #v(0.6cm)
-  #text(10pt)[Version: 2026-02-23]
+  #text(10pt)[Version: 2026-02-26]
   #linebreak()
   #text(10pt)[Team: ACLAB]
   #v(0.8cm)
@@ -60,77 +60,97 @@
 
 = System Overview
 #concept-block[
-  #inline("Purpose")
-  Tài liệu này mô tả chi tiết kiến trúc kỹ thuật của workspace `HospitalRobot`,
-  bao gồm interfaces, cấu hình runtime, luồng dữ liệu và checklist debug.
+  #inline("Mục tiêu tài liệu")
+  Tài liệu này là đặc tả kỹ thuật đầy đủ cho runtime ROS2 của workspace `HospitalRobot`.
+  Mục tiêu là giúp developer, operator và QA có cùng một chuẩn hiểu về:
+  interface contract, luồng điều khiển, cấu hình, hành vi lỗi và cách kiểm chứng.
 
-  #inline("In-scope packages")
-  - `robot_common`: config/plan/command/logging shared layer
-  - `line_sensors`: serial sensor driver
-  - `line_follower`: FSM + plan executor
-  - `motor_driver`: actuation bridge to motor controller
-  - `manual_control`: manual path + auto mode sync
-  - `mqtt_bridge`: MQTT/keyboard integration
-  - `robot`: bringup entrypoint
+  #inline("Phạm vi hệ thống")
+  - `robot_common`: lớp chia sẻ config, command protocol, logging và plan JSON
+  - `line_sensors`: lấy frame line sensor qua serial
+  - `line_follower`: FSM bám line + plan executor
+  - `motor_driver`: chuyển command thành tốc độ 4 bánh và gửi serial
+  - `manual_control`: đồng bộ mode manual/auto và service sync
+  - `camera_sensor`: đọc serial camera, chuẩn hoá payload nhận diện
+  - `mqtt_bridge`: cầu nối MQTT/ROS2 + keyboard teleop
+  - `robot`: gói bringup runtime
 
-  #inline("Primary control path")
-  `line_sensors -> /line_sensors/frame -> line_follower -> /motor_cmd -> motor_driver`
-
-  #inline("Secondary control paths")
-  - Manual command path:
-    `/VR_control -> manual_control -> /motor_cmd`
-  - Auto mode path:
-    `/pick_robot -> manual_control -> /auto_mode -> line_follower`
-  - Plan select path:
-    `/plan_select -> line_follower -> plan files`
-
-  #inline("Core service interface")
-  `/set_auto_mode` (`std_srvs/SetBool`) for mode synchronization.
+  #inline("Nguyên tắc kiến trúc")
+  - Điều khiển chuyển động tách theo pipeline `sense -> decide -> act`
+  - Auto mode và manual mode dùng chung đường xuất lệnh `/motor_cmd`
+  - Mọi tích hợp ngoài ROS2 (MQTT, serial) phải có lớp chuẩn hoá dữ liệu
+  - Runtime ưu tiên fail-safe: mất line hoặc dữ liệu lỗi thì dừng robot
 ]
 
 #colbreak()
 
 = Interface Matrix
 #concept-block[
-  #inline("Topics")
-  - `/line_sensors/frame` (`std_msgs/Int16MultiArray`): sensor frame
-  - `/motor_cmd` (`std_msgs/String`): low-level motion command
-  - `/auto_mode` (`std_msgs/Bool`): global auto state
-  - `/VR_control` (`std_msgs/String`): manual command input
-  - `/pick_robot` (`std_msgs/String`): auto mode trigger
-  - `/plan_select` (`std_msgs/String`): plan runtime selection
-  - `/debug_logs_toggle` (`std_msgs/Bool`): runtime debug toggle
+  #inline("Topics - data plane")
+  - `/line_sensors/frame` (`std_msgs/Int16MultiArray`)
+    layout: `[left_count, mid_count, right_count, left_full, mid_full, right_full]`
+  - `/motor_cmd` (`std_msgs/String`)
+    format chuẩn: `Direction:Speed`
+  - `/auto_mode` (`std_msgs/Bool`)
+    cờ mode auto dùng cho đồng bộ control path
+  - `/VR_control` (`std_msgs/String`)
+    command manual từ operator/MQTT/keyboard
+  - `/pick_robot` (`std_msgs/String`)
+    trigger mode auto bằng `"1"` hoặc `"0"`
+  - `/plan_select` (`std_msgs/String`)
+    chọn plan runtime hoặc lệnh `clear`
+  - `/face/camera` (`std_msgs/String`)
+    payload chuẩn hoá camera `<DEV1,FACE,score>` hoặc `<DEV1,NO_OBJECT>`
+
+  #inline("Topics - observability plane")
+  - `/plan_status` (`std_msgs/String`)
+    JSON event/status theo tiến trình plan
+  - `/plan_callback` (`std_msgs/String`)
+    callback JSON tại mốc rotate -> autoline
+  - `/plan_message` (`std_msgs/String`)
+    payload step-level do plan phát ra
+  - `/debug_logs_toggle` (`std_msgs/Bool`)
+    bật/tắt debug log runtime ở node hỗ trợ
 
   #inline("Services")
   - `/set_auto_mode` (`std_srvs/SetBool`)
+    service đồng bộ mode với `line_follower`
 ]
 
 #colbreak()
 
 = Runtime Procedure
 #concept-block[
-  #inline("Step 1 - Build and source")
+  #inline("Bước 1 - Build và source workspace")
   ```bash
   colcon build --symlink-install
   source install/setup.bash
   ```
 
-  #inline("Step 2 - Bringup core runtime")
+  #inline("Bước 2 - Bringup runtime chính")
   ```bash
   ros2 run robot robot
   ```
 
-  #inline("Step 3 - Start MQTT bridge (optional but recommended)")
+  #inline("Bước 3 - Khởi động MQTT bridge (khuyến nghị)")
   ```bash
   ros2 run mqtt_bridge mqtt_bridge
   ```
 
-  #inline("Step 4 - Verify runtime interfaces")
+  #inline("Bước 4 - Kiểm tra interface sau khi lên hệ thống")
   ```bash
   ros2 topic list
   ros2 topic echo /line_sensors/frame
   ros2 topic echo /motor_cmd
+  ros2 topic echo /plan_status
   ros2 service list | grep set_auto_mode
+  ```
+
+  #inline("Bước 5 - Thử tuyến điều khiển end-to-end")
+  ```bash
+  ros2 topic pub --once /pick_robot std_msgs/String "{data: '1'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic echo /motor_cmd
   ```
 ]
 
@@ -162,9 +182,24 @@
 #colbreak()
 #include "packages/manual_control.typ"
 #colbreak()
+#include "packages/camera_sensor.typ"
+#colbreak()
 #include "packages/mqtt_bridge.typ"
 #colbreak()
 #include "packages/robot.typ"
+
+#colbreak()
+
+= Documentation Style
+#concept-block[
+  #inline("Style chuẩn áp dụng toàn bộ docs")
+  - Mỗi package phải có các mục theo đúng thứ tự:
+    `Role -> Runtime node -> I/O contract -> Configuration -> Runtime behavior -> Observability -> Validation -> Troubleshooting`
+  - Mọi giá trị default phải bám trực tiếp `robot_common/robot_common/config.json`
+  - Mọi command format phải chỉ rõ ví dụ payload hợp lệ
+  - Mọi topic/service phải ghi rõ kiểu message
+  - Mọi hành vi fallback/recovery phải mô tả điều kiện kích hoạt và kết quả
+]
 
 #colbreak()
 

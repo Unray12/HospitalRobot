@@ -3,8 +3,8 @@
 = Package `motor_driver`
 #concept-block[
   #inline("Role")
-  - Chuyển command hướng thành tốc độ 4 bánh mecanum.
-  - Gửi packet serial xuống board điều khiển motor.
+  - Tầng actuation bridge giữa ROS2 command và controller phần cứng.
+  - Nhận command text mức cao, chuyển sang 4 bánh mecanum và đẩy xuống serial.
 
   #inline("Runtime node")
   - Executable: `motor_driver`
@@ -21,6 +21,8 @@
     `Direction:Speed`
   - Serial output format:
     `(fl,fr,rl,rr)\n`
+  - Value policy:
+    wheel speed = `direction_sign * speed`.
 
   #inline("Direction mapping")
   - `Forward`: `(-1,-1,-1,-1)`
@@ -31,21 +33,41 @@
   - `RotateLeft`: `(1,1,-1,-1)`
   - `Stop`: `(0,0,0,0)`
 
-  #inline("Config defaults (current)")
+  #inline("Configuration (current defaults)")
   - Section:
     `robot_common/robot_common/config.json -> motor_driver`
   - Serial:
-    `port=/dev/ttyUSB0`, `baudrate=115200`, `timeout=0.1`
+    `port=/dev/ttyUSB1`, `baudrate=115200`, `timeout=0.1`
+  - Reconnect:
+    `reconnect_period_sec=2.0`,
+    fallback `[/dev/ttyUSB1, /dev/ttyUSB0]`,
+    `scan_prefixes=[/dev/ttyUSB, /dev/ttyACM, COM]`
   - Command topic:
     `/motor_cmd`
   - Debug toggle topic:
     `/debug_logs_toggle`
 
-  #inline("Operational logs")
+  #inline("Runtime behavior")
+  - Parse command bằng `robot_common.command_protocol.parse_command`.
+  - Command invalid bị bỏ qua, không phát serial.
+  - Khi serial write lỗi:
+    đóng port và chờ reconnect timer tự phục hồi.
+  - Reconnect strategy:
+    thử port chính -> fallback ports -> scan ports theo prefix.
+
+  #inline("Observability")
   - `DEBUG_TOGGLE`: trạng thái debug log ON/OFF.
   - `MOTOR`: log wheel speed `fl/fr/rl/rr` khi debug bật.
+  - `SERIAL`: thông báo reconnect thành công.
 
-  #inline("Troubleshooting checklist")
+  #inline("Validation commands")
+  ```bash
+  ros2 topic pub --once /motor_cmd std_msgs/String "{data: 'Forward:8'}"
+  ros2 topic pub --once /debug_logs_toggle std_msgs/Bool "{data: true}"
+  ros2 topic pub --once /motor_cmd std_msgs/String "{data: 'RotateLeft:6'}"
+  ```
+
+  #inline("Troubleshooting")
   - Có `/motor_cmd` nhưng motor không chạy:
     kiểm tra serial port, quyền truy cập cổng, và nguồn board.
   - Command bị bỏ qua:

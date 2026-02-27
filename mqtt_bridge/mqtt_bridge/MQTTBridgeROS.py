@@ -5,6 +5,7 @@ from threading import Event
 import os
 import re
 import time
+import json
 
 try:
     import paho.mqtt.client as mqtt
@@ -55,6 +56,8 @@ class MQTTBridgeNode(Node):
         plan_keys = config.get("plan_keys", {})
         room_plans = config.get("room_plans", {})
         log_bridge_cfg = config.get("log_bridge", {})
+        camera_face_forward_cfg = config.get("camera_face_forward", {})
+        camera_plan_cfg = config.get("camera_face_plan_message", {})
 
         self.broker_address = broker_cfg.get("address", "127.0.0.1")
         self.broker_port = broker_cfg.get("port", 1883)
@@ -106,6 +109,18 @@ class MQTTBridgeNode(Node):
             for word in log_bridge_cfg.get("keywords", ["[PLAN_STATUS]", "[PLAN]"])
             if str(word)
         ]
+        self._camera_face_plan_enabled = bool(camera_plan_cfg.get("enabled", False))
+        self._camera_face_require_plan_autoline = bool(
+            camera_plan_cfg.get("require_plan_autoline", True)
+        )
+        self._camera_face_forward_enabled = bool(camera_face_forward_cfg.get("enabled", True))
+        self._camera_face_plan_messages = {
+            str(k).strip(): str(v)
+            for k, v in camera_plan_cfg.get("id_messages", {}).items()
+            if str(k).strip() and str(v).strip()
+        }
+        self._plan_autoline_active = False
+        self._active_plan_name = None
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
@@ -264,6 +279,7 @@ class MQTTBridgeNode(Node):
         payload = str(msg.data or "").strip()
         if not payload:
             return
+        self._update_plan_runtime_state(payload)
         self.client.publish(self.topic_plan_status_mqtt, payload)
         self.log.info(f"ROS2 -> MQTT plan status: {payload}", event="PLAN_STATUS_MQTT")
 
@@ -282,7 +298,61 @@ class MQTTBridgeNode(Node):
         payload = str(msg.data or "")
         if payload == "":
             return
-        self.client.publish(self.topic_camera_mqtt, payload)
+        if self._camera_face_forward_enabled:
+            self.client.publish(self.topic_camera_mqtt, payload)
+        self._publish_camera_plan_message(payload)
+
+    def _publish_camera_plan_message(self, payload: str):
+        if not self._camera_face_plan_enabled:
+            return
+        if self._camera_face_require_plan_autoline:
+            if (not self._plan_autoline_active) or (not self._active_plan_name):
+                return
+        face_id = self._extract_face_id(payload)
+        if face_id is None:
+            return
+        message = self._camera_face_plan_messages.get(str(face_id))
+        if not message:
+            return
+        self.client.publish(self.topic_plan_message_mqtt, message)
+        self.log.info(
+            f"Camera FACE id={face_id} -> MQTT {self.topic_plan_message_mqtt}: {message}",
+            event="CAMERA_PLAN_MSG",
+        )
+
+    def _update_plan_runtime_state(self, payload: str):
+        try:
+            data = json.loads(payload)
+        except Exception:
+            return
+        if not isinstance(data, dict):
+            return
+
+        event_name = str(data.get("event") or "").strip().lower()
+        plan_name = data.get("plan")
+        autoline = data.get("autoline")
+
+        if plan_name:
+            self._active_plan_name = str(plan_name).strip()
+
+        if autoline is not None:
+            self._plan_autoline_active = bool(autoline)
+
+        if event_name in {"cleared", "completed_reset"}:
+            self._active_plan_name = None
+            self._plan_autoline_active = False
+
+    def _extract_face_id(self, payload: str):
+        text = (payload or "").strip().upper()
+        if "FACE" not in text:
+            return None
+        m = re.search(r"FACE\s*,\s*(\d+)", text)
+        if not m:
+            return None
+        try:
+            return int(m.group(1))
+        except ValueError:
+            return None
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()
