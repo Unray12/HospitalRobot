@@ -1,12 +1,171 @@
 {
-    "name": "a15",
+    "name": "a18",
+    "start_without_cross": true,
     "steps": [
         {
-            "action": "Stop",
-            "duration": 0.5
+            "label": "S1_INTRO",
+            "action": "RotateRight",
+            "until": "line",
+            "speed": 5,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Xin chào cô chú, anh chị. Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn đến phòng khám A18 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con. Bây giờ chúng ta bắt đầu di chuyển ạ."
+                }
+            ]
         },
         {
-            "action": "Stop"
+            "label": "S2_MOVE_AUTOLINE",
+            "action": "AutoLine",
+            "enabled": true
+        },
+        {
+            "label": "S3_MOVE_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con."
+                }
+            ]
+        },
+        {
+            "label": "S3_MOVE_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con."
+                }
+            ]
+        },
+        {
+            "label": "S3_MOVE_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con."
+                }
+            ]
+        },
+        {
+            "label": "S3_MOVE_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con."
+                }
+            ]
+        },
+        {
+            "label": "S4_CHECK_FOLLOW",
+            "action": "RotateLeft",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con xin kiểm tra lại ạ. Nếu cô chú, anh chị đang ở phía sau, vui lòng tiếp tục đi theo con để đến phòng khám A18. Nếu cần đi chậm lại, xin hãy báo để con điều chỉnh tốc độ."
+                }
+            ]
+        },
+        {
+            "label": "S5_ARRIVED_A18",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "min_duration": 20,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Chúng ta đã đến phòng khám A18. Cô chú, anh chị vui lòng kiểm tra thông tin khám và làm theo hướng dẫn của nhân viên y tế tại đây. Chúc cô chú, anh chị thăm khám thuận lợi."
+                }
+            ]
+        },
+        {
+            "label": "S6_RETURNING",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con xin phép quay về vị trí hỗ trợ ban đầu để tiếp tục hướng dẫn những người bệnh khác. Con cảm ơn cô chú, anh chị."
+                }
+            ]
+        },
+        {
+            "label": "S7_RETURN_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con đang quay về vị trí ban đầu. Cô chú, anh chị vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con."
+                }
+            ]
+        },
+        {
+            "label": "S7_RETURN_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con đang quay về vị trí ban đầu. Cô chú, anh chị vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con."
+                }
+            ]
+        },
+          {
+            "label": "S7_RETURN_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con đang quay về vị trí ban đầu. Cô chú, anh chị vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con."
+                }
+            ]
+        },
+        {
+            "label": "S7_RETURN_FORWARD",
+            "action": "Forward",
+            "speed": 8,
+            "duration": 2,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con đang quay về vị trí ban đầu. Cô chú, anh chị vui lòng đi phía sau con và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ, xin vui lòng báo cho con."
+                }
+            ]
+        },
+        {
+            "label": "S8_RETURN_DONE",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "done"
+                }
+            ],
+            "end_state": "true",
+            "strict_line": true,
+            "continue_immediately": true
         }
     ],
     "end_state": "stop"

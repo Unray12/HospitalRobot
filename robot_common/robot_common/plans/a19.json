@@ -1,14 +1,76 @@
 {
     "name": "a19",
+    "start_without_cross": true,
     "steps": [
         {
-            "action": "Follow",
-            "duration": 1.2
+            "label": "S1_INTRO",
+            "action": "RotateRight",
+            "until": "line",
+            "speed": 5,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú, anh chị đến phòng khám A19 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi phía sau con, giữ khoảng cách vừa phải và chú ý quan sát xung quanh để đảm bảo an toàn. Nếu cần hỗ trợ thêm, cô chú có thể báo cho nhân viên y tế gần nhất hoặc nói với con. Bây giờ chúng ta cùng bắt đầu di chuyển ạ."
+                }
+            ]
         },
         {
-            "action": "Stop",
-            "duration": 0.2
+            "label": "S2_AUTOLINE",
+            "action": "AutoLine",
+            "enabled": true
+        },
+        {
+            "label": "S3_CHECK_FOLLOW",
+            "action": "RotateLeft",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con. Nếu cần đi chậm lại hoặc có vấn đề gì, cô chú cứ báo để con hỗ trợ kịp thời."
+                }
+            ]
+        },
+        {
+            "label": "S4_WAIT_TIMEOUT",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "min_duration": 20,
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Chúng ta đã đến phòng khám A19. Cô chú, anh chị vui lòng kiểm tra lại thông tin khám bệnh và làm theo hướng dẫn của nhân viên y tế tại đây. Con chúc cô chú, anh chị có buổi khám thuận lợi."
+                }
+            ]
+        },
+        {
+            "label": "S5_RETURNING",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "say: Con xin phép quay về vị trí ban đầu để tiếp tục hỗ trợ những người bệnh khác. Chúc cô chú, anh chị nhiều sức khỏe."
+                }
+            ]
+        },
+        {
+            "label": "S6_RETURN_DONE",
+            "action": "RotateRight",
+            "speed": 5,
+            "until": "line",
+            "messages": [
+                {
+                    "topic": "/plan_message",
+                    "message": "done"
+                }
+            ],
+            "end_state": "true",
+            "strict_line": true,
+            "continue_immediately": true
         }
     ],
-    "end_state": "follow"
+    "end_state": "stop"
 }
