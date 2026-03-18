@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-import json
 import os
-import re
 import sys
 import threading
 import time
@@ -19,6 +17,12 @@ from std_msgs.msg import Bool, String
 
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
+from .runtime_utils import (
+    build_room_plan_state,
+    extract_face_id,
+    resolve_plan_command,
+    update_plan_runtime_state,
+)
 
 if os.name == "nt":
     import msvcrt
@@ -87,15 +91,7 @@ class MQTTBridgeNode(Node):
         self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
         self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
-        self.room_plan_map = {str(k).strip().lower(): str(v).strip() for k, v in room_plans.items()}
-        if not self.room_plan_map:
-            # Backward compatible: if no room_plans, reuse numeric plan hotkeys.
-            self.room_plan_map = {
-                str(k).strip().lower(): str(v).strip()
-                for k, v in self.plan_key_map.items()
-                if str(k).strip().isdigit()
-            }
-        self._known_plans = set(self.room_plan_map.values()) | set(self.plan_key_map.values())
+        self.room_plan_map, self._known_plans = build_room_plan_state(self.plan_key_map, room_plans)
         self._debug_logs_enabled = False
         self._echo_suppress_window_sec = float(config.get("echo_suppress_window_sec", 0.35))
         self._recent_local_pub = {}
@@ -187,7 +183,14 @@ class MQTTBridgeNode(Node):
             ros_msg.data = data
             self.ros_pick_pub.publish(ros_msg)
         elif msg.topic == self.topic_plan:
-            resolved = self._resolve_plan_command(data)
+            resolved, missing_room_id = resolve_plan_command(
+                data,
+                self.plan_key_map,
+                self.room_plan_map,
+                self._known_plans,
+            )
+            if missing_room_id is not None:
+                self.log.warning(f"Room id has no mapped plan: {missing_room_id}", event="PLAN_MQTT")
             if not resolved:
                 self.log.warning(f"Ignored invalid plan command: {data}", event="PLAN_MQTT")
                 return
@@ -310,7 +313,7 @@ class MQTTBridgeNode(Node):
         if self._camera_face_require_plan_autoline:
             if (not self._plan_autoline_active) or (not self._active_plan_name):
                 return
-        face_id = self._extract_face_id(payload)
+        face_id = extract_face_id(payload)
         if face_id is None:
             return
         message = self._camera_face_plan_messages.get(str(face_id))
@@ -323,75 +326,11 @@ class MQTTBridgeNode(Node):
         )
 
     def _update_plan_runtime_state(self, payload: str):
-        try:
-            data = json.loads(payload)
-        except Exception:
-            return
-        if not isinstance(data, dict):
-            return
-
-        event_name = str(data.get("event") or "").strip().lower()
-        plan_name = data.get("plan")
-        autoline = data.get("autoline")
-
-        if plan_name:
-            self._active_plan_name = str(plan_name).strip()
-
-        if autoline is not None:
-            self._plan_autoline_active = bool(autoline)
-
-        if event_name in {"cleared", "completed_reset"}:
-            self._active_plan_name = None
-            self._plan_autoline_active = False
-
-    def _extract_face_id(self, payload: str):
-        text = (payload or "").strip().upper()
-        if "FACE" not in text:
-            return None
-        m = re.search(r"FACE\s*,\s*(\d+)", text)
-        if not m:
-            return None
-        try:
-            return int(m.group(1))
-        except ValueError:
-            return None
-
-    def _resolve_plan_command(self, payload: str):
-        text = (payload or "").strip()
-        if not text:
-            return None
-
-        lower = text.lower()
-        if lower in {"0", "clear", "room:0", "room/0"}:
-            return "clear"
-
-        if text in self.plan_key_map:
-            return self.plan_key_map[text]
-        if lower in self.room_plan_map:
-            return self.room_plan_map[lower]
-
-        m = re.match(r"^(room|phong|plan)\s*[:/_-]?\s*([a-z0-9_-]+)$", lower)
-        if m:
-            prefix = m.group(1).strip()
-            room_id = m.group(2).strip()
-            if room_id in {"0", "clear"}:
-                return "clear"
-            if room_id in self.room_plan_map:
-                return self.room_plan_map[room_id]
-            if prefix == "plan" and room_id.startswith("plan_"):
-                return room_id
-            self.log.warning(f"Room id has no mapped plan: {room_id}", event="PLAN_MQTT")
-            return None
-
-        if lower.startswith("plan:") or lower.startswith("plan/"):
-            plan_name = text.split(":", 1)[1].strip() if ":" in text else text.split("/", 1)[1].strip()
-            return plan_name or None
-
-        if text in self._known_plans:
-            return text
-
-        # Keep compatibility: allow direct plan names even if not listed in mappings.
-        return text
+        self._active_plan_name, self._plan_autoline_active = update_plan_runtime_state(
+            payload,
+            self._active_plan_name,
+            self._plan_autoline_active,
+        )
 
     def _mark_local_publish(self, topic: str, payload: str):
         self._recent_local_pub[(topic, payload)] = time.time()
@@ -422,5 +361,5 @@ def main(args=None):
             rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
