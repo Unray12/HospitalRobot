@@ -100,7 +100,7 @@
   - `/plan_select` (`std_msgs/String`)
     chọn plan runtime hoặc lệnh `clear`
   - `/face/camera` (`std_msgs/String`)
-    payload chuẩn hoá camera `<DEV1,FACE,score>` hoặc `<DEV1,NO_OBJECT>`
+    payload chuẩn hoá camera `<DEV1,FACE,id>` hoặc `<DEV1,NO_OBJECT>`
 
   #inline("Topics - observability plane")
   - `/plan_status` (`std_msgs/String`)
@@ -149,7 +149,7 @@
   #inline("Bước 5 - Thử tuyến điều khiển end-to-end")
   ```bash
   ros2 topic pub --once /pick_robot std_msgs/String "{data: '1'}"
-  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a19'}"
   ros2 topic echo /motor_cmd
   ```
 ]

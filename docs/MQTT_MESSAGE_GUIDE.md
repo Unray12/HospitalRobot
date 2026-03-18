@@ -1,7 +1,7 @@
 # MQTT Message Guide (HospitalRobot)
 
 Tài liệu này mô tả đầy đủ cách điều khiển robot bằng MQTT, bám theo code hiện tại trong:
-- `mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py`
+- `mqtt_bridge/mqtt_bridge/mqtt_bridge_node.py`
 - `robot_common/robot_common/config.json`
 
 ## 1. Mục đích
@@ -64,23 +64,22 @@ ROS2 tương ứng:
 Ý nghĩa: chọn plan cho `line_follower`.
 
 Payload khuyến nghị:
-- `room:a20`, `room:a19`, `room:a18`, `room:a17`, `room:a16`, `room:a15`
-- `room:1` đến `room:6`
+- `room:a19`, `room:a18`, `room:a17`, `room:a16`, `room:a15`
+- `room:1` đến `room:5`
 - `clear` hoặc `room:0` để clear plan
 
 Payload tương thích:
-- `1..6`
-- `phong:1..6`
-- `plan:1..6`
-- tên plan trực tiếp như `a20`, `plan_turn_right`
+- `1..5`
+- `phong:1..5`
+- `plan:1..5`
+- tên plan trực tiếp như `a19`, `plan_turn_right`
 
 Map mặc định:
-- `1 -> a20`
-- `2 -> a19`
-- `3 -> a18`
-- `4 -> a17`
-- `5 -> a16`
-- `6 -> a15`
+- `1 -> a19`
+- `2 -> a18`
+- `3 -> a17`
+- `4 -> a16`
+- `5 -> a15`
 
 Lưu ý:
 - Bridge normalize payload trước khi publish ROS topic `/plan_select`.
@@ -92,7 +91,7 @@ Lưu ý:
 
 ```bash
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:1"
-mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a20"
+mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "room:a19"
 mosquitto_pub -h 127.0.0.1 -p 1883 -t plan_select -m "clear"
 ```
 
@@ -136,7 +135,7 @@ ros2 topic echo /motor_cmd
 ```
 
 Kỳ vọng:
-- `plan_select=room:1` -> `/plan_select` nhận `a20`
+- `plan_select=room:1` -> `/plan_select` nhận `a19`
 - `pick_robot=1` -> `/auto_mode` chuyển `True`
 - `VR_control=Forward` -> `/motor_cmd` xuất `Forward:<speed>`
 
@@ -148,7 +147,7 @@ Mapping mặc định:
 - `j/p`: `RotateLeft/RotateRight`
 - `k`: toggle auto mode
 - `e`: toggle debug logs
-- `1..6`: chọn plan
+- `1..5`: chọn plan
 - `0`: clear plan
 - `q`: quit node
 

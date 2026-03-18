@@ -22,7 +22,7 @@ Tài liệu này là đặc tả chi tiết cho file plan JSON dùng bởi `line
 
 ```json
 {
-  "name": "a20",
+  "name": "a19",
   "start_without_cross": true,
   "steps": [
     { "action": "RotateRight", "speed": 5, "until": "line", "timeout": 8 },
@@ -65,7 +65,7 @@ Ví dụ `messages`:
   "action": "RotateRight",
   "until": "line",
   "messages": [
-    { "topic": "/plan_message", "message": "say: dang den phong A20" }
+    { "topic": "/plan_message", "message": "say: dang den phong A19" }
   ]
 }
 ```
@@ -145,16 +145,15 @@ Alias hợp lệ:
 ## 8. Mapping plan mặc định runtime
 
 Theo `config.json` hiện tại:
-- `1 -> a20`
-- `2 -> a19`
-- `3 -> a18`
-- `4 -> a17`
-- `5 -> a16`
-- `6 -> a15`
+- `1 -> a19`
+- `2 -> a18`
+- `3 -> a17`
+- `4 -> a16`
+- `5 -> a15`
 - `0/clear -> clear plan`
 
 MQTT room map mặc định:
-- `room:a20..a15` hoặc `room:1..6`
+- `room:a19..a15` hoặc `room:1..5`
 
 ## 9. Ví dụ plan nâng cao
 

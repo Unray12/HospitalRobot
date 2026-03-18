@@ -11,8 +11,8 @@
   - Run:
     `ros2 run motor_driver motor_driver`
   - Main files:
-    `motor_driver/motor_driver_node.py`,
-    `motor_driver/motor_controller.py`
+    `motor_driver/motor_driver/motor_driver_node.py`,
+    `motor_driver/motor_driver/motor_controller.py`
 
   #inline("I/O contract")
   - Subscribe:
@@ -37,7 +37,7 @@
   - Section:
     `robot_common/robot_common/config.json -> motor_driver`
   - Serial:
-    `port=/dev/ttyUSB1`, `baudrate=115200`, `timeout=0.1`
+    `port=/dev/ttyUSB0`, `baudrate=115200`, `timeout=0.1`
   - Reconnect:
     `reconnect_period_sec=2.0`,
     fallback `[/dev/ttyUSB1, /dev/ttyUSB0]`,

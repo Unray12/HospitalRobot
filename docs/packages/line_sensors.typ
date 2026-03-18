@@ -12,8 +12,8 @@
   - Run:
     `ros2 run line_sensors line_sensor_driver`
   - Main files:
-    `line_sensors/line_sensor_driver_node.py`,
-    `line_sensors/line_sensor_reader.py`
+    `line_sensors/line_sensors/line_sensor_driver_node.py`,
+    `line_sensors/line_sensors/line_sensor_reader.py`
 
   #inline("I/O contract")
   - Publish:
@@ -29,7 +29,7 @@
   - Section:
     `robot_common/robot_common/config.json -> line_sensors`
   - Serial:
-    `port=/dev/ttyACM1`, `baudrate=115200`, `timeout=0.1`
+    `port=/dev/ttyACM0`, `baudrate=115200`, `timeout=0.1`
   - Reconnect:
     `reconnect_period_sec=2.0`,
     fallback `[/dev/ttyACM1, /dev/ttyACM0]`

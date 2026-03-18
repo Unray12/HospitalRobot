@@ -13,8 +13,8 @@
   - Run:
     `ros2 run line_follower line_follower`
   - Main files:
-    `line_follower/line_follower_node.py`,
-    `line_follower/line_follower.py`
+    `line_follower/line_follower/line_follower_node.py`,
+    `line_follower/line_follower/line_follower.py`
 
   #inline("I/O contract")
   - Subscribe topics:
@@ -64,9 +64,9 @@
     `rotate_early_stop_on_side=true`,
     `rotate_line_side_min_count=1`
   - Plan:
-    `cross_plan_name=a20`,
+    `cross_plan_name=a19`,
     `plan_end_state=stop`,
-    alias `1..6` tương ứng `a20..a15`.
+    alias `1..5` tương ứng `a19..a15`.
 
   #inline("Runtime sequence (auto mode)")
   - Nhận frame từ `/line_sensors/frame` và cập nhật `self._last_frame`.
@@ -100,7 +100,7 @@
   ```bash
   ros2 topic echo /plan_status
   ros2 topic echo /plan_callback
-  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a19'}"
   ros2 service call /set_auto_mode std_srvs/srv/SetBool "{data: true}"
   ros2 topic echo /motor_cmd
   ```

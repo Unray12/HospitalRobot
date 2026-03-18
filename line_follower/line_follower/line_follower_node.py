@@ -25,7 +25,7 @@ class LineFollowerNode(Node):
 
         self.base_speed = int(config.get("base_speed", 6))
         self.plan_select_debounce_sec = float(config.get("plan_select_debounce_sec", 0.35))
-        self.autoMode = False
+        self.auto_mode = False
         self._last_frame = None
         self._last_plan_name = None
         self._last_plan_ts = 0.0
@@ -167,7 +167,7 @@ class LineFollowerNode(Node):
             self._set_auto_mode(True)
             self._publish_plan_status_event("autoline_enabled", status=self.follower.get_plan_status())
             self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
-        elif self.autoMode:
+        elif self.auto_mode:
             self.follower.reset()
         if start_without_cross:
             if self.follower.request_plan_start():
@@ -176,18 +176,18 @@ class LineFollowerNode(Node):
         self.log.info(f"Plan selected: {name}", event="PLAN")
 
     def _set_auto_mode(self, enabled: bool):
-        if enabled and not self.autoMode:
-            self.autoMode = True
+        if enabled and not self.auto_mode:
+            self.auto_mode = True
             self.follower.reset()
             self.log.info("Auto Mode Enabled", event="MODE")
-        elif not enabled and self.autoMode:
-            self.autoMode = False
+        elif not enabled and self.auto_mode:
+            self.auto_mode = False
             self.follower.stop()
             self._publish_stop()
             self.log.info("Auto Mode Disabled", event="MODE")
 
     def _timer_cb(self):
-        if not self.autoMode:
+        if not self.auto_mode:
             self._check_and_publish_plan_completed()
             return
 

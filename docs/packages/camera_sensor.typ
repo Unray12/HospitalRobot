@@ -18,7 +18,7 @@
   - Publish:
     `/face/camera` (`std_msgs/String`)
   - Output format chuẩn:
-    `<DEV1,FACE,0|1>` hoặc `<DEV1,NO_OBJECT>`
+    `<DEV1,FACE,<id>>` hoặc `<DEV1,NO_OBJECT>`
   - Input format chấp nhận:
     chuỗi biến thể có/không có dấu `< >`, có ký tự nhiễu, có lỗi chính tả nhẹ.
 
@@ -26,7 +26,7 @@
   - Section:
     `robot_common/robot_common/config.json -> camera_sensor`
   - Serial:
-    `port=/dev/ttyACM0`, `baudrate=115200`, `timeout=0.2`
+    `port=/dev/ttyACM1`, `baudrate=115200`, `timeout=0.2`
   - Reconnect:
     `reconnect_period_sec=2.0`
   - Topic:
@@ -60,7 +60,7 @@
   - Không có dữ liệu:
     kiểm tra serial port đang bị process khác giữ.
   - Nhiều frame bị drop:
-    kiểm tra format firmware gửi lên có theo `DEV,STATE[,score]`.
+    kiểm tra format firmware gửi lên có theo `DEV,STATE[,id]`.
   - MQTT không thấy `face/camera`:
     kiểm tra `mqtt_bridge` đang subscribe ROS `/face/camera`.
 ]

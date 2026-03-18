@@ -1,20 +1,22 @@
-#!/usr/bin/python3
-import sys
-import threading
-from threading import Event
+#!/usr/bin/env python3
+import json
 import os
 import re
+import sys
+import threading
 import time
-import json
+from threading import Event
 
 try:
     import paho.mqtt.client as mqtt
 except ImportError:
     mqtt = None
+
 import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String, Bool
 from rcl_interfaces.msg import Log
+from rclpy.node import Node
+from std_msgs.msg import Bool, String
+
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
@@ -25,7 +27,7 @@ else:
     import tty
 
 
-# Hàm đọc phím 1 ký tự
+# Read a single keyboard character without waiting for Enter.
 def get_key():
     if os.name == "nt":
         key = msvcrt.getch()
@@ -46,7 +48,7 @@ def get_key():
 
 class MQTTBridgeNode(Node):
     def __init__(self):
-        super().__init__('mqtt_bridge_ros2')
+        super().__init__("mqtt_bridge_ros2")
         self.log = LogAdapter(self.get_logger(), "mqtt_bridge")
 
         config = ConfigManager("mqtt_bridge", logger=self.log).load()
@@ -122,7 +124,7 @@ class MQTTBridgeNode(Node):
         self._plan_autoline_active = False
         self._active_plan_name = None
 
-        # ROS 2 publisher
+        # ROS 2 publishers/subscriptions.
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
@@ -136,7 +138,7 @@ class MQTTBridgeNode(Node):
         if mqtt is None:
             raise RuntimeError("paho-mqtt is not installed")
 
-        # MQTT client
+        # MQTT client.
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
@@ -145,18 +147,18 @@ class MQTTBridgeNode(Node):
 
         self.client.connect(self.broker_address, self.broker_port, 60)
 
-        # MQTT chạy ở thread riêng
+        # Keep the MQTT loop off the ROS executor thread.
         self._stop_event = Event()
         self._mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
         self._mqtt_thread.start()
 
-        # Keyboard đọc ở worker thread để không block executor
+        # Read keyboard input in a worker thread to avoid blocking the executor.
         self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
         self._keyboard_thread.start()
 
         self.log.info("MQTT <-> ROS2 bridge started", event="BOOT")
 
-    # MQTT callbacks
+    # MQTT callbacks.
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self._mqtt_connected = True
@@ -194,10 +196,10 @@ class MQTTBridgeNode(Node):
             if resolved != data:
                 self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
 
-    # Keyboard → MQTT
+    # Keyboard -> MQTT.
     def keyboard_loop(self):
-        self.log.info("Dieu khien WASD | q de thoat", event="KEYBOARD")
-        autoMode = False
+        self.log.info("Keyboard teleop ready: WASD, 1-5 plan select, q quit", event="KEYBOARD")
+        auto_mode = False
         while rclpy.ok() and not self._stop_event.is_set():
             key = get_key().lower()
             cmd = ""
@@ -205,8 +207,8 @@ class MQTTBridgeNode(Node):
             if key in self.keyboard_map:
                 cmd = self.keyboard_map[key]
             elif key == self.key_toggle_auto:
-                autoMode = not autoMode
-                mode_msg = "1" if autoMode else "0"
+                auto_mode = not auto_mode
+                mode_msg = "1" if auto_mode else "0"
                 self.ros_pick_pub.publish(String(data=mode_msg))
                 self.client.publish(self.topic_pick, mode_msg)
                 self._mark_local_publish(self.topic_pick, mode_msg)
@@ -237,7 +239,7 @@ class MQTTBridgeNode(Node):
                         event="BRIDGE_FALLBACK",
                     )
             elif key == self.key_quit:
-                self.log.info("Thoat chuong trinh", event="KEYBOARD")
+                self.log.info("Keyboard requested shutdown", event="KEYBOARD")
                 self._stop_event.set()
                 rclpy.shutdown()
                 break
