@@ -1,8 +1,16 @@
 from line_follower.line_follower.line_follower import LineFollowerFSM
 
 
-def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, right_full=False):
-    return {
+def _frame(
+    left_count,
+    mid_count,
+    right_count,
+    left_full=False,
+    mid_full=False,
+    right_full=False,
+    advanced_cross_detected=None,
+):
+    frame = {
         "left_count": left_count,
         "mid_count": mid_count,
         "right_count": right_count,
@@ -10,6 +18,9 @@ def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, 
         "mid_full": mid_full,
         "right_full": right_full,
     }
+    if advanced_cross_detected is not None:
+        frame["advanced_cross_detected"] = advanced_cross_detected
+    return frame
 
 
 def test_follow_centered_line_goes_forward():
@@ -36,6 +47,17 @@ def test_lost_line_stops():
 def test_crossing_without_plan_returns_to_follow():
     fsm = LineFollowerFSM(base_speed=8, crossing_duration=0.5)
     first = fsm.update(_frame(1, 1, 1, left_full=True, mid_full=True, right_full=True), now=1.0)
+    assert first == ("Forward", 8)
+    second = fsm.update(_frame(0, 3, 0, mid_full=True), now=1.6)
+    assert second == ("Forward", 8)
+
+
+def test_crossing_can_use_advanced_cross_flag():
+    fsm = LineFollowerFSM(base_speed=8, crossing_duration=0.5)
+    first = fsm.update(
+        _frame(0, 3, 0, mid_full=True, advanced_cross_detected=True),
+        now=1.0,
+    )
     assert first == ("Forward", 8)
     second = fsm.update(_frame(0, 3, 0, mid_full=True), now=1.6)
     assert second == ("Forward", 8)

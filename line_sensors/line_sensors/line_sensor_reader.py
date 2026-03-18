@@ -74,7 +74,7 @@ class LineSensorReader:
         mid_count = self._count_active(middle)
         right_count = self._count_active(right)
 
-        return {
+        frame = {
             "left_count": left_count,
             "mid_count": mid_count,
             "right_count": right_count,
@@ -82,6 +82,13 @@ class LineSensorReader:
             "mid_full": self._is_full_black(middle),
             "right_full": self._is_full_black(right),
         }
+        line_tracking = self._parse_line_tracking(payload.get("LineTracking"))
+        raw_arrow = self._parse_raw_arrow(payload.get("RawArrow"))
+        if line_tracking is not None:
+            frame["line_tracking"] = line_tracking
+        if raw_arrow is not None:
+            frame["raw_arrow"] = raw_arrow
+        return frame
 
     def close(self):
         if self.ser and self.ser.is_open:
@@ -165,6 +172,45 @@ class LineSensorReader:
         if not isinstance(sensor_dict, dict) or not sensor_dict:
             return False
         return all(v == 1 for v in sensor_dict.values())
+
+    def _parse_line_tracking(self, payload):
+        if not isinstance(payload, dict):
+            return None
+
+        segments = payload.get("segments", [])
+        if not isinstance(segments, list):
+            segments = []
+
+        return {
+            "segments": [self._as_int(item, 0) for item in segments],
+            "direction": self._as_int(payload.get("direction", 0)),
+            "x_center": self._as_int(payload.get("x_center", -1)),
+            "error": self._as_int(payload.get("error", 0)),
+            "y_head": self._as_int(payload.get("y_head", -1)),
+            "y_tail": self._as_int(payload.get("y_tail", -1)),
+            "y_center": self._as_int(payload.get("y_center", -1)),
+            "y_type": self._as_int(payload.get("y_type", 0)),
+            "line_length_y": self._as_int(payload.get("line_length_y", 0)),
+        }
+
+    def _parse_raw_arrow(self, payload):
+        if not isinstance(payload, dict):
+            return None
+
+        return {
+            "x_tail": self._as_int(payload.get("x_tail", -1)),
+            "y_tail": self._as_int(payload.get("y_tail", -1)),
+            "x_head": self._as_int(payload.get("x_head", -1)),
+            "y_head": self._as_int(payload.get("y_head", -1)),
+            "direction": self._as_int(payload.get("direction", 0)),
+            "ID": self._as_int(payload.get("ID", 0)),
+        }
+
+    def _as_int(self, value, default):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return int(default)
 
     def _log_info(self, msg):
         if self._logger:

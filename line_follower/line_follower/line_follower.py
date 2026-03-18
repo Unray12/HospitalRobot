@@ -159,12 +159,9 @@ class LineFollowerFSM:
         left_count = frame["left_count"]
         mid_count = frame["mid_count"]
         right_count = frame["right_count"]
-        left_full = frame["left_full"]
-        mid_full = frame["mid_full"]
-        right_full = frame["right_full"]
 
         total_black = left_count + mid_count + right_count
-        cross_detected = left_full and mid_full and right_full
+        cross_detected = self._is_cross_detected(frame)
         cross_event = cross_detected and not self._cross_active
         self._cross_active = cross_detected
         if total_black > 0:
@@ -538,6 +535,12 @@ class LineFollowerFSM:
 
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
+
+    def _is_cross_detected(self, frame):
+        advanced_cross_detected = frame.get("advanced_cross_detected")
+        if advanced_cross_detected is not None:
+            return bool(advanced_cross_detected)
+        return bool(frame["left_full"] and frame["mid_full"] and frame["right_full"])
 
     def _log_info(self, msg):
         if self._logger:

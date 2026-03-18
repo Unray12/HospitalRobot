@@ -18,6 +18,8 @@
   #inline("I/O contract")
   - Publish:
     `/line_sensors/frame` (`std_msgs/Int16MultiArray`)
+  - Optional publish when `advanced.enabled=true`:
+    `/line_sensors/advanced` (`std_msgs/String`, JSON payload)
   - Frame layout:
     `[left_count, mid_count, right_count, left_full, mid_full, right_full]`
   - Subscribe:
@@ -35,17 +37,25 @@
     fallback `[/dev/ttyACM1, /dev/ttyACM0]`
   - Publish:
     `topic=/line_sensors/frame`, `rate_hz=100`
+  - Advanced mode:
+    `enabled=false`, `topic=/line_sensors/advanced`,
+    profile `huskylens_line_tracking`
   - Debug toggle topic:
     `/debug_logs_toggle`
   - Filter zero-frame:
     `zero_hold_sec=0.15`, `zero_min_streak=3`
   - Optional:
     `debug_log_period`, `debug_enabled_default`, `scan_prefixes`
+  - Future HuskyLens profile config:
+    `i2c`, `image`, `segmentation`, `y_classification`, `runtime`
 
   #inline("Runtime behavior")
   - Timer publish chạy theo `rate_hz`, đọc non-blocking từ serial buffer.
   - Nếu parse thành công:
     publish frame theo layout cố định cho downstream node.
+  - Nếu advanced mode bật và payload có `LineTracking`/`RawArrow`:
+    publish thêm JSON metadata sang `/line_sensors/advanced`.
+    Payload này có thể được `line_follower` dùng để nhận diện cross chính xác hơn.
   - Nếu frame toàn zero:
     giữ frame non-zero gần nhất trong cửa sổ `zero_hold_sec`.
   - Nếu mất serial:

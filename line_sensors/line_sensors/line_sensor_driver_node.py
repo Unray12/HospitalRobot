@@ -1,6 +1,8 @@
+import json
+
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int16MultiArray, Bool
+from std_msgs.msg import Int16MultiArray, Bool, String
 
 from .line_sensor_reader import LineSensorReader
 from robot_common.config_manager import ConfigManager
@@ -17,6 +19,7 @@ class LineSensorDriverNode(Node):
         pub_cfg = config.get("publish", {})
         topics_cfg = config.get("topics", {})
         filter_cfg = config.get("filter", {})
+        advanced_cfg = config.get("advanced", {})
 
         port = serial_cfg.get("port", "/dev/ttyACM0")
         baudrate = serial_cfg.get("baudrate", 115200)
@@ -24,6 +27,7 @@ class LineSensorDriverNode(Node):
         topic = pub_cfg.get("topic", "/line_sensors/frame")
         rate_hz = pub_cfg.get("rate_hz", 100)
         debug_toggle_topic = topics_cfg.get("debug_toggle", "/debug_logs_toggle")
+        advanced_topic = topics_cfg.get("advanced", "/line_sensors/advanced")
         self.reconnect_period_sec = float(config.get("reconnect_period_sec", 2.0))
         self.fallback_ports = config.get("fallback_ports", ["/dev/ttyACM1", "/dev/ttyACM0"])
         self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyACM", "/dev/ttyUSB", "COM"])
@@ -36,6 +40,11 @@ class LineSensorDriverNode(Node):
         self._last_nonzero_frame = None
         self._last_nonzero_ts = 0.0
         self._last_published_frame = None
+        self.advanced_enabled = bool(advanced_cfg.get("enabled", False))
+        self.advanced_publish_payload = bool(advanced_cfg.get("publish_payload", True))
+        self.advanced_include_line_tracking = bool(advanced_cfg.get("include_line_tracking", True))
+        self.advanced_include_raw_arrow = bool(advanced_cfg.get("include_raw_arrow", True))
+        self.advanced_profile = str(advanced_cfg.get("profile", "default")).strip() or "default"
 
         self.reader = LineSensorReader(
             port=port,
@@ -45,10 +54,20 @@ class LineSensorDriverNode(Node):
         )
 
         self.pub = self.create_publisher(Int16MultiArray, topic, 10)
+        self.advanced_pub = (
+            self.create_publisher(String, advanced_topic, 10)
+            if self.advanced_enabled
+            else None
+        )
         self.create_subscription(Bool, debug_toggle_topic, self._debug_toggle_cb, 10)
         period = 1.0 / max(rate_hz, 1)
         self.timer = self.create_timer(period, self._timer_cb)
         self.reconnect_timer = self.create_timer(self.reconnect_period_sec, self._reconnect_cb)
+        if self.advanced_enabled:
+            self.log.info(
+                f"Advanced line sensor mode enabled: topic={advanced_topic} profile={self.advanced_profile}",
+                event="ADVANCED",
+            )
 
     def _debug_toggle_cb(self, msg: Bool):
         self.debug_enabled = bool(msg.data)
@@ -72,6 +91,7 @@ class LineSensorDriverNode(Node):
         ]
         self.pub.publish(msg)
         self._last_published_frame = dict(frame)
+        self._publish_advanced_payload(frame)
         self._log_sensor_debug(frame)
 
     def _reconnect_cb(self):
@@ -99,6 +119,34 @@ class LineSensorDriverNode(Node):
             left_full=int(frame["left_full"]),
             mid_full=int(frame["mid_full"]),
             right_full=int(frame["right_full"]),
+        )
+
+    def _publish_advanced_payload(self, frame):
+        if not self.advanced_pub or not self.advanced_publish_payload:
+            return
+
+        payload = {
+            "profile": self.advanced_profile,
+            "line_sensor": {
+                "left_count": int(frame["left_count"]),
+                "mid_count": int(frame["mid_count"]),
+                "right_count": int(frame["right_count"]),
+                "left_full": int(frame["left_full"]),
+                "mid_full": int(frame["mid_full"]),
+                "right_full": int(frame["right_full"]),
+            },
+        }
+
+        if self.advanced_include_line_tracking and isinstance(frame.get("line_tracking"), dict):
+            payload["line_tracking"] = frame["line_tracking"]
+        if self.advanced_include_raw_arrow and isinstance(frame.get("raw_arrow"), dict):
+            payload["raw_arrow"] = frame["raw_arrow"]
+
+        if len(payload) == 2 and "line_tracking" not in payload and "raw_arrow" not in payload:
+            return
+
+        self.advanced_pub.publish(
+            String(data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
         )
 
     def _filter_frame(self, frame):

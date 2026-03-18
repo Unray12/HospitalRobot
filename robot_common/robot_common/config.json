@@ -35,7 +35,40 @@
             "rate_hz": 100
         },
         "topics": {
-            "debug_toggle": "/debug_logs_toggle"
+            "debug_toggle": "/debug_logs_toggle",
+            "advanced": "/line_sensors/advanced"
+        },
+        "advanced": {
+            "enabled": false,
+            "publish_payload": true,
+            "include_line_tracking": true,
+            "include_raw_arrow": true,
+            "profile": "huskylens_line_tracking",
+            "i2c": {
+                "bus_id": 0,
+                "sda_pin": 12,
+                "scl_pin": 13,
+                "freq": 100000
+            },
+            "image": {
+                "width": 320,
+                "height": 240
+            },
+            "segmentation": {
+                "num_segments": 12,
+                "x_crop_left": 20,
+                "x_crop_right": 20,
+                "min_track_width": 6,
+                "full_segments_min_length": 140
+            },
+            "y_classification": {
+                "mid": 120,
+                "bottom_threshold": 220
+            },
+            "runtime": {
+                "retry_interval_ms": 1000,
+                "loop_delay_sec": 0.5
+            }
         }
     },
     "line_follower": {
@@ -56,6 +89,13 @@
         "cross_plan_name": "a19",
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
+        "line_sensor_advanced": {
+            "enabled": false,
+            "topic": "/line_sensors/advanced",
+            "message_ttl_sec": 0.25,
+            "use_for_cross_detection": true,
+            "cross_min_active_segments": 12
+        },
         "topics": {
             "line_frame": "/line_sensors/frame",
             "cmd_vel": "/motor_cmd",

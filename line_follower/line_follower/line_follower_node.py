@@ -20,6 +20,7 @@ class LineFollowerNode(Node):
         config = ConfigManager("line_follower", logger=self.log).load()
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
+        advanced_cfg = config.get("line_sensor_advanced", {})
         self.plan_alias = config.get("plan_alias", {})
         self.auto_on_plan_select_default = bool(config.get("auto_on_plan_select", True))
 
@@ -35,6 +36,21 @@ class LineFollowerNode(Node):
         self.plan_status_log_period = float(config.get("plan_status_log_period", 0.8))
         self._active_plan_autoline = None
         self._plan_completion_reported = False
+        self._line_sensor_advanced_enabled = bool(advanced_cfg.get("enabled", False))
+        self._line_sensor_advanced_topic = str(
+            advanced_cfg.get("topic", "/line_sensors/advanced")
+        ).strip() or "/line_sensors/advanced"
+        self._line_sensor_advanced_ttl_sec = float(
+            max(0.0, advanced_cfg.get("message_ttl_sec", 0.25))
+        )
+        self._line_sensor_advanced_use_for_cross_detection = bool(
+            advanced_cfg.get("use_for_cross_detection", True)
+        )
+        self._line_sensor_advanced_cross_min_active_segments = int(
+            max(1, advanced_cfg.get("cross_min_active_segments", 12))
+        )
+        self._last_line_sensor_advanced = None
+        self._last_line_sensor_advanced_ts = 0.0
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_name = config.get("cross_plan_name")
@@ -82,6 +98,17 @@ class LineFollowerNode(Node):
         self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
+        if self._line_sensor_advanced_enabled:
+            self.create_subscription(
+                String,
+                self._line_sensor_advanced_topic,
+                self._line_sensor_advanced_cb,
+                10,
+            )
+            self.log.info(
+                f"Line sensor advanced cross detection enabled: topic={self._line_sensor_advanced_topic}",
+                event="ADVANCED",
+            )
         self.create_service(SetBool, auto_service, self._auto_srv_cb)
 
         self.timer = self.create_timer(0.01, self._timer_cb)
@@ -91,7 +118,7 @@ class LineFollowerNode(Node):
             self.log.warning("Line frame invalid length", event="FRAME")
             return
 
-        self._last_frame = {
+        frame = {
             "left_count": msg.data[0],
             "mid_count": msg.data[1],
             "right_count": msg.data[2],
@@ -99,6 +126,72 @@ class LineFollowerNode(Node):
             "mid_full": bool(msg.data[4]),
             "right_full": bool(msg.data[5]),
         }
+        self._last_frame = self._merge_line_sensor_advanced(frame)
+
+    def _line_sensor_advanced_cb(self, msg: String):
+        try:
+            payload = json.loads(str(msg.data or ""))
+        except json.JSONDecodeError:
+            self.log.warning("Line sensor advanced payload JSON invalid", event="ADVANCED")
+            return
+
+        if not isinstance(payload, dict):
+            self.log.warning("Line sensor advanced payload is not an object", event="ADVANCED")
+            return
+
+        self._last_line_sensor_advanced = payload
+        self._last_line_sensor_advanced_ts = time.time()
+        if self._last_frame is not None:
+            self._last_frame = self._merge_line_sensor_advanced(dict(self._last_frame))
+
+    def _merge_line_sensor_advanced(self, frame):
+        if not self._line_sensor_advanced_enabled:
+            return frame
+
+        payload = self._get_fresh_line_sensor_advanced()
+        if payload is None:
+            frame.pop("advanced_cross_detected", None)
+            frame.pop("line_tracking", None)
+            frame.pop("raw_arrow", None)
+            return frame
+
+        merged = dict(frame)
+        line_tracking = payload.get("line_tracking")
+        raw_arrow = payload.get("raw_arrow")
+        if isinstance(line_tracking, dict):
+            merged["line_tracking"] = line_tracking
+        if isinstance(raw_arrow, dict):
+            merged["raw_arrow"] = raw_arrow
+
+        advanced_cross_detected = self._advanced_cross_detected(payload)
+        if advanced_cross_detected is not None:
+            merged["advanced_cross_detected"] = advanced_cross_detected
+        else:
+            merged.pop("advanced_cross_detected", None)
+        return merged
+
+    def _get_fresh_line_sensor_advanced(self):
+        if self._last_line_sensor_advanced is None:
+            return None
+        if self._line_sensor_advanced_ttl_sec <= 0:
+            return self._last_line_sensor_advanced
+        age = time.time() - self._last_line_sensor_advanced_ts
+        if age <= self._line_sensor_advanced_ttl_sec:
+            return self._last_line_sensor_advanced
+        return None
+
+    def _advanced_cross_detected(self, payload):
+        if not self._line_sensor_advanced_use_for_cross_detection:
+            return None
+        line_tracking = payload.get("line_tracking")
+        if not isinstance(line_tracking, dict):
+            return None
+        segments = line_tracking.get("segments")
+        if not isinstance(segments, list) or not segments:
+            return None
+        active_segments = sum(1 for item in segments if self._to_bool(item, False))
+        threshold = min(self._line_sensor_advanced_cross_min_active_segments, len(segments))
+        return active_segments >= threshold
 
     def _auto_cb(self, msg: Bool):
         self._set_auto_mode(msg.data)

@@ -89,6 +89,8 @@
   #inline("Topics - data plane")
   - `/line_sensors/frame` (`std_msgs/Int16MultiArray`)
     layout: `[left_count, mid_count, right_count, left_full, mid_full, right_full]`
+  - `/line_sensors/advanced` (`std_msgs/String`, optional JSON)
+    payload nâng cao cho line tracking / raw arrow / advanced cross detection
   - `/motor_cmd` (`std_msgs/String`)
     format chuẩn: `Direction:Speed`
   - `/auto_mode` (`std_msgs/Bool`)
