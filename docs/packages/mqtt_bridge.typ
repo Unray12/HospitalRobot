@@ -46,10 +46,11 @@
   #inline("Keyboard mapping")
   - Move:
     `w/s/a/d`, stop `space`
+    double-tap cùng một phím move để bật/tắt continuous motion
   - Rotate:
     `j` (left), `p` (right)
   - Mode/debug:
-    `k` toggle auto, `e` toggle debug logs
+    `k` toggle auto from current `/auto_mode` state, `e` toggle debug logs
   - Plan hotkeys:
     `1..5` select room-plan, `0` clear
   - Quit:

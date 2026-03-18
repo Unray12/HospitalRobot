@@ -143,9 +143,10 @@ Kỳ vọng:
 
 Mapping mặc định:
 - `w/s/a/d`: `Forward/Backward/Left/Right`
+  - nhấn nhanh 2 lần cùng một phím để bật/tắt chế độ giữ chuyển động liên tục
 - `space`: `Stop`
 - `j/p`: `RotateLeft/RotateRight`
-- `k`: toggle auto mode
+- `k`: toggle auto mode using the current `/auto_mode` runtime state
 - `e`: toggle debug logs
 - `1..5`: chọn plan
 - `0`: clear plan
