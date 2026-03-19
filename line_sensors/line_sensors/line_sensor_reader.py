@@ -191,14 +191,14 @@ class LineSensorReader:
 
         return {
             "segments": [self._as_int(item, 0) for item in segments],
-            "direction": self._as_int(payload.get("direction", 0)),
-            "x_center": self._as_int(payload.get("x_center", -1)),
-            "error": self._as_int(payload.get("error", 0)),
-            "y_head": self._as_int(payload.get("y_head", -1)),
-            "y_tail": self._as_int(payload.get("y_tail", -1)),
-            "y_center": self._as_int(payload.get("y_center", -1)),
-            "y_type": self._as_int(payload.get("y_type", 0)),
-            "line_length_y": self._as_int(payload.get("line_length_y", 0)),
+            "direction": self._as_int(payload.get("direction", 0), 0),
+            "x_center": self._as_int(payload.get("x_center", -1), -1),
+            "error": self._as_int(payload.get("error", 0), 0),
+            "y_head": self._as_int(payload.get("y_head", -1), -1),
+            "y_tail": self._as_int(payload.get("y_tail", -1), -1),
+            "y_center": self._as_int(payload.get("y_center", -1), -1),
+            "y_type": self._as_int(payload.get("y_type", 0), 0),
+            "line_length_y": self._as_int(payload.get("line_length_y", 0), 0),
         }
 
     def _parse_raw_arrow(self, payload):
@@ -206,12 +206,12 @@ class LineSensorReader:
             return None
 
         return {
-            "x_tail": self._as_int(payload.get("x_tail", -1)),
-            "y_tail": self._as_int(payload.get("y_tail", -1)),
-            "x_head": self._as_int(payload.get("x_head", -1)),
-            "y_head": self._as_int(payload.get("y_head", -1)),
-            "direction": self._as_int(payload.get("direction", 0)),
-            "ID": self._as_int(payload.get("ID", 0)),
+            "x_tail": self._as_int(payload.get("x_tail", -1), -1),
+            "y_tail": self._as_int(payload.get("y_tail", -1), -1),
+            "x_head": self._as_int(payload.get("x_head", -1), -1),
+            "y_head": self._as_int(payload.get("y_head", -1), -1),
+            "direction": self._as_int(payload.get("direction", 0), 0),
+            "ID": self._as_int(payload.get("ID", 0), 0),
         }
 
     def _as_int(self, value, default):
