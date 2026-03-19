@@ -43,32 +43,7 @@
             "publish_payload": true,
             "include_line_tracking": true,
             "include_raw_arrow": true,
-            "profile": "huskylens_line_tracking",
-            "i2c": {
-                "bus_id": 0,
-                "sda_pin": 12,
-                "scl_pin": 13,
-                "freq": 100000
-            },
-            "image": {
-                "width": 320,
-                "height": 240
-            },
-            "segmentation": {
-                "num_segments": 12,
-                "x_crop_left": 20,
-                "x_crop_right": 20,
-                "min_track_width": 6,
-                "full_segments_min_length": 140
-            },
-            "y_classification": {
-                "mid": 120,
-                "bottom_threshold": 220
-            },
-            "runtime": {
-                "retry_interval_ms": 1000,
-                "loop_delay_sec": 0.5
-            }
+            "profile": "serial_line_tracking_json"
         }
     },
     "line_follower": {

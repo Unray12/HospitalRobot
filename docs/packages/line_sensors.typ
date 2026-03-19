@@ -39,15 +39,15 @@
     `topic=/line_sensors/frame`, `rate_hz=100`
   - Advanced mode:
     `enabled=false`, `topic=/line_sensors/advanced`,
-    profile `huskylens_line_tracking`
+    profile `serial_line_tracking_json`
   - Debug toggle topic:
     `/debug_logs_toggle`
   - Filter zero-frame:
     `zero_hold_sec=0.15`, `zero_min_streak=3`
   - Optional:
     `debug_log_period`, `debug_enabled_default`, `scan_prefixes`
-  - Future HuskyLens profile config:
-    `i2c`, `image`, `segmentation`, `y_classification`, `runtime`
+  - Advanced payload control:
+    `publish_payload`, `include_line_tracking`, `include_raw_arrow`
 
   #inline("Runtime behavior")
   - Timer publish chạy theo `rate_hz`, đọc non-blocking từ serial buffer.
