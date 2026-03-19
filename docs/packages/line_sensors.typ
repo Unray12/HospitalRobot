@@ -12,12 +12,14 @@
   - Run:
     `ros2 run line_sensors line_sensor_driver`
   - Main files:
-    `line_sensors/line_sensor_driver_node.py`,
-    `line_sensors/line_sensor_reader.py`
+    `line_sensors/line_sensors/line_sensor_driver_node.py`,
+    `line_sensors/line_sensors/line_sensor_reader.py`
 
   #inline("I/O contract")
   - Publish:
     `/line_sensors/frame` (`std_msgs/Int16MultiArray`)
+  - Optional publish when `advanced.enabled=true`:
+    `/line_sensors/advanced` (`std_msgs/String`, JSON payload)
   - Frame layout:
     `[left_count, mid_count, right_count, left_full, mid_full, right_full]`
   - Subscribe:
@@ -29,23 +31,31 @@
   - Section:
     `robot_common/robot_common/config.json -> line_sensors`
   - Serial:
-    `port=/dev/ttyACM1`, `baudrate=115200`, `timeout=0.1`
+    `port=/dev/ttyACM0`, `baudrate=115200`, `timeout=0.1`
   - Reconnect:
     `reconnect_period_sec=2.0`,
     fallback `[/dev/ttyACM1, /dev/ttyACM0]`
   - Publish:
     `topic=/line_sensors/frame`, `rate_hz=100`
+  - Advanced mode:
+    `enabled=true`, `topic=/line_sensors/advanced`,
+    profile `serial_line_tracking_json`
   - Debug toggle topic:
     `/debug_logs_toggle`
   - Filter zero-frame:
     `zero_hold_sec=0.15`, `zero_min_streak=3`
   - Optional:
     `debug_log_period`, `debug_enabled_default`, `scan_prefixes`
+  - Advanced payload control:
+    `publish_payload`, `include_line_tracking`, `include_raw_arrow`
 
   #inline("Runtime behavior")
   - Timer publish chạy theo `rate_hz`, đọc non-blocking từ serial buffer.
   - Nếu parse thành công:
     publish frame theo layout cố định cho downstream node.
+  - Nếu advanced mode bật và payload có `LineTracking`/`RawArrow`:
+    publish thêm JSON metadata sang `/line_sensors/advanced`.
+    Payload này có thể được `line_follower` dùng để nhận diện cross chính xác hơn.
   - Nếu frame toàn zero:
     giữ frame non-zero gần nhất trong cửa sổ `zero_hold_sec`.
   - Nếu mất serial:

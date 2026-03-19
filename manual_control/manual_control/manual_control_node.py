@@ -8,6 +8,7 @@ from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
+
 class ManualControlNode(Node):
     def __init__(self):
         super().__init__("manual_control")
@@ -21,7 +22,7 @@ class ManualControlNode(Node):
         self.auto_sync_retry_period = float(config.get("auto_mode_service_retry_period", 0.2))
         self.auto_sync_max_attempts = int(config.get("auto_mode_service_max_attempts", 30))
         self.manual_override_on_input = bool(config.get("manual_override_on_input", True))
-        self.autoMode = False
+        self.auto_mode = False
         self._auto_sync = AutoModeSync(max_attempts=self.auto_sync_max_attempts)
 
         cmd_topic = topics_cfg.get("cmd_vel", "/cmd_vel")
@@ -44,10 +45,10 @@ class ManualControlNode(Node):
         if out_msg is None:
             return
 
-        if self.autoMode:
+        if self.auto_mode:
             if not self.manual_override_on_input:
                 return
-            self.autoMode = False
+            self.auto_mode = False
             self.auto_pub.publish(Bool(data=False))
             self._auto_sync.queue(False)
             self.log.info("Manual override: auto mode disabled by operator input", event="MODE")
@@ -56,9 +57,9 @@ class ManualControlNode(Node):
 
     def _pick_cb(self, msg: String):
         data = msg.data.strip()
-        self.autoMode = data == "1"
-        self.auto_pub.publish(Bool(data=self.autoMode))
-        self._auto_sync.queue(self.autoMode)
+        self.auto_mode = data == "1"
+        self.auto_pub.publish(Bool(data=self.auto_mode))
+        self._auto_sync.queue(self.auto_mode)
 
     def _sync_auto_mode_timer_cb(self):
         action, enabled = self._auto_sync.step(self.auto_client.service_is_ready())

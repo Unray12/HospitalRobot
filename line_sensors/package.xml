@@ -4,7 +4,7 @@
   <name>line_sensors</name>
   <version>0.0.0</version>
   <description>Line sensor driver node</description>
-  <maintainer email="aclab@todo.todo">aclab</maintainer>
+  <maintainer email="aclab@gmail.com">aclab</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>

@@ -12,7 +12,7 @@
   - Run:
     `ros2 run mqtt_bridge mqtt_bridge`
   - Main file:
-    `mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py`
+    `mqtt_bridge/mqtt_bridge/mqtt_bridge_node.py`
 
   #inline("I/O contract")
   - MQTT subscribe:
@@ -24,9 +24,9 @@
     `/plan_status -> plan_status`,
     `/plan_message -> plan_message`
   - Plan command format (recommended):
-    `room:a20..a15` hoặc `room:1..6`, `room:0` hoặc `clear` để clear plan.
+    `room:a19..a15` hoặc `room:1..5`, `room:0` hoặc `clear` để clear plan.
   - Backward compatible plan command:
-    `1..6`, `phong:*`, `plan:*`, direct plan name.
+    `1..5`, `phong:*`, `plan:*`, direct plan name.
 
   #inline("Configuration (current defaults)")
   - Section:
@@ -46,12 +46,13 @@
   #inline("Keyboard mapping")
   - Move:
     `w/s/a/d`, stop `space`
+    double-tap cùng một phím move để bật/tắt continuous motion
   - Rotate:
     `j` (left), `p` (right)
   - Mode/debug:
-    `k` toggle auto, `e` toggle debug logs
+    `k` toggle auto from current `/auto_mode` state, `e` toggle debug logs
   - Plan hotkeys:
-    `1..6` select room-plan, `0` clear
+    `1..5` select room-plan, `0` clear
   - Quit:
     `q`
 

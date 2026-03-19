@@ -89,6 +89,8 @@
   #inline("Topics - data plane")
   - `/line_sensors/frame` (`std_msgs/Int16MultiArray`)
     layout: `[left_count, mid_count, right_count, left_full, mid_full, right_full]`
+  - `/line_sensors/advanced` (`std_msgs/String`, optional JSON)
+    payload nâng cao cho line tracking / raw arrow / advanced cross detection
   - `/motor_cmd` (`std_msgs/String`)
     format chuẩn: `Direction:Speed`
   - `/auto_mode` (`std_msgs/Bool`)
@@ -100,7 +102,7 @@
   - `/plan_select` (`std_msgs/String`)
     chọn plan runtime hoặc lệnh `clear`
   - `/face/camera` (`std_msgs/String`)
-    payload chuẩn hoá camera `<DEV1,FACE,score>` hoặc `<DEV1,NO_OBJECT>`
+    payload chuẩn hoá camera `<DEV1,FACE,id>` hoặc `<DEV1,NO_OBJECT>`
 
   #inline("Topics - observability plane")
   - `/plan_status` (`std_msgs/String`)
@@ -149,7 +151,7 @@
   #inline("Bước 5 - Thử tuyến điều khiển end-to-end")
   ```bash
   ros2 topic pub --once /pick_robot std_msgs/String "{data: '1'}"
-  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a19'}"
   ros2 topic echo /motor_cmd
   ```
 ]

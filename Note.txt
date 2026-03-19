@@ -53,7 +53,7 @@ Check MQTT package:
   ros2 pkg list | grep mqtt
 
 Test MQTT topic:
-  mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t VR_control -v
 
 ######################## SERIAL PORTS ########################
 Motor: /dev/ttyUSB0

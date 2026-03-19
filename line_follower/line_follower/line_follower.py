@@ -1,5 +1,6 @@
 import time
 
+
 class LineFollowerFSM:
     STATE_FOLLOWING = 0
     STATE_CROSSING = 1
@@ -26,6 +27,9 @@ class LineFollowerFSM:
         rotate_line_side_max_count=2,
         rotate_early_stop_on_side=True,
         rotate_line_side_min_count=1,
+        advanced_follow_enabled=False,
+        advanced_follow_error_deadband=12,
+        advanced_follow_min_active_segments=1,
         plan_lost_line_hold_sec=0.8,
         plan_lost_line_warn_period=0.5,
         logger=None,
@@ -45,6 +49,9 @@ class LineFollowerFSM:
         self.rotate_line_side_max_count = int(max(0, rotate_line_side_max_count))
         self.rotate_early_stop_on_side = bool(rotate_early_stop_on_side)
         self.rotate_line_side_min_count = int(max(1, rotate_line_side_min_count))
+        self.advanced_follow_enabled = bool(advanced_follow_enabled)
+        self.advanced_follow_error_deadband = int(max(0, advanced_follow_error_deadband))
+        self.advanced_follow_min_active_segments = int(max(1, advanced_follow_min_active_segments))
         self.plan_lost_line_hold_sec = float(max(0.0, plan_lost_line_hold_sec))
         self.plan_lost_line_warn_period = float(max(0.1, plan_lost_line_warn_period))
 
@@ -74,19 +81,11 @@ class LineFollowerFSM:
         self._plan_lost_line_since = None
         self._last_plan_lost_line_warn_ts = 0.0
 
-    def reset(self):
-        self.state = self.STATE_FOLLOWING
-        self.crossing_start_time = None
-        self._plan_index = 0
+    def _reset_plan_execution_state(self, reset_plan_progress=True):
+        if reset_plan_progress:
+            self._plan_index = 0
         self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
+        self._clear_plan_action_state()
         self._plan_continue_immediate = False
         self._plan_force_complete = False
         self._cross_active = False
@@ -99,6 +98,21 @@ class LineFollowerFSM:
         self._autoline_mode = False
         self._plan_lost_line_since = None
         self._last_plan_lost_line_warn_ts = 0.0
+
+    def _clear_plan_action_state(self):
+        self._plan_action_until = None
+        self._plan_action = None
+        self._plan_action_speed = None
+        self._plan_action_until_line = False
+        self._plan_action_min_until = None
+        self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_rotate_strict_center = False
+
+    def reset(self):
+        self.state = self.STATE_FOLLOWING
+        self.crossing_start_time = None
+        self._reset_plan_execution_state(reset_plan_progress=True)
 
     def stop(self):
         # Preserve current plan progress when stopping so status does not jump to step 1/N.
@@ -107,85 +121,22 @@ class LineFollowerFSM:
     def _enter_stopped(self, reset_plan_progress=True):
         self.state = self.STATE_STOPPED
         self.crossing_start_time = None
-        if reset_plan_progress:
-            self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
-        self._plan_new_step = True
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_plan_execution_state(reset_plan_progress=reset_plan_progress)
 
     def set_plan(self, steps, end_state=None):
         self.cross_plan = steps or []
         if end_state:
             self.plan_end_state = end_state
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._plan_new_step = True
-        self._cross_active = False
         self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_plan_execution_state(reset_plan_progress=True)
 
     def clear_plan(self):
         self.cross_plan = []
         self.plan_end_state = "stop"
         self._plan_labels = {}
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
         self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_plan_execution_state(reset_plan_progress=True)
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -214,12 +165,9 @@ class LineFollowerFSM:
         left_count = frame["left_count"]
         mid_count = frame["mid_count"]
         right_count = frame["right_count"]
-        left_full = frame["left_full"]
-        mid_full = frame["mid_full"]
-        right_full = frame["right_full"]
 
         total_black = left_count + mid_count + right_count
-        cross_detected = left_full and mid_full and right_full
+        cross_detected = self._is_cross_detected(frame)
         cross_event = cross_detected and not self._cross_active
         self._cross_active = cross_detected
         if total_black > 0:
@@ -472,25 +420,13 @@ class LineFollowerFSM:
                 if frame is None:
                     return "Forward", self.base_speed
                 return self._follow_line(frame)
-            self._plan_action = None
-            self._plan_action_speed = None
-            self._plan_action_until = None
-            self._plan_action_until_line = False
-            self._plan_action_min_until = None
-            self._plan_action_timeout = None
-            self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-            self._plan_rotate_strict_center = False
+            self._clear_plan_action_state()
             return self._after_plan_action(now)
 
         if self._plan_action_until_line:
             if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
                 self._log_warn(f"Plan rotate timeout reached: {self._plan_action}")
-                self._plan_action = None
-                self._plan_action_speed = None
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._plan_rotate_strict_center = False
+                self._clear_plan_action_state()
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
@@ -500,13 +436,7 @@ class LineFollowerFSM:
                 allow_side_stop=self._plan_rotate_allow_side_stop,
                 strict_center=self._plan_rotate_strict_center,
             ):
-                self._plan_action = None
-                self._plan_action_speed = None
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-                self._plan_rotate_strict_center = False
+                self._clear_plan_action_state()
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
@@ -514,14 +444,7 @@ class LineFollowerFSM:
             return self._plan_action, int(self._plan_action_speed)
 
         # action done
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
+        self._clear_plan_action_state()
         return self._after_plan_action(now)
 
     def _follow_default(self):
@@ -596,6 +519,10 @@ class LineFollowerFSM:
             self._log_info("===> LOST LINE: STOP")
             return "Stop", 0
 
+        advanced_follow = self._follow_line_advanced(frame)
+        if advanced_follow is not None:
+            return advanced_follow
+
         if mid_full and left_count <= 1 and right_count <= 1:
             self.state = self.STATE_FOLLOWING
             return "Forward", self.base_speed
@@ -618,6 +545,43 @@ class LineFollowerFSM:
 
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
+
+    def _follow_line_advanced(self, frame):
+        if not self.advanced_follow_enabled:
+            return None
+
+        line_tracking = frame.get("line_tracking")
+        if not isinstance(line_tracking, dict):
+            return None
+
+        segments = line_tracking.get("segments")
+        if not isinstance(segments, list) or not segments:
+            return None
+
+        active_segments = sum(1 for item in segments if self._to_bool(item, False))
+        if active_segments < self.advanced_follow_min_active_segments:
+            return None
+
+        error = line_tracking.get("error")
+        try:
+            error_value = int(error)
+        except (TypeError, ValueError):
+            return None
+
+        if abs(error_value) <= self.advanced_follow_error_deadband:
+            self.state = self.STATE_FOLLOWING
+            return "Forward", self.base_speed
+        if error_value < 0:
+            self.state = self.STATE_TURN_LEFT
+            return "RotateLeft", self.turn_speed_left
+        self.state = self.STATE_TURN_RIGHT
+        return "RotateRight", self.turn_speed_right
+
+    def _is_cross_detected(self, frame):
+        advanced_cross_detected = frame.get("advanced_cross_detected")
+        if advanced_cross_detected is not None:
+            return bool(advanced_cross_detected)
+        return bool(frame["left_full"] and frame["mid_full"] and frame["right_full"])
 
     def _log_info(self, msg):
         if self._logger:

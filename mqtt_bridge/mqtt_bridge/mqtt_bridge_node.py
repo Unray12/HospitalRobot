@@ -1,22 +1,28 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+import os
 import sys
 import threading
-from threading import Event
-import os
-import re
 import time
-import json
+from threading import Event
 
 try:
     import paho.mqtt.client as mqtt
 except ImportError:
     mqtt = None
+
 import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String, Bool
 from rcl_interfaces.msg import Log
+from rclpy.node import Node
+from std_msgs.msg import Bool, String
+
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
+from .runtime_utils import (
+    build_room_plan_state,
+    extract_face_id,
+    resolve_plan_command,
+    update_plan_runtime_state,
+)
 
 if os.name == "nt":
     import msvcrt
@@ -25,7 +31,7 @@ else:
     import tty
 
 
-# Hàm đọc phím 1 ký tự
+# Read a single keyboard character without waiting for Enter.
 def get_key():
     if os.name == "nt":
         key = msvcrt.getch()
@@ -46,7 +52,7 @@ def get_key():
 
 class MQTTBridgeNode(Node):
     def __init__(self):
-        super().__init__('mqtt_bridge_ros2')
+        super().__init__("mqtt_bridge_ros2")
         self.log = LogAdapter(self.get_logger(), "mqtt_bridge")
 
         config = ConfigManager("mqtt_bridge", logger=self.log).load()
@@ -72,6 +78,9 @@ class MQTTBridgeNode(Node):
         self.topic_plan_status_mqtt = topics_cfg.get("plan_status_mqtt", "plan_status")
         self.topic_plan_message_ros = topics_cfg.get("plan_message_ros", "/plan_message")
         self.topic_plan_message_mqtt = topics_cfg.get("plan_message_mqtt", "plan_message")
+        manual_control_cfg = ConfigManager("manual_control", logger=self.log).load()
+        manual_topics_cfg = manual_control_cfg.get("topics", {})
+        self.topic_auto_mode_ros = manual_topics_cfg.get("auto_mode", "/auto_mode")
         self.keyboard_map = {
             str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
             str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
@@ -85,17 +94,11 @@ class MQTTBridgeNode(Node):
         self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
         self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
-        self.room_plan_map = {str(k).strip().lower(): str(v).strip() for k, v in room_plans.items()}
-        if not self.room_plan_map:
-            # Backward compatible: if no room_plans, reuse numeric plan hotkeys.
-            self.room_plan_map = {
-                str(k).strip().lower(): str(v).strip()
-                for k, v in self.plan_key_map.items()
-                if str(k).strip().isdigit()
-            }
-        self._known_plans = set(self.room_plan_map.values()) | set(self.plan_key_map.values())
+        self.room_plan_map, self._known_plans = build_room_plan_state(self.plan_key_map, room_plans)
         self._debug_logs_enabled = False
         self._echo_suppress_window_sec = float(config.get("echo_suppress_window_sec", 0.35))
+        self._continuous_motion_window_sec = float(config.get("continuous_motion_window_sec", 0.35))
+        self._continuous_motion_repeat_sec = float(config.get("continuous_motion_repeat_sec", 0.2))
         self._recent_local_pub = {}
         self._log_bridge_enabled = bool(log_bridge_cfg.get("enabled", True))
         self._log_bridge_ros_topic = str(log_bridge_cfg.get("ros_topic", "/rosout"))
@@ -121,12 +124,25 @@ class MQTTBridgeNode(Node):
         }
         self._plan_autoline_active = False
         self._active_plan_name = None
+        self._auto_mode_active = False
+        self._continuous_motion_keys = {
+            str(keyboard_cfg.get("forward", "w")).lower(),
+            str(keyboard_cfg.get("backward", "s")).lower(),
+            str(keyboard_cfg.get("left", "a")).lower(),
+            str(keyboard_cfg.get("right", "d")).lower(),
+        }
+        self._continuous_motion_key = None
+        self._continuous_motion_command = None
+        self._last_motion_key = None
+        self._last_motion_ts = 0.0
 
-        # ROS 2 publisher
+        # ROS 2 publishers/subscriptions.
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
         self.ros_pick_pub = self.create_publisher(String, self.topic_pick, 10)
         self.ros_plan_pub = self.create_publisher(String, self.topic_plan, 10)
         self.ros_debug_pub = self.create_publisher(Bool, self.topic_debug_toggle, 10)
+        self.create_timer(self._continuous_motion_repeat_sec, self._continuous_motion_timer_cb)
+        self.create_subscription(Bool, self.topic_auto_mode_ros, self._auto_mode_cb, 20)
         self.create_subscription(String, self.topic_camera_ros, self._camera_cb, 20)
         self.create_subscription(String, self.topic_plan_status_ros, self._plan_status_cb, 20)
         self.create_subscription(String, self.topic_plan_message_ros, self._plan_message_cb, 20)
@@ -136,7 +152,7 @@ class MQTTBridgeNode(Node):
         if mqtt is None:
             raise RuntimeError("paho-mqtt is not installed")
 
-        # MQTT client
+        # MQTT client.
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
@@ -145,18 +161,18 @@ class MQTTBridgeNode(Node):
 
         self.client.connect(self.broker_address, self.broker_port, 60)
 
-        # MQTT chạy ở thread riêng
+        # Keep the MQTT loop off the ROS executor thread.
         self._stop_event = Event()
         self._mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
         self._mqtt_thread.start()
 
-        # Keyboard đọc ở worker thread để không block executor
+        # Read keyboard input in a worker thread to avoid blocking the executor.
         self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
         self._keyboard_thread.start()
 
         self.log.info("MQTT <-> ROS2 bridge started", event="BOOT")
 
-    # MQTT callbacks
+    # MQTT callbacks.
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self._mqtt_connected = True
@@ -170,6 +186,9 @@ class MQTTBridgeNode(Node):
     def on_disconnect(self, client, userdata, rc):
         self._mqtt_connected = False
         self.log.warning(f"Disconnected from MQTT broker: rc={rc}", event="MQTT")
+
+    def _auto_mode_cb(self, msg: Bool):
+        self._auto_mode_active = bool(msg.data)
 
     def on_message(self, client, userdata, msg):
         data = msg.payload.decode()
@@ -185,7 +204,14 @@ class MQTTBridgeNode(Node):
             ros_msg.data = data
             self.ros_pick_pub.publish(ros_msg)
         elif msg.topic == self.topic_plan:
-            resolved = self._resolve_plan_command(data)
+            resolved, missing_room_id = resolve_plan_command(
+                data,
+                self.plan_key_map,
+                self.room_plan_map,
+                self._known_plans,
+            )
+            if missing_room_id is not None:
+                self.log.warning(f"Room id has no mapped plan: {missing_room_id}", event="PLAN_MQTT")
             if not resolved:
                 self.log.warning(f"Ignored invalid plan command: {data}", event="PLAN_MQTT")
                 return
@@ -194,23 +220,26 @@ class MQTTBridgeNode(Node):
             if resolved != data:
                 self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
 
-    # Keyboard → MQTT
+    # Keyboard -> MQTT.
     def keyboard_loop(self):
-        self.log.info("Dieu khien WASD | q de thoat", event="KEYBOARD")
-        autoMode = False
+        self.log.info(
+            "Keyboard teleop ready: WASD double-tap for continuous move, 1-5 plan select, k toggle auto, q quit",
+            event="KEYBOARD",
+        )
         while rclpy.ok() and not self._stop_event.is_set():
             key = get_key().lower()
             cmd = ""
 
             if key in self.keyboard_map:
+                if key in self._continuous_motion_keys:
+                    self._handle_motion_key(key)
+                    continue
+                if self._continuous_motion_command:
+                    self._disable_continuous_motion(send_stop=False, reason="rotate_or_stop_key")
                 cmd = self.keyboard_map[key]
             elif key == self.key_toggle_auto:
-                autoMode = not autoMode
-                mode_msg = "1" if autoMode else "0"
-                self.ros_pick_pub.publish(String(data=mode_msg))
-                self.client.publish(self.topic_pick, mode_msg)
-                self._mark_local_publish(self.topic_pick, mode_msg)
-                self.log.info(f"ROS2 -> MQTT: {mode_msg}", event="BRIDGE_OUT")
+                self._disable_continuous_motion(send_stop=True, reason="toggle_auto")
+                self._toggle_auto_mode()
             elif key == self.key_toggle_debug_logs:
                 self._debug_logs_enabled = not self._debug_logs_enabled
                 self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
@@ -220,6 +249,7 @@ class MQTTBridgeNode(Node):
                     event="DEBUG_TOGGLE",
                 )
             elif key in self.plan_key_map:
+                self._disable_continuous_motion(send_stop=True, reason="plan_select")
                 plan_name = self.plan_key_map[key]
                 if self._mqtt_connected:
                     mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
@@ -237,18 +267,88 @@ class MQTTBridgeNode(Node):
                         event="BRIDGE_FALLBACK",
                     )
             elif key == self.key_quit:
-                self.log.info("Thoat chuong trinh", event="KEYBOARD")
+                self._disable_continuous_motion(send_stop=True, reason="shutdown")
+                self.log.info("Keyboard requested shutdown", event="KEYBOARD")
                 self._stop_event.set()
                 rclpy.shutdown()
                 break
 
             if cmd:
-                self.ros_pub.publish(String(data=cmd))
-                self.client.publish(self.topic_vr, cmd)
-                self._mark_local_publish(self.topic_vr, cmd)
-                self.log.info(f"ROS2 -> MQTT: {cmd}", event="BRIDGE_OUT")
+                self._publish_vr_command(cmd)
 
         self.client.disconnect()
+
+    def _handle_motion_key(self, key):
+        command = self.keyboard_map[key]
+        now = time.time()
+        is_double_tap = (
+            key == self._last_motion_key
+            and (now - self._last_motion_ts) <= self._continuous_motion_window_sec
+        )
+
+        if is_double_tap:
+            if self._continuous_motion_key == key:
+                self._disable_continuous_motion(send_stop=True, reason=f"double_tap_off:{key}")
+            else:
+                self._enable_continuous_motion(key, command)
+            self._last_motion_key = None
+            self._last_motion_ts = 0.0
+            return
+
+        if self._continuous_motion_key and self._continuous_motion_key != key:
+            self._disable_continuous_motion(send_stop=False, reason=f"new_direction:{key}")
+
+        self._publish_vr_command(command)
+        self._last_motion_key = key
+        self._last_motion_ts = now
+
+    def _enable_continuous_motion(self, key, command):
+        self._continuous_motion_key = key
+        self._continuous_motion_command = command
+        self._publish_vr_command(command)
+        self.log.info(
+            f"Continuous motion enabled: key={key} command={command}",
+            event="KEYBOARD",
+        )
+
+    def _disable_continuous_motion(self, send_stop, reason):
+        if not self._continuous_motion_command:
+            self._last_motion_key = None
+            self._last_motion_ts = 0.0
+            return
+
+        command = self._continuous_motion_command
+        self._continuous_motion_key = None
+        self._continuous_motion_command = None
+        self._last_motion_key = None
+        self._last_motion_ts = 0.0
+        if send_stop:
+            self._publish_vr_command("Stop")
+        self.log.info(
+            f"Continuous motion disabled: reason={reason} previous={command} stop={int(send_stop)}",
+            event="KEYBOARD",
+        )
+
+    def _continuous_motion_timer_cb(self):
+        if not self._continuous_motion_command:
+            return
+        self._publish_vr_command(self._continuous_motion_command)
+
+    def _toggle_auto_mode(self):
+        mode_msg = "0" if self._auto_mode_active else "1"
+        self.log.info(
+            f"Keyboard auto toggle requested: current={int(self._auto_mode_active)} next={mode_msg}",
+            event="KEYBOARD",
+        )
+        self.ros_pick_pub.publish(String(data=mode_msg))
+        self.client.publish(self.topic_pick, mode_msg)
+        self._mark_local_publish(self.topic_pick, mode_msg)
+
+    def _publish_vr_command(self, command):
+        self.ros_pub.publish(String(data=command))
+        self.client.publish(self.topic_vr, command)
+        self._mark_local_publish(self.topic_vr, command)
+        self.log.info(f"ROS2 -> MQTT: {command}", event="BRIDGE_OUT")
 
     def destroy_node(self):
         self._stop_event.set()
@@ -308,7 +408,7 @@ class MQTTBridgeNode(Node):
         if self._camera_face_require_plan_autoline:
             if (not self._plan_autoline_active) or (not self._active_plan_name):
                 return
-        face_id = self._extract_face_id(payload)
+        face_id = extract_face_id(payload)
         if face_id is None:
             return
         message = self._camera_face_plan_messages.get(str(face_id))
@@ -321,75 +421,11 @@ class MQTTBridgeNode(Node):
         )
 
     def _update_plan_runtime_state(self, payload: str):
-        try:
-            data = json.loads(payload)
-        except Exception:
-            return
-        if not isinstance(data, dict):
-            return
-
-        event_name = str(data.get("event") or "").strip().lower()
-        plan_name = data.get("plan")
-        autoline = data.get("autoline")
-
-        if plan_name:
-            self._active_plan_name = str(plan_name).strip()
-
-        if autoline is not None:
-            self._plan_autoline_active = bool(autoline)
-
-        if event_name in {"cleared", "completed_reset"}:
-            self._active_plan_name = None
-            self._plan_autoline_active = False
-
-    def _extract_face_id(self, payload: str):
-        text = (payload or "").strip().upper()
-        if "FACE" not in text:
-            return None
-        m = re.search(r"FACE\s*,\s*(\d+)", text)
-        if not m:
-            return None
-        try:
-            return int(m.group(1))
-        except ValueError:
-            return None
-
-    def _resolve_plan_command(self, payload: str):
-        text = (payload or "").strip()
-        if not text:
-            return None
-
-        lower = text.lower()
-        if lower in {"0", "clear", "room:0", "room/0"}:
-            return "clear"
-
-        if text in self.plan_key_map:
-            return self.plan_key_map[text]
-        if lower in self.room_plan_map:
-            return self.room_plan_map[lower]
-
-        m = re.match(r"^(room|phong|plan)\s*[:/_-]?\s*([a-z0-9_-]+)$", lower)
-        if m:
-            prefix = m.group(1).strip()
-            room_id = m.group(2).strip()
-            if room_id in {"0", "clear"}:
-                return "clear"
-            if room_id in self.room_plan_map:
-                return self.room_plan_map[room_id]
-            if prefix == "plan" and room_id.startswith("plan_"):
-                return room_id
-            self.log.warning(f"Room id has no mapped plan: {room_id}", event="PLAN_MQTT")
-            return None
-
-        if lower.startswith("plan:") or lower.startswith("plan/"):
-            plan_name = text.split(":", 1)[1].strip() if ":" in text else text.split("/", 1)[1].strip()
-            return plan_name or None
-
-        if text in self._known_plans:
-            return text
-
-        # Keep compatibility: allow direct plan names even if not listed in mappings.
-        return text
+        self._active_plan_name, self._plan_autoline_active = update_plan_runtime_state(
+            payload,
+            self._active_plan_name,
+            self._plan_autoline_active,
+        )
 
     def _mark_local_publish(self, topic: str, payload: str):
         self._recent_local_pub[(topic, payload)] = time.time()
@@ -420,5 +456,5 @@ def main(args=None):
             rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

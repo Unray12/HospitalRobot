@@ -1,8 +1,17 @@
 from line_follower.line_follower.line_follower import LineFollowerFSM
 
 
-def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, right_full=False):
-    return {
+def _frame(
+    left_count,
+    mid_count,
+    right_count,
+    left_full=False,
+    mid_full=False,
+    right_full=False,
+    advanced_cross_detected=None,
+    line_tracking=None,
+):
+    frame = {
         "left_count": left_count,
         "mid_count": mid_count,
         "right_count": right_count,
@@ -10,6 +19,11 @@ def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, 
         "mid_full": mid_full,
         "right_full": right_full,
     }
+    if advanced_cross_detected is not None:
+        frame["advanced_cross_detected"] = advanced_cross_detected
+    if line_tracking is not None:
+        frame["line_tracking"] = line_tracking
+    return frame
 
 
 def test_follow_centered_line_goes_forward():
@@ -26,6 +40,69 @@ def test_left_bias_rotates_left():
     assert speed == 6
 
 
+def test_advanced_follow_positive_error_rotates_right():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "error": 16},
+        ),
+        now=0.0,
+    )
+    assert direction == "RotateRight"
+    assert speed == 7
+
+
+def test_advanced_follow_negative_error_rotates_left():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], "error": -18},
+        ),
+        now=0.0,
+    )
+    assert direction == "RotateLeft"
+    assert speed == 6
+
+
+def test_advanced_follow_small_error_goes_forward():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], "error": 4},
+        ),
+        now=0.0,
+    )
+    assert direction == "Forward"
+    assert speed == 8
+
+
 def test_lost_line_stops():
     fsm = LineFollowerFSM(base_speed=8)
     direction, speed = fsm.update(_frame(0, 0, 0), now=0.0)
@@ -36,6 +113,17 @@ def test_lost_line_stops():
 def test_crossing_without_plan_returns_to_follow():
     fsm = LineFollowerFSM(base_speed=8, crossing_duration=0.5)
     first = fsm.update(_frame(1, 1, 1, left_full=True, mid_full=True, right_full=True), now=1.0)
+    assert first == ("Forward", 8)
+    second = fsm.update(_frame(0, 3, 0, mid_full=True), now=1.6)
+    assert second == ("Forward", 8)
+
+
+def test_crossing_can_use_advanced_cross_flag():
+    fsm = LineFollowerFSM(base_speed=8, crossing_duration=0.5)
+    first = fsm.update(
+        _frame(0, 3, 0, mid_full=True, advanced_cross_detected=True),
+        now=1.0,
+    )
     assert first == ("Forward", 8)
     second = fsm.update(_frame(0, 3, 0, mid_full=True), now=1.6)
     assert second == ("Forward", 8)

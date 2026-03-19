@@ -51,14 +51,8 @@
     log có thể đọc bởi người vận hành và đồng thời parse được bởi tool.
 
   #inline("Plan repository hiện có")
-  - `a15`, `a16`, `a17`, `a18`, `a19`, `a20`
-  - `plan_demo_autoline_callback`
-  - `plan_sample_huong_dan`
-  - Legacy plan templates:
-  - `plan_straight`
-  - `plan_turn_right`
-  - `plan_u_turn`
-  - `plan_stop`
+  - `a15`, `a16`, `a17`, `a18`, `a19`
+  - `plan_master_reference_non_a`
 
   #inline("Validation commands")
   ```bash

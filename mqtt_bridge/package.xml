@@ -4,7 +4,7 @@
   <name>mqtt_bridge</name>
   <version>0.0.0</version>
   <description>MQTT bridge between operator inputs and ROS2 robot topics</description>
-  <maintainer email="aclab@todo.todo">aclab</maintainer>
+  <maintainer email="aclab@gmail.com">aclab</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>

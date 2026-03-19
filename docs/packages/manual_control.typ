@@ -11,8 +11,8 @@
   - Run:
     `ros2 run manual_control manual_control`
   - Main files:
-    `manual_control/manual_control_node.py`,
-    `manual_control/auto_mode_sync.py`
+    `manual_control/manual_control/manual_control_node.py`,
+    `manual_control/manual_control/auto_mode_sync.py`
 
   #inline("I/O contract")
   - Subscribe:
@@ -37,9 +37,9 @@
     `auto_mode_service_max_attempts=30`
 
   #inline("Runtime behavior")
-  - `autoMode=true` + có lệnh manual:
+  - `auto_mode=true` + có lệnh manual:
     nếu `manual_override_on_input=true` thì tự tắt auto mode rồi mới phát lệnh tay.
-  - `autoMode=true` + `manual_override_on_input=false` -> bỏ qua lệnh tay.
+  - `auto_mode=true` + `manual_override_on_input=false` -> bỏ qua lệnh tay.
   - `/pick_robot` nhận `"1"/"0"` để bật/tắt auto mode.
   - Khi mode đổi:
     publish `/auto_mode` và queue sync service với retry logic.
@@ -62,7 +62,7 @@
   - Toggle auto không phản ánh ở follower:
     xem log `AUTO_SYNC` và tình trạng service `/set_auto_mode`.
   - Manual command mất tác dụng:
-    kiểm tra `autoMode` có đang bật hay không.
+    kiểm tra `auto_mode` có đang bật hay không.
   - Sync bị drop:
     tăng `auto_mode_service_max_attempts` hoặc giảm retry period.
 ]

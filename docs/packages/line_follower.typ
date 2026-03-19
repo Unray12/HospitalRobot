@@ -13,12 +13,14 @@
   - Run:
     `ros2 run line_follower line_follower`
   - Main files:
-    `line_follower/line_follower_node.py`,
-    `line_follower/line_follower.py`
+    `line_follower/line_follower/line_follower_node.py`,
+    `line_follower/line_follower/line_follower.py`
 
   #inline("I/O contract")
   - Subscribe topics:
     `/line_sensors/frame`, `/auto_mode`, `/plan_select`
+  - Optional subscribe when `line_sensor_advanced.enabled=true`:
+    `/line_sensors/advanced` (`std_msgs/String`, JSON payload)
   - Publish topics:
     `/motor_cmd` (`std_msgs/String`, format `Direction:Speed`)
     `/pick_robot` (`std_msgs/String`), `/plan_status` (`std_msgs/String`),
@@ -64,12 +66,22 @@
     `rotate_early_stop_on_side=true`,
     `rotate_line_side_min_count=1`
   - Plan:
-    `cross_plan_name=a20`,
+    `cross_plan_name=a19`,
     `plan_end_state=stop`,
-    alias `1..6` tương ứng `a20..a15`.
+    alias `1..5` tương ứng `a19..a15`.
+  - Optional advanced line sensor:
+    `enabled=true`, `topic=/line_sensors/advanced`,
+    `use_for_following=true`, `follow_error_deadband=12`,
+    `follow_min_active_segments=1`,
+    `use_for_cross_detection=true`,
+    `cross_min_active_segments=12`
 
   #inline("Runtime sequence (auto mode)")
   - Nhận frame từ `/line_sensors/frame` và cập nhật `self._last_frame`.
+  - Nếu advanced line sensor bật và payload còn mới:
+    merge `line_tracking/raw_arrow` vào frame runtime;
+    bám line ưu tiên `line_tracking.error`,
+    `cross` detection ưu tiên `line_tracking.segments`.
   - Timer 10ms gọi FSM `update(frame, now)`.
   - Nếu có result `(direction, speed)`:
     format thành `Direction:Speed` và publish `/motor_cmd`.
@@ -100,7 +112,7 @@
   ```bash
   ros2 topic echo /plan_status
   ros2 topic echo /plan_callback
-  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a19'}"
   ros2 service call /set_auto_mode std_srvs/srv/SetBool "{data: true}"
   ros2 topic echo /motor_cmd
   ```

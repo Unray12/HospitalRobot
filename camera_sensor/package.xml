@@ -3,9 +3,9 @@
 <package format="3">
   <name>camera_sensor</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Camera sensor reader and face event publisher node</description>
   <maintainer email="thanhtinh1234789@gmail.com">aclab</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
