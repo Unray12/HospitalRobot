@@ -70,7 +70,9 @@
     `plan_end_state=stop`,
     alias `1..5` tương ứng `a19..a15`.
   - Optional advanced line sensor:
-    `enabled=false`, `topic=/line_sensors/advanced`,
+    `enabled=true`, `topic=/line_sensors/advanced`,
+    `use_for_following=true`, `follow_error_deadband=12`,
+    `follow_min_active_segments=1`,
     `use_for_cross_detection=true`,
     `cross_min_active_segments=12`
 
@@ -78,6 +80,7 @@
   - Nhận frame từ `/line_sensors/frame` và cập nhật `self._last_frame`.
   - Nếu advanced line sensor bật và payload còn mới:
     merge `line_tracking/raw_arrow` vào frame runtime;
+    bám line ưu tiên `line_tracking.error`,
     `cross` detection ưu tiên `line_tracking.segments`.
   - Timer 10ms gọi FSM `update(frame, now)`.
   - Nếu có result `(direction, speed)`:

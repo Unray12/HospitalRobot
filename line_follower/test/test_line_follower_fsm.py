@@ -9,6 +9,7 @@ def _frame(
     mid_full=False,
     right_full=False,
     advanced_cross_detected=None,
+    line_tracking=None,
 ):
     frame = {
         "left_count": left_count,
@@ -20,6 +21,8 @@ def _frame(
     }
     if advanced_cross_detected is not None:
         frame["advanced_cross_detected"] = advanced_cross_detected
+    if line_tracking is not None:
+        frame["line_tracking"] = line_tracking
     return frame
 
 
@@ -35,6 +38,69 @@ def test_left_bias_rotates_left():
     direction, speed = fsm.update(_frame(3, 1, 0), now=0.0)
     assert direction == "RotateLeft"
     assert speed == 6
+
+
+def test_advanced_follow_positive_error_rotates_right():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], "error": 16},
+        ),
+        now=0.0,
+    )
+    assert direction == "RotateRight"
+    assert speed == 7
+
+
+def test_advanced_follow_negative_error_rotates_left():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], "error": -18},
+        ),
+        now=0.0,
+    )
+    assert direction == "RotateLeft"
+    assert speed == 6
+
+
+def test_advanced_follow_small_error_goes_forward():
+    fsm = LineFollowerFSM(
+        base_speed=8,
+        turn_speed_left=6,
+        turn_speed_right=7,
+        advanced_follow_enabled=True,
+        advanced_follow_error_deadband=12,
+    )
+    direction, speed = fsm.update(
+        _frame(
+            0,
+            1,
+            0,
+            line_tracking={"segments": [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], "error": 4},
+        ),
+        now=0.0,
+    )
+    assert direction == "Forward"
+    assert speed == 8
 
 
 def test_lost_line_stops():

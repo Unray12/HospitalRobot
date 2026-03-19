@@ -122,12 +122,20 @@ class LineSensorReader:
 
     def _open_serial(self, port):
         try:
-            self.ser = serial.Serial(
-                port=port,
-                baudrate=self.baudrate,
-                timeout=self.timeout,
-            )
-            time.sleep(2)
+            kwargs = {
+                "port": port,
+                "baudrate": self.baudrate,
+                "timeout": self.timeout,
+            }
+            try:
+                self.ser = serial.Serial(exclusive=True, **kwargs)
+            except TypeError:
+                self.ser = serial.Serial(**kwargs)
+
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+            self._buffer = ""
+            time.sleep(0.2)
             self._last_open_error = None
             self._log_info(f"Serial Line Sensors connected: {port}")
             return True

@@ -27,6 +27,9 @@ class LineFollowerFSM:
         rotate_line_side_max_count=2,
         rotate_early_stop_on_side=True,
         rotate_line_side_min_count=1,
+        advanced_follow_enabled=False,
+        advanced_follow_error_deadband=12,
+        advanced_follow_min_active_segments=1,
         plan_lost_line_hold_sec=0.8,
         plan_lost_line_warn_period=0.5,
         logger=None,
@@ -46,6 +49,9 @@ class LineFollowerFSM:
         self.rotate_line_side_max_count = int(max(0, rotate_line_side_max_count))
         self.rotate_early_stop_on_side = bool(rotate_early_stop_on_side)
         self.rotate_line_side_min_count = int(max(1, rotate_line_side_min_count))
+        self.advanced_follow_enabled = bool(advanced_follow_enabled)
+        self.advanced_follow_error_deadband = int(max(0, advanced_follow_error_deadband))
+        self.advanced_follow_min_active_segments = int(max(1, advanced_follow_min_active_segments))
         self.plan_lost_line_hold_sec = float(max(0.0, plan_lost_line_hold_sec))
         self.plan_lost_line_warn_period = float(max(0.1, plan_lost_line_warn_period))
 
@@ -513,6 +519,10 @@ class LineFollowerFSM:
             self._log_info("===> LOST LINE: STOP")
             return "Stop", 0
 
+        advanced_follow = self._follow_line_advanced(frame)
+        if advanced_follow is not None:
+            return advanced_follow
+
         if mid_full and left_count <= 1 and right_count <= 1:
             self.state = self.STATE_FOLLOWING
             return "Forward", self.base_speed
@@ -535,6 +545,37 @@ class LineFollowerFSM:
 
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
+
+    def _follow_line_advanced(self, frame):
+        if not self.advanced_follow_enabled:
+            return None
+
+        line_tracking = frame.get("line_tracking")
+        if not isinstance(line_tracking, dict):
+            return None
+
+        segments = line_tracking.get("segments")
+        if not isinstance(segments, list) or not segments:
+            return None
+
+        active_segments = sum(1 for item in segments if self._to_bool(item, False))
+        if active_segments < self.advanced_follow_min_active_segments:
+            return None
+
+        error = line_tracking.get("error")
+        try:
+            error_value = int(error)
+        except (TypeError, ValueError):
+            return None
+
+        if abs(error_value) <= self.advanced_follow_error_deadband:
+            self.state = self.STATE_FOLLOWING
+            return "Forward", self.base_speed
+        if error_value < 0:
+            self.state = self.STATE_TURN_LEFT
+            return "RotateLeft", self.turn_speed_left
+        self.state = self.STATE_TURN_RIGHT
+        return "RotateRight", self.turn_speed_right
 
     def _is_cross_detected(self, frame):
         advanced_cross_detected = frame.get("advanced_cross_detected")

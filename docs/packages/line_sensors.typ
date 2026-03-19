@@ -38,7 +38,7 @@
   - Publish:
     `topic=/line_sensors/frame`, `rate_hz=100`
   - Advanced mode:
-    `enabled=false`, `topic=/line_sensors/advanced`,
+    `enabled=true`, `topic=/line_sensors/advanced`,
     profile `serial_line_tracking_json`
   - Debug toggle topic:
     `/debug_logs_toggle`

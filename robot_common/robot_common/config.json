@@ -5,8 +5,7 @@
                 "line_sensor_driver",
                 "line_follower",
                 "motor_driver",
-                "manual_control",
-                "camera_sensor"
+                "manual_control"
             ]
         }
     },
@@ -22,7 +21,7 @@
     },
     "line_sensors": {
         "serial": {
-            "port": "/dev/ttyACM0",
+            "port": "/dev/ttyACM1",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -39,7 +38,7 @@
             "advanced": "/line_sensors/advanced"
         },
         "advanced": {
-            "enabled": false,
+            "enabled": true,
             "publish_payload": true,
             "include_line_tracking": true,
             "include_raw_arrow": true,
@@ -65,9 +64,12 @@
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
         "line_sensor_advanced": {
-            "enabled": false,
+            "enabled": true,
             "topic": "/line_sensors/advanced",
             "message_ttl_sec": 0.25,
+            "use_for_following": true,
+            "follow_error_deadband": 12,
+            "follow_min_active_segments": 1,
             "use_for_cross_detection": true,
             "cross_min_active_segments": 12
         },
@@ -176,7 +178,7 @@
             "enabled": true,
             "require_plan_autoline": true,
             "id_messages": {
-               "0": "say: Xin vui lòng nhường đường giúp con di chuyển ạ. Con xin cảm ơn.",
+                "0": "say: Xin vui lòng nhường đường giúp con di chuyển ạ. Con xin cảm ơn.",
                 "1": "say: Con kính chào bác Chiến. Chúc Giám đốc một ngày làm việc hiệu quả và nhiều sức khỏe.",
                 "2": "say: Con Kính chào Bác Minh. Chúc Bác một ngày làm việc thành công.",
                 "3": "say: Con chào Thầy Thơ. Chúc Thầy một ngày làm việc hiệu quả và nhiều năng lượng.",
