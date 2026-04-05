@@ -25,6 +25,8 @@ Topic trạng thái (ROS2 -> MQTT):
 - `plan_status`
 - `plan_message`
 - `face/camera`
+- `huskylens/frame`
+- `huskylens/valid`
 - `robot_logs` (lọc từ `/rosout` theo cấu hình log bridge)
 
 ## 3. Contract chi tiết từng topic điều khiển
@@ -120,6 +122,8 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_select -v
 mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_status -v
 mosquitto_sub -h 127.0.0.1 -p 1883 -t plan_message -v
 mosquitto_sub -h 127.0.0.1 -p 1883 -t face/camera -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t huskylens/frame -v
+mosquitto_sub -h 127.0.0.1 -p 1883 -t huskylens/valid -v
 ```
 
 ## 6. Kiểm tra ROS2 song song
@@ -132,6 +136,8 @@ ros2 topic echo /auto_mode
 ros2 topic echo /plan_status
 ros2 topic echo /plan_message
 ros2 topic echo /face/camera
+ros2 topic echo /huskylens/frame
+ros2 topic echo /huskylens/valid
 ros2 topic echo /motor_cmd
 ```
 

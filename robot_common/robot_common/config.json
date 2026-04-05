@@ -6,7 +6,8 @@
                 "line_follower",
                 "motor_driver",
                 "manual_control",
-                "camera_sensor"
+                "camera_sensor",
+                "huskylens_sensor"
             ]
         }
     },
@@ -56,6 +57,13 @@
         "cross_plan_name": "a19",
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
+        "tracking": {
+            "strategy": "line_sensor",
+            "strict_mode": false,
+            "line_frame_stale_sec": 0.4,
+            "huskylens_frame_stale_sec": 0.6,
+            "log_invalid_period": 1.0
+        },
         "topics": {
             "line_frame": "/line_sensors/frame",
             "cmd_vel": "/motor_cmd",
@@ -67,6 +75,14 @@
         },
         "service": {
             "set_auto_mode": "/set_auto_mode"
+        },
+        "huskylens": {
+            "enabled": false,
+            "topic_frame": "/huskylens/frame",
+            "max_abs_error": 120,
+            "control_gain": 1.0,
+            "deadband": 1.0,
+            "fallback_on_invalid": true
         },
         "plan_alias": {
             "0": "clear",
@@ -103,6 +119,31 @@
             "set_auto_mode": "/set_auto_mode"
         }
     },
+    "huskylens_sensor": {
+        "serial": {
+            "port": "/dev/ttyACM2",
+            "baudrate": 9600,
+            "timeout": 0.2
+        },
+        "publish": {
+            "topic_frame": "/huskylens/frame",
+            "topic_valid": "/huskylens/valid",
+            "rate_hz": 20
+        },
+        "reconnect_period_sec": 2.0,
+        "fallback_ports": [
+            "/dev/ttyACM2",
+            "/dev/ttyACM1",
+            "/dev/ttyACM0"
+        ],
+        "scan_prefixes": [
+            "/dev/ttyACM",
+            "/dev/ttyUSB",
+            "COM"
+        ],
+        "parse_log_every": 20,
+        "status_log_period": 2.0
+    },
     "mqtt_bridge": {
         "broker": {
             "address": "127.0.0.1",
@@ -119,7 +160,11 @@
             "plan_status_ros": "/plan_status",
             "plan_status_mqtt": "plan_status",
             "plan_message_ros": "/plan_message",
-            "plan_message_mqtt": "plan_message"
+            "plan_message_mqtt": "plan_message",
+            "huskylens_frame_ros": "/huskylens/frame",
+            "huskylens_frame_mqtt": "huskylens/frame",
+            "huskylens_valid_ros": "/huskylens/valid",
+            "huskylens_valid_mqtt": "huskylens/valid"
         },
         "keyboard": {
             "forward": "w",

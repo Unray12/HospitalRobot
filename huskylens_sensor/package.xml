@@ -1,25 +1,16 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>robot</name>
+  <name>huskylens_sensor</name>
   <version>0.0.0</version>
-  <description>Robot bringup package for launching core runtime nodes</description>
+  <description>HuskyLens sensor bridge node</description>
   <maintainer email="aclab@todo.todo">aclab</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
   <depend>robot_common</depend>
-  <depend>line_sensors</depend>
-  <depend>line_follower</depend>
-  <depend>motor_driver</depend>
-  <depend>manual_control</depend>
-  <depend>camera_sensor</depend>
-  <depend>huskylens_sensor</depend>
+  <exec_depend>python3-serial</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

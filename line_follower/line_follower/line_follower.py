@@ -1,4 +1,5 @@
 import time
+from .line_follow_strategies import LineSensorStrategy, HuskyLensStrategy, HybridStrategy
 
 class LineFollowerFSM:
     STATE_FOLLOWING = 0
@@ -28,6 +29,12 @@ class LineFollowerFSM:
         rotate_line_side_min_count=1,
         plan_lost_line_hold_sec=0.8,
         plan_lost_line_warn_period=0.5,
+        tracking_strategy="line_sensor",
+        tracking_strict_mode=False,
+        tracking_log_invalid_period=1.0,
+        huskylens_max_abs_error=120,
+        huskylens_control_gain=1.0,
+        huskylens_deadband=1.0,
         logger=None,
     ):
         self._logger = logger
@@ -47,6 +54,19 @@ class LineFollowerFSM:
         self.rotate_line_side_min_count = int(max(1, rotate_line_side_min_count))
         self.plan_lost_line_hold_sec = float(max(0.0, plan_lost_line_hold_sec))
         self.plan_lost_line_warn_period = float(max(0.1, plan_lost_line_warn_period))
+        self.tracking_strategy_name = str(tracking_strategy or "line_sensor").strip().lower()
+        self.tracking_strict_mode = bool(tracking_strict_mode)
+        self.tracking_log_invalid_period = float(max(0.1, tracking_log_invalid_period))
+        self.huskylens_max_abs_error = int(max(1, huskylens_max_abs_error))
+        self.huskylens_control_gain = float(max(0.0, huskylens_control_gain))
+        self.huskylens_deadband = float(max(0.0, huskylens_deadband))
+        self._tracking_context = {}
+        self._last_tracking_invalid_log_ts = 0.0
+
+        self._line_sensor_strategy = LineSensorStrategy(self._compute_line_sensor_command)
+        self._huskylens_strategy = HuskyLensStrategy(self._compute_huskylens_command)
+        self._hybrid_strategy = HybridStrategy(self._huskylens_strategy, self._line_sensor_strategy)
+        self._tracking_strategy = self._resolve_tracking_strategy(self.tracking_strategy_name)
 
         self.state = self.STATE_FOLLOWING
         self.crossing_start_time = None
@@ -577,6 +597,45 @@ class LineFollowerFSM:
         return False
 
     def _follow_line(self, frame):
+        context = dict(self._tracking_context or {})
+        if isinstance(frame, dict) and context.get("line_sensor_frame") is None:
+            context["line_sensor_frame"] = frame
+            context["line_sensor_stale"] = False
+
+        command = self._tracking_strategy.compute(context)
+        if command is None:
+            if self.tracking_strict_mode:
+                now = time.time()
+                if (now - self._last_tracking_invalid_log_ts) >= self.tracking_log_invalid_period:
+                    self._log_warn(
+                        f"strict_mode stop: strategy={self.tracking_strategy_name} no valid input",
+                        event="TRACKING",
+                    )
+                    self._last_tracking_invalid_log_ts = now
+                self.state = self.STATE_STOPPED
+                return "Stop", 0
+            now = time.time()
+            if (now - self._last_tracking_invalid_log_ts) >= self.tracking_log_invalid_period:
+                self._log_warn(
+                    f"strategy={self.tracking_strategy_name} invalid input -> fallback line_sensor",
+                    event="FALLBACK",
+                )
+                self._last_tracking_invalid_log_ts = now
+            return self._compute_line_sensor_command(
+                {
+                    "line_sensor_frame": frame,
+                    "line_sensor_stale": False,
+                }
+            )
+        return command
+
+    def _compute_line_sensor_command(self, frame_context):
+        frame = (frame_context or {}).get("line_sensor_frame")
+        if not isinstance(frame, dict):
+            return None
+        if bool((frame_context or {}).get("line_sensor_stale", False)):
+            return None
+
         left_count = frame["left_count"]
         mid_count = frame["mid_count"]
         right_count = frame["right_count"]
@@ -619,15 +678,46 @@ class LineFollowerFSM:
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
 
+    def _compute_huskylens_command(self, frame_context):
+        huskylens = (frame_context or {}).get("huskylens_frame")
+        if not isinstance(huskylens, dict):
+            return None
+        if bool((frame_context or {}).get("huskylens_stale", False)):
+            return None
+
+        connected = bool(huskylens.get("connected", 0))
+        algorithm_set = bool(huskylens.get("algorithm_set", 0))
+        valid = bool(huskylens.get("valid", 0))
+        if not (connected and algorithm_set and valid):
+            return None
+
+        try:
+            error = int(huskylens.get("error", 0))
+        except Exception:
+            return None
+
+        if abs(error) > self.huskylens_max_abs_error:
+            return None
+
+        bias = float(error) * self.huskylens_control_gain
+        if abs(bias) <= self.huskylens_deadband:
+            self.state = self.STATE_FOLLOWING
+            return "Forward", self.base_speed
+        if bias < 0:
+            self.state = self.STATE_TURN_LEFT
+            return "RotateLeft", self.turn_speed_left
+        self.state = self.STATE_TURN_RIGHT
+        return "RotateRight", self.turn_speed_right
+
     def _log_info(self, msg):
         if self._logger:
             self._logger.info(msg)
         else:
             print(msg)
 
-    def _log_warn(self, msg):
+    def _log_warn(self, msg, event="WARN"):
         if self._logger:
-            self._logger.warning(msg)
+            self._logger.warning(msg, event=event)
         else:
             print(msg)
 
@@ -666,6 +756,25 @@ class LineFollowerFSM:
 
     def set_autoline_mode(self, enabled):
         self._autoline_mode = bool(enabled)
+
+    def set_tracking_context(self, frame_context):
+        self._tracking_context = frame_context if isinstance(frame_context, dict) else {}
+
+    def set_huskylens_frame(self, frame):
+        if not isinstance(self._tracking_context, dict):
+            self._tracking_context = {}
+        self._tracking_context["huskylens_frame"] = frame if isinstance(frame, dict) else None
+
+    def _resolve_tracking_strategy(self, strategy_name):
+        normalized = str(strategy_name or "line_sensor").strip().lower()
+        if normalized == "huskylens":
+            return self._huskylens_strategy
+        if normalized == "hybrid":
+            return self._hybrid_strategy
+        if normalized != "line_sensor":
+            self._log_warn(f"unknown strategy '{strategy_name}', fallback to line_sensor", event="STRATEGY")
+            self.tracking_strategy_name = "line_sensor"
+        return self._line_sensor_strategy
 
     def _should_skip_cross_pre(self):
         """Skip pre-forward phase when next actionable step is rotate for immediate turn."""

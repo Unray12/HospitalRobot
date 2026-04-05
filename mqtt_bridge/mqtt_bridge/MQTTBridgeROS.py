@@ -72,6 +72,10 @@ class MQTTBridgeNode(Node):
         self.topic_plan_status_mqtt = topics_cfg.get("plan_status_mqtt", "plan_status")
         self.topic_plan_message_ros = topics_cfg.get("plan_message_ros", "/plan_message")
         self.topic_plan_message_mqtt = topics_cfg.get("plan_message_mqtt", "plan_message")
+        self.topic_huskylens_frame_ros = topics_cfg.get("huskylens_frame_ros", "/huskylens/frame")
+        self.topic_huskylens_frame_mqtt = topics_cfg.get("huskylens_frame_mqtt", "huskylens/frame")
+        self.topic_huskylens_valid_ros = topics_cfg.get("huskylens_valid_ros", "/huskylens/valid")
+        self.topic_huskylens_valid_mqtt = topics_cfg.get("huskylens_valid_mqtt", "huskylens/valid")
         self.keyboard_map = {
             str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
             str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
@@ -130,6 +134,8 @@ class MQTTBridgeNode(Node):
         self.create_subscription(String, self.topic_camera_ros, self._camera_cb, 20)
         self.create_subscription(String, self.topic_plan_status_ros, self._plan_status_cb, 20)
         self.create_subscription(String, self.topic_plan_message_ros, self._plan_message_cb, 20)
+        self.create_subscription(String, self.topic_huskylens_frame_ros, self._huskylens_frame_cb, 20)
+        self.create_subscription(Bool, self.topic_huskylens_valid_ros, self._huskylens_valid_cb, 20)
         if self._log_bridge_enabled:
             self.create_subscription(Log, self._log_bridge_ros_topic, self._rosout_cb, 100)
 
@@ -301,6 +307,28 @@ class MQTTBridgeNode(Node):
         if self._camera_face_forward_enabled:
             self.client.publish(self.topic_camera_mqtt, payload)
         self._publish_camera_plan_message(payload)
+
+    def _huskylens_frame_cb(self, msg: String):
+        if not self._mqtt_connected:
+            return
+        payload = str(msg.data or "").strip()
+        if not payload:
+            return
+        self.client.publish(self.topic_huskylens_frame_mqtt, payload)
+        self.log.info(
+            f"ROS2 -> MQTT huskylens frame: {payload}",
+            event="HUSKYLENS_MQTT",
+        )
+
+    def _huskylens_valid_cb(self, msg: Bool):
+        if not self._mqtt_connected:
+            return
+        payload = "1" if bool(msg.data) else "0"
+        self.client.publish(self.topic_huskylens_valid_mqtt, payload)
+        self.log.info(
+            f"ROS2 -> MQTT huskylens valid: {payload}",
+            event="HUSKYLENS_MQTT",
+        )
 
     def _publish_camera_plan_message(self, payload: str):
         if not self._camera_face_plan_enabled:
