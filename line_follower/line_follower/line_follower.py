@@ -722,10 +722,10 @@ class LineFollowerFSM:
         # Independent control:
         # 1) prioritize lateral correction from tail_offset_x with threshold +/-3
         # 2) then heading correction from angle_deg with threshold +/-3
-        if tail_offset_x < -3.0:
+        if tail_offset_x < -10.0:
             self.state = self.STATE_TURN_RIGHT
             return "Right", self.turn_speed_right
-        if tail_offset_x > 3.0:
+        if tail_offset_x > 10.0:
             self.state = self.STATE_TURN_LEFT
             return "Left", self.turn_speed_left
         if angle_deg < -3.0:
