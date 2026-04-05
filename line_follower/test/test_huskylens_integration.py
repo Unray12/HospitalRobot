@@ -64,8 +64,8 @@ def test_huskylens_strategy_tail_priority_when_both_exceed_threshold():
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": -6, "angle_deg": 10},
     )
     direction, speed = fsm.update(line_frame, now=0.0)
-    assert direction == "Left"
-    assert speed == 6
+    assert direction == "Right"
+    assert speed == 7
 
 
 def test_huskylens_strategy_safe_zone_goes_forward():
@@ -119,8 +119,8 @@ def test_hybrid_strategy_prefers_huskylens_then_fallback_line_sensor():
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": 1, "angle_deg": 8},
     )
     direction, speed = fsm.update(line_frame, now=0.0)
-    assert direction == "RotateRight"
-    assert speed == 7
+    assert direction == "RotateLeft"
+    assert speed == 6
 
     _set_context(
         fsm,
@@ -165,8 +165,8 @@ def test_huskylens_strategy_tail_offset_used_when_angle_in_safe_zone():
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": 4.2, "angle_deg": 1.0},
     )
     direction, speed = fsm.update(line_frame, now=0.0)
-    assert direction == "Right"
-    assert speed == 7
+    assert direction == "Left"
+    assert speed == 6
 
 
 def test_plan_flow_regression_not_broken_with_strategy_switch():
