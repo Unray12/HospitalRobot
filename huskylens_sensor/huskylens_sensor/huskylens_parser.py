@@ -34,26 +34,26 @@ def normalize_huskylens_payload(raw):
         return None, f"missing_fields: {','.join(missing)}"
 
     try:
-        if "error" in sensor:
-            error = int(sensor.get("error"))
-        elif "tail_offset_x" in sensor and "angle_deg" in sensor:
-            tail_offset_x = float(sensor.get("tail_offset_x"))
-            angle_deg = float(sensor.get("angle_deg"))
-            error = int(round(0.8 * tail_offset_x + 0.2 * angle_deg))
-        else:
-            return None, "missing_fields: error_or_tail_offset_x_angle_deg"
-
         frame = {
             "connected": _to_flag(sensor.get("connected")),
             "algorithm_set": _to_flag(sensor.get("algorithm_set")),
             "valid": _to_flag(sensor.get("valid")),
-            "error": int(error),
             "y_type": int(sensor.get("y_type", 0)),
             "line_length_y": max(0, int(sensor.get("line_length_y", 0))),
             "direction": int(sensor.get("direction", 0)),
         }
+
+        if "tail_offset_x" in sensor:
+            frame["tail_offset_x"] = float(sensor.get("tail_offset_x"))
+        if "angle_deg" in sensor:
+            frame["angle_deg"] = float(sensor.get("angle_deg"))
+        if "error" in sensor:
+            frame["error"] = int(sensor.get("error"))
     except Exception as exc:
         return None, f"invalid_field_type: {exc}"
+
+    if ("tail_offset_x" not in frame or "angle_deg" not in frame) and ("error" not in frame):
+        return None, "missing_fields: tail_offset_x_angle_deg_or_error"
 
     return frame, None
 
@@ -75,7 +75,8 @@ def default_frame():
         "connected": 0,
         "algorithm_set": 0,
         "valid": 0,
-        "error": 0,
+        "tail_offset_x": 0.0,
+        "angle_deg": 0.0,
         "y_type": 0,
         "line_length_y": 0,
         "direction": 0,

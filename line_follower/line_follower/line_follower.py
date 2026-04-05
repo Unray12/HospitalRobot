@@ -714,22 +714,28 @@ class LineFollowerFSM:
             return None
 
         try:
-            error = int(huskylens.get("error", 0))
+            angle_deg = float(huskylens.get("angle_deg"))
+            tail_offset_x = float(huskylens.get("tail_offset_x"))
         except Exception:
             return None
 
-        if abs(error) > self.huskylens_max_abs_error:
-            return None
-
-        bias = float(error) * self.huskylens_control_gain
-        if abs(bias) <= self.huskylens_deadband:
-            self.state = self.STATE_FOLLOWING
-            return "Forward", self.base_speed
-        if bias < 0:
+        # Independent control:
+        # 1) prioritize lateral correction from tail_offset_x with threshold +/-3
+        # 2) then heading correction from angle_deg with threshold +/-3
+        if tail_offset_x < -3.0:
+            self.state = self.STATE_TURN_LEFT
+            return "Left", self.turn_speed_left
+        if tail_offset_x > 3.0:
+            self.state = self.STATE_TURN_RIGHT
+            return "Right", self.turn_speed_right
+        if angle_deg < -3.0:
             self.state = self.STATE_TURN_LEFT
             return "RotateLeft", self.turn_speed_left
-        self.state = self.STATE_TURN_RIGHT
-        return "RotateRight", self.turn_speed_right
+        if angle_deg > 3.0:
+            self.state = self.STATE_TURN_RIGHT
+            return "RotateRight", self.turn_speed_right
+        self.state = self.STATE_FOLLOWING
+        return "Forward", self.base_speed
 
     def _log_info(self, msg, event="INFO"):
         if self._logger:

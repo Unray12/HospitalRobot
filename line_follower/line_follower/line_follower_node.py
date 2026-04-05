@@ -172,20 +172,12 @@ class LineFollowerNode(Node):
                 self._last_huskylens_frame = None
                 self._last_huskylens_ts = time.time()
                 return
-            error_value = sensor.get("error")
-            if error_value is None:
-                # Support upstream payloads that expose tail/angle instead of precomputed error.
-                tail = sensor.get("tail_offset_x")
-                angle = sensor.get("angle_deg")
-                if tail is not None and angle is not None:
-                    error_value = int(round(0.8 * float(tail) + 0.2 * float(angle)))
-                else:
-                    error_value = 0
             self._last_huskylens_frame = {
                 "connected": int(sensor.get("connected", 0)),
                 "algorithm_set": int(sensor.get("algorithm_set", 0)),
                 "valid": int(sensor.get("valid", 0)),
-                "error": int(error_value),
+                "tail_offset_x": float(sensor.get("tail_offset_x")),
+                "angle_deg": float(sensor.get("angle_deg")),
                 "direction": int(sensor.get("direction", 0)),
             }
             self._last_huskylens_ts = time.time()
