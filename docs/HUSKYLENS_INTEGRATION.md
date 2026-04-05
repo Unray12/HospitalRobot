@@ -1,104 +1,25 @@
 # HuskyLens Integration Guide
 
-Tài liệu mô tả tích hợp thiết bị HuskyLens serial vào hệ thống HospitalRobot.
+Tài liệu mô tả luồng `output -> input` khi dùng `huskylens_sensor` với `line_follower`.
 
-## 1. Kiến trúc luồng dữ liệu
+## 1. Luồng dữ liệu chuẩn
 
-- Thiết bị HuskyLens (serial `/dev/ttyACM2`) xuất JSON line-by-line.
-- Node mới `huskylens_sensor` đọc serial, normalize frame và publish:
-  - `/huskylens/frame` (`std_msgs/String`)
-  - `/huskylens/valid` (`std_msgs/Bool`)
-- `line_follower` subscribe `/huskylens/frame` theo cấu hình strategy (`line_sensor`, `huskylens`, `huskylens_raw`, `hybrid`).
-- Với `huskylens_raw`, controller dùng công thức:
-  - `tail_offset_x = x_tail - 160`
-  - `angle_deg = atan2(x_head - x_tail, y_tail - y_head) * 180/pi`
-  rồi ưu tiên sửa góc trước, sau đó dời ngang.
-- Nếu HuskyLens invalid hoặc mất tín hiệu:
-  - Với `fallback_on_invalid=true` sẽ quay về logic line sensor cũ.
-  - Với `fallback_on_invalid=false` sẽ STOP để fail-safe.
-- `mqtt_bridge` forward observability ROS -> MQTT:
-  - `/huskylens/frame` -> `huskylens/frame`
-  - `/huskylens/valid` -> `huskylens/valid`
+1. Thiết bị HuskyLens xuất JSON qua serial.
+2. `huskylens_sensor` đọc serial, normalize dữ liệu và publish:
+   - `/huskylens/frame` (`std_msgs/String`)
+   - `/huskylens/valid` (`std_msgs/Bool`)
+3. `line_follower` subscribe `/huskylens/frame`, parse JSON và lấy các trường:
+   - `connected`
+   - `algorithm_set`
+   - `valid`
+   - `error`
+4. `line_follower` dùng `error` để tạo lệnh motor và publish `/motor_cmd`.
 
-## 2. Cấu hình
-
-Trong `robot_common/robot_common/config.json`:
-
-### `huskylens_sensor`
-
-- `serial.port`: mặc định `/dev/ttyACM2`
-- `serial.baudrate`: mặc định `9600`
-- `serial.timeout`: mặc định `0.2`
-- `publish.topic_frame`: mặc định `/huskylens/frame`
-- `publish.topic_valid`: mặc định `/huskylens/valid`
-- `publish.rate_hz`: mặc định `20`
-- `reconnect_period_sec`, `fallback_ports`, `scan_prefixes`
-- `parse_log_every`, `status_log_period`
-
-### `line_follower.tracking`
-
-- `strategy`: `line_sensor` | `huskylens` | `hybrid`
-- `strategy`: `line_sensor` | `huskylens` | `huskylens_raw` | `hybrid`
-- `strict_mode`: strategy invalid -> STOP khi bật
-- `line_frame_stale_sec`, `huskylens_frame_stale_sec`: ngưỡng timeout dữ liệu
-- `log_invalid_period`: chu kỳ log khi input strategy không hợp lệ
-
-### `line_follower.huskylens`
-
-- `enabled`: bật/tắt tích hợp HuskyLens (default `false`)
-- `topic_frame`: topic input frame
-- `max_abs_error`: ngưỡng error hợp lệ
-- `control_gain`: hệ số bias từ error
-- `deadband`: vùng chết quanh error=0 để đi thẳng
-- `fallback_on_invalid`: fallback về line_sensors khi HuskyLens invalid
-
-### `line_follower.huskylens_raw`
-
-- `topic_frame`, `image_center_x`
-- `speed_forward`, `speed_rotate`, `speed_lateral`
-- `alpha_tail`, `alpha_angle`
-- `tail_deadband_px`, `angle_deadband_deg`
-- `tail_hysteresis_px`, `angle_hysteresis_deg`
-- `invalid_timeout_sec`, `min_command_hold_ms`
-- `publish_rate_hz`, `debug_log_period`
-
-### `mqtt_bridge.topics`
-
-- `huskylens_frame_ros`, `huskylens_frame_mqtt`
-- `huskylens_valid_ros`, `huskylens_valid_mqtt`
-
-## 3. Run commands
-
-Build:
-
-```bash
-colcon build --symlink-install
-source install/setup.bash
-```
-
-Run HuskyLens node:
-
-```bash
-ros2 run huskylens_sensor huskylens_sensor
-```
-
-Run full bringup:
-
-```bash
-ros2 run robot robot
-```
-
-Run MQTT bridge:
-
-```bash
-ros2 run mqtt_bridge mqtt_bridge
-```
-
-## 4. Topic contract
+## 2. Topic contract
 
 ### `/huskylens/frame` (`std_msgs/String`)
 
-Payload JSON compact:
+Payload canonical sau normalize:
 
 ```json
 {
@@ -119,19 +40,39 @@ Payload JSON compact:
 - `true` khi `connected=1 && algorithm_set=1 && valid=1`
 - `false` trong các trường hợp còn lại
 
-## 5. Troubleshooting
+## 3. Input được chấp nhận ở HuskyLens sensor
 
-- Không thấy data `/huskylens/frame`:
-  - kiểm tra quyền đọc `/dev/ttyACM2`
-  - kiểm tra baudrate và dây UART
-  - xem log `[huskylens_sensor] [SERIAL]`
-- Data có nhưng `valid=false`:
-  - kiểm tra firmware HuskyLens có set line tracking algorithm
-  - kiểm tra trường `valid/connected/algorithm_set` từ nguồn serial
-- `line_follower` chưa dùng HuskyLens:
-  - đặt `line_follower.tracking.strategy` thành `huskylens` hoặc `hybrid`
-  - bật `line_follower.huskylens.enabled=true`
-  - kiểm tra topic `line_follower.huskylens.topic_frame`
-- MQTT dashboard không thấy HuskyLens:
-  - kiểm tra `mqtt_bridge` đang chạy
-  - kiểm tra map topic trong `mqtt_bridge.topics`
+`huskylens_sensor` chấp nhận 2 kiểu input:
+
+1. Có sẵn `error`.
+2. Không có `error` nhưng có `tail_offset_x` và `angle_deg`.
+
+Nếu là kiểu 2 thì node tự quy đổi:
+
+`error = round(0.8 * tail_offset_x + 0.2 * angle_deg)`
+
+Sau đó luôn publish theo format canonical ở trên để `line_follower` đọc ổn định.
+
+## 4. Cấu hình cần giữ
+
+Trong `robot_common/robot_common/config.json`, giữ block:
+
+```json
+"huskylens": {
+  "enabled": true,
+  "topic_frame": "/huskylens/frame",
+  "max_abs_error": 120,
+  "control_gain": 1.0,
+  "deadband": 1.0,
+  "fallback_on_invalid": false
+}
+```
+
+## 5. Kiểm tra nhanh
+
+```bash
+ros2 topic echo /huskylens/frame --once
+ros2 topic echo /huskylens/valid --once
+```
+
+Nếu `/huskylens/frame` có `HuskylenSensor.error` và `line_follower` đang chạy strategy `huskylens`/`hybrid`, luồng I/O đã nối đúng.

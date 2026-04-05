@@ -25,16 +25,6 @@ class HuskyLensStrategy(BaseLineFollowStrategy):
         return self._compute_fn(frame_context)
 
 
-class HuskyLensRawStrategy(BaseLineFollowStrategy):
-    name = "huskylens_raw"
-
-    def __init__(self, compute_fn):
-        self._compute_fn = compute_fn
-
-    def compute(self, frame_context):
-        return self._compute_fn(frame_context)
-
-
 class HybridStrategy(BaseLineFollowStrategy):
     name = "hybrid"
 

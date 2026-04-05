@@ -1,6 +1,5 @@
 import time
-from .huskylens_raw_controller import HuskyLensRawController
-from .line_follow_strategies import LineSensorStrategy, HuskyLensStrategy, HuskyLensRawStrategy, HybridStrategy
+from .line_follow_strategies import LineSensorStrategy, HuskyLensStrategy, HybridStrategy
 
 class LineFollowerFSM:
     STATE_FOLLOWING = 0
@@ -37,7 +36,6 @@ class LineFollowerFSM:
         huskylens_max_abs_error=120,
         huskylens_control_gain=1.0,
         huskylens_deadband=1.0,
-        huskylens_raw_cfg=None,
         logger=None,
     ):
         self._logger = logger
@@ -64,13 +62,11 @@ class LineFollowerFSM:
         self.huskylens_max_abs_error = int(max(1, huskylens_max_abs_error))
         self.huskylens_control_gain = float(max(0.0, huskylens_control_gain))
         self.huskylens_deadband = float(max(0.0, huskylens_deadband))
-        self._huskylens_raw_controller = HuskyLensRawController(huskylens_raw_cfg or {})
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
         self._line_sensor_strategy = LineSensorStrategy(self._compute_line_sensor_command)
         self._huskylens_strategy = HuskyLensStrategy(self._compute_huskylens_command)
-        self._huskylens_raw_strategy = HuskyLensRawStrategy(self._compute_huskylens_raw_command)
         self._hybrid_strategy = HybridStrategy(self._huskylens_strategy, self._line_sensor_strategy)
         self._tracking_strategy = self._resolve_tracking_strategy(self.tracking_strategy_name)
 
@@ -735,35 +731,6 @@ class LineFollowerFSM:
         self.state = self.STATE_TURN_RIGHT
         return "RotateRight", self.turn_speed_right
 
-    def _compute_huskylens_raw_command(self, frame_context):
-        now = (frame_context or {}).get("now")
-        if now is None:
-            now = time.time()
-        command = self._huskylens_raw_controller.compute(frame_context, float(now))
-
-        dbg = self._huskylens_raw_controller.consume_debug()
-        if dbg:
-            self._log_info(
-                (
-                    f"raw_valid={int(bool(dbg.get('valid')))} mode={dbg.get('mode')} "
-                    f"cmd={dbg.get('command')} speed={dbg.get('speed')} "
-                    f"tail_raw={dbg.get('tail_offset_x_raw')} angle_raw={dbg.get('angle_deg_raw')} "
-                    f"tail_filt={dbg.get('tail_offset_x_filt')} angle_filt={dbg.get('angle_deg_filt')}"
-                ),
-                event="HUSKY_RAW",
-            )
-
-        direction, speed = command
-        if direction == "RotateLeft":
-            self.state = self.STATE_TURN_LEFT
-        elif direction == "RotateRight":
-            self.state = self.STATE_TURN_RIGHT
-        elif direction == "Stop":
-            self.state = self.STATE_STOPPED
-        else:
-            self.state = self.STATE_FOLLOWING
-        return direction, int(speed)
-
     def _log_info(self, msg, event="INFO"):
         if self._logger:
             self._logger.info(msg, event=event)
@@ -824,8 +791,6 @@ class LineFollowerFSM:
         normalized = str(strategy_name or "line_sensor").strip().lower()
         if normalized == "huskylens":
             return self._huskylens_strategy
-        if normalized == "huskylens_raw":
-            return self._huskylens_raw_strategy
         if normalized == "hybrid":
             return self._hybrid_strategy
         if normalized != "line_sensor":
@@ -836,28 +801,6 @@ class LineFollowerFSM:
     def _should_bypass_line_sensor_gate(self):
         if self.tracking_strategy_name == "line_sensor":
             return False
-        if self.tracking_strategy_name == "huskylens_raw":
-            ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
-            raw = ctx.get("huskylens_frame")
-            if not isinstance(raw, dict):
-                return False
-            if bool(ctx.get("huskylens_stale", False)):
-                return False
-            try:
-                x_tail = int(raw.get("x_tail", -1))
-                y_tail = int(raw.get("y_tail", -1))
-                x_head = int(raw.get("x_head", -1))
-                y_head = int(raw.get("y_head", -1))
-            except Exception:
-                return False
-            return (
-                bool(raw.get("connected", 0))
-                and bool(raw.get("algorithm_set", 0))
-                and x_tail >= 0
-                and y_tail >= 0
-                and x_head >= 0
-                and y_head >= 0
-            )
         ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
         huskylens = ctx.get("huskylens_frame")
         if not isinstance(huskylens, dict):

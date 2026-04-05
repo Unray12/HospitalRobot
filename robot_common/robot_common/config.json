@@ -85,24 +85,6 @@
             "deadband": 1.0,
             "fallback_on_invalid": false
         },
-        "huskylens_raw": {
-            "enabled": false,
-            "topic_frame": "/huskylens/frame",
-            "image_center_x": 160,
-            "speed_forward": 8,
-            "speed_rotate": 6,
-            "speed_lateral": 6,
-            "alpha_tail": 0.35,
-            "alpha_angle": 0.25,
-            "tail_deadband_px": 8,
-            "angle_deadband_deg": 1.0,
-            "tail_hysteresis_px": 2.0,
-            "angle_hysteresis_deg": 0.5,
-            "invalid_timeout_sec": 0.4,
-            "min_command_hold_ms": 250,
-            "publish_rate_hz": 20,
-            "debug_log_period": 0.5
-        },
         "plan_alias": {
             "0": "clear",
             "1": "a19",
