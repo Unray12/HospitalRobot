@@ -33,6 +33,7 @@ class LineFollowerFSM:
         tracking_strategy="line_sensor",
         tracking_strict_mode=False,
         tracking_log_invalid_period=1.0,
+        tracking_allow_line_sensor_fallback=True,
         huskylens_max_abs_error=120,
         huskylens_control_gain=1.0,
         huskylens_deadband=1.0,
@@ -59,6 +60,7 @@ class LineFollowerFSM:
         self.tracking_strategy_name = str(tracking_strategy or "line_sensor").strip().lower()
         self.tracking_strict_mode = bool(tracking_strict_mode)
         self.tracking_log_invalid_period = float(max(0.1, tracking_log_invalid_period))
+        self.tracking_allow_line_sensor_fallback = bool(tracking_allow_line_sensor_fallback)
         self.huskylens_max_abs_error = int(max(1, huskylens_max_abs_error))
         self.huskylens_control_gain = float(max(0.0, huskylens_control_gain))
         self.huskylens_deadband = float(max(0.0, huskylens_deadband))
@@ -620,6 +622,19 @@ class LineFollowerFSM:
                 if (now - self._last_tracking_invalid_log_ts) >= self.tracking_log_invalid_period:
                     self._log_warn(
                         f"strict_mode stop: strategy={self.tracking_strategy_name} no valid input",
+                        event="TRACKING",
+                    )
+                    self._last_tracking_invalid_log_ts = now
+                self.state = self.STATE_STOPPED
+                return "Stop", 0
+            if not self.tracking_allow_line_sensor_fallback:
+                now = time.time()
+                if (now - self._last_tracking_invalid_log_ts) >= self.tracking_log_invalid_period:
+                    self._log_warn(
+                        (
+                            f"strategy={self.tracking_strategy_name} invalid input with "
+                            "line_sensor fallback disabled -> stop"
+                        ),
                         event="TRACKING",
                     )
                     self._last_tracking_invalid_log_ts = now

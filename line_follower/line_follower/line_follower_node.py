@@ -33,6 +33,7 @@ class LineFollowerNode(Node):
             )
             self.tracking_strategy = "line_sensor"
         self.tracking_strict_mode = bool(tracking_cfg.get("strict_mode", False))
+        self.tracking_only_huskylens = bool(tracking_cfg.get("only_huskylens", False))
         self.line_frame_stale_sec = float(max(0.1, tracking_cfg.get("line_frame_stale_sec", 0.4)))
         self.huskylens_frame_stale_sec = float(max(0.1, tracking_cfg.get("huskylens_frame_stale_sec", 0.6)))
         self.tracking_log_invalid_period = float(max(0.2, tracking_cfg.get("log_invalid_period", 1.0)))
@@ -95,6 +96,7 @@ class LineFollowerNode(Node):
             tracking_strategy=self.tracking_strategy,
             tracking_strict_mode=self.tracking_strict_mode,
             tracking_log_invalid_period=self.tracking_log_invalid_period,
+            tracking_allow_line_sensor_fallback=not self.tracking_only_huskylens,
             huskylens_max_abs_error=huskylens_cfg.get("max_abs_error", 120),
             huskylens_control_gain=huskylens_cfg.get("control_gain", 1.0),
             huskylens_deadband=huskylens_cfg.get("deadband", 1.0),
@@ -119,8 +121,11 @@ class LineFollowerNode(Node):
         self.pick_pub = self.create_publisher(String, pick_topic, 10)
         self.plan_status_pub = self.create_publisher(String, plan_status_topic, 10)
         self.plan_callback_pub = self.create_publisher(String, plan_callback_topic, 10)
-        self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
-        self.log.info(f"Line sensor input enabled: {frame_topic}", event="LINE_SENSOR")
+        if not self.tracking_only_huskylens:
+            self.create_subscription(Int16MultiArray, frame_topic, self._frame_cb, 10)
+            self.log.info(f"Line sensor input enabled: {frame_topic}", event="LINE_SENSOR")
+        else:
+            self.log.info("Line sensor input disabled (only_huskylens=true)", event="LINE_SENSOR")
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
         self._subscribe_huskylens = (
@@ -134,7 +139,10 @@ class LineFollowerNode(Node):
         else:
             self.log.info("HuskyLens input disabled by strategy/config", event="HUSKYLENS")
         self.log.info(
-            f"tracking strategy={self.tracking_strategy} strict_mode={int(self.tracking_strict_mode)}",
+            (
+                f"tracking strategy={self.tracking_strategy} strict_mode={int(self.tracking_strict_mode)} "
+                f"only_huskylens={int(self.tracking_only_huskylens)}"
+            ),
             event="STRATEGY",
         )
         self.create_service(SetBool, auto_service, self._auto_srv_cb)
@@ -284,8 +292,8 @@ class LineFollowerNode(Node):
         )
         self.follower.set_tracking_context(
             {
-                "line_sensor_frame": self._last_frame,
-                "line_sensor_stale": line_stale,
+                "line_sensor_frame": (None if self.tracking_only_huskylens else self._last_frame),
+                "line_sensor_stale": (True if self.tracking_only_huskylens else line_stale),
                 "line_sensor_ts": self._last_frame_ts,
                 "huskylens_frame": self._last_huskylens_frame,
                 "huskylens_stale": huskylens_stale,
@@ -295,7 +303,7 @@ class LineFollowerNode(Node):
         )
         self._consume_autoline_action()
         self._consume_step_messages()
-        result = self.follower.update(self._last_frame, now)
+        result = self.follower.update((None if self.tracking_only_huskylens else self._last_frame), now)
         self._consume_autoline_action()
         self._consume_step_messages()
         if result is None:

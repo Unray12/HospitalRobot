@@ -60,6 +60,7 @@
         "tracking": {
             "strategy": "huskylens",
             "strict_mode": true,
+            "only_huskylens": true,
             "line_frame_stale_sec": 0.4,
             "huskylens_frame_stale_sec": 0.6,
             "log_invalid_period": 1.0
