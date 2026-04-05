@@ -2,7 +2,7 @@
 Workspace: ~/Desktop/workspaces/RobotROS2/ros2_ws
 Build + Source:
   colcon build --symlink-install
-  source ~/Desktop/workspaces/RobotROS2/ros2_ws/install/setup.bash
+  source ./install/setup.bash
 
 Check packages:
   ros2 pkg list | grep -E "robot|line_sensors|line_follower|motor_driver|manual_control|mqtt_bridge"

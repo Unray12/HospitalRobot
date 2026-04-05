@@ -13,7 +13,7 @@
     },
     "camera_sensor": {
         "serial": {
-            "port": "/dev/ttyACM1",
+            "port": "/dev/ttyACM2",
             "baudrate": 115200,
             "timeout": 0.2
         },
@@ -58,8 +58,8 @@
         "plan_end_state": "stop",
         "auto_on_plan_select": true,
         "tracking": {
-            "strategy": "line_sensor",
-            "strict_mode": false,
+            "strategy": "huskylens",
+            "strict_mode": true,
             "line_frame_stale_sec": 0.4,
             "huskylens_frame_stale_sec": 0.6,
             "log_invalid_period": 1.0
@@ -77,12 +77,12 @@
             "set_auto_mode": "/set_auto_mode"
         },
         "huskylens": {
-            "enabled": false,
+            "enabled": true,
             "topic_frame": "/huskylens/frame",
             "max_abs_error": 120,
             "control_gain": 1.0,
             "deadband": 1.0,
-            "fallback_on_invalid": true
+            "fallback_on_invalid": false
         },
         "plan_alias": {
             "0": "clear",
@@ -121,7 +121,7 @@
     },
     "huskylens_sensor": {
         "serial": {
-            "port": "/dev/ttyACM2",
+            "port": "/dev/ttyACM1",
             "baudrate": 9600,
             "timeout": 0.2
         },
