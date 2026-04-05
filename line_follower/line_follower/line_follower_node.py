@@ -22,10 +22,11 @@ class LineFollowerNode(Node):
         service_cfg = config.get("service", {})
         tracking_cfg = config.get("tracking", {})
         huskylens_cfg = config.get("huskylens", {})
+        huskylens_raw_cfg = config.get("huskylens_raw", {})
         self.plan_alias = config.get("plan_alias", {})
         self.auto_on_plan_select_default = bool(config.get("auto_on_plan_select", True))
         self.tracking_strategy = str(tracking_cfg.get("strategy", "line_sensor")).strip().lower() or "line_sensor"
-        if self.tracking_strategy not in {"line_sensor", "huskylens", "hybrid"}:
+        if self.tracking_strategy not in {"line_sensor", "huskylens", "hybrid", "huskylens_raw"}:
             self.log.warning(
                 f"Invalid tracking.strategy='{self.tracking_strategy}', fallback to 'line_sensor'",
                 event="STRATEGY",
@@ -37,8 +38,16 @@ class LineFollowerNode(Node):
         self.tracking_log_invalid_period = float(max(0.2, tracking_cfg.get("log_invalid_period", 1.0)))
         self.huskylens_enabled = bool(huskylens_cfg.get("enabled", False))
         self.huskylens_fallback_on_invalid = bool(huskylens_cfg.get("fallback_on_invalid", True))
-        self.huskylens_topic_frame = str(huskylens_cfg.get("topic_frame", "/huskylens/frame"))
-        if self.tracking_strategy in {"huskylens", "hybrid"} and not self.huskylens_enabled:
+        if self.tracking_strategy == "huskylens_raw":
+            self.huskylens_topic_frame = str(huskylens_raw_cfg.get("topic_frame", "/huskylens/frame"))
+        else:
+            self.huskylens_topic_frame = str(huskylens_cfg.get("topic_frame", "/huskylens/frame"))
+        self.raw_cmd_rate_hz = float(max(1.0, huskylens_raw_cfg.get("publish_rate_hz", 20.0)))
+        self._raw_cmd_period_sec = 1.0 / self.raw_cmd_rate_hz
+        self._last_cmd_pub_ts = 0.0
+        self._control_log_period = float(max(0.1, huskylens_raw_cfg.get("debug_log_period", 0.5)))
+        self._last_control_log_ts = 0.0
+        if self.tracking_strategy in {"huskylens", "hybrid", "huskylens_raw"} and not self.huskylens_enabled:
             self.log.warning(
                 "tracking strategy uses huskylens but huskylens.enabled=false; keep subscribing by strategy",
                 event="HUSKYLENS",
@@ -89,6 +98,7 @@ class LineFollowerNode(Node):
             huskylens_max_abs_error=huskylens_cfg.get("max_abs_error", 120),
             huskylens_control_gain=huskylens_cfg.get("control_gain", 1.0),
             huskylens_deadband=huskylens_cfg.get("deadband", 1.0),
+            huskylens_raw_cfg=huskylens_raw_cfg,
             logger=self.log,
         )
         if plan_name:
@@ -115,7 +125,7 @@ class LineFollowerNode(Node):
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
         self._subscribe_huskylens = (
             self.huskylens_enabled
-            or self.tracking_strategy in {"huskylens", "hybrid"}
+            or self.tracking_strategy in {"huskylens", "hybrid", "huskylens_raw"}
             or (self.tracking_strategy == "line_sensor" and not self.huskylens_fallback_on_invalid)
         )
         if self._subscribe_huskylens:
@@ -167,6 +177,11 @@ class LineFollowerNode(Node):
                 "algorithm_set": int(sensor.get("algorithm_set", 0)),
                 "valid": int(sensor.get("valid", 0)),
                 "error": int(sensor.get("error", 0)),
+                "x_tail": int(sensor.get("x_tail", -1)),
+                "y_tail": int(sensor.get("y_tail", -1)),
+                "x_head": int(sensor.get("x_head", -1)),
+                "y_head": int(sensor.get("y_head", -1)),
+                "direction": int(sensor.get("direction", 0)),
             }
             self._last_huskylens_ts = time.time()
         except Exception:
@@ -275,6 +290,7 @@ class LineFollowerNode(Node):
                 "huskylens_frame": self._last_huskylens_frame,
                 "huskylens_stale": huskylens_stale,
                 "huskylens_ts": self._last_huskylens_ts,
+                "now": now,
             }
         )
         self._consume_autoline_action()
@@ -288,7 +304,17 @@ class LineFollowerNode(Node):
             return
 
         direction, speed = result
+        if self.tracking_strategy == "huskylens_raw":
+            # Rate-limit command publish for raw HuskyLens control to reduce command jitter.
+            if direction != "Stop" and (now - self._last_cmd_pub_ts) < self._raw_cmd_period_sec:
+                self._log_plan_status(now)
+                self._check_and_publish_plan_completed()
+                return
+            self._last_cmd_pub_ts = now
         self.cmd_pub.publish(self._command_to_msg(direction, speed))
+        if self.tracking_strategy == "huskylens_raw" and (now - self._last_control_log_ts) >= self._control_log_period:
+            self._last_control_log_ts = now
+            self.log.info(f"cmd={direction}:{speed}", event="CONTROL")
         self._log_plan_status(now)
         self._check_and_publish_plan_completed()
 

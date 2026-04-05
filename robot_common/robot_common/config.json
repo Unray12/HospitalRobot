@@ -84,6 +84,24 @@
             "deadband": 1.0,
             "fallback_on_invalid": false
         },
+        "huskylens_raw": {
+            "enabled": false,
+            "topic_frame": "/huskylens/frame",
+            "image_center_x": 160,
+            "speed_forward": 8,
+            "speed_rotate": 6,
+            "speed_lateral": 6,
+            "alpha_tail": 0.35,
+            "alpha_angle": 0.25,
+            "tail_deadband_px": 8,
+            "angle_deadband_deg": 1.0,
+            "tail_hysteresis_px": 2.0,
+            "angle_hysteresis_deg": 0.5,
+            "invalid_timeout_sec": 0.4,
+            "min_command_hold_ms": 250,
+            "publish_rate_hz": 20,
+            "debug_log_period": 0.5
+        },
         "plan_alias": {
             "0": "clear",
             "1": "a19",
@@ -179,6 +197,19 @@
             "quit": "q"
         },
         "echo_suppress_window_sec": 0.35,
+        "log_control": {
+            "bridge_in_enabled": false,
+            "bridge_out_enabled": false,
+            "bridge_traffic_period": 1.0,
+            "plan_status_enabled": true,
+            "plan_status_period": 0.5,
+            "plan_message_enabled": true,
+            "plan_message_period": 0.5,
+            "huskylens_frame_enabled": false,
+            "huskylens_frame_period": 2.0,
+            "huskylens_valid_enabled": true,
+            "huskylens_valid_log_on_change": true
+        },
         "plan_keys": {
             "0": "clear",
             "1": "a19",

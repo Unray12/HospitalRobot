@@ -8,7 +8,11 @@ Tài liệu mô tả tích hợp thiết bị HuskyLens serial vào hệ thống
 - Node mới `huskylens_sensor` đọc serial, normalize frame và publish:
   - `/huskylens/frame` (`std_msgs/String`)
   - `/huskylens/valid` (`std_msgs/Bool`)
-- `line_follower` subscribe `/huskylens/frame` theo cấu hình strategy (`line_sensor`, `huskylens`, `hybrid`) và dùng `error` bias quay trái/phải.
+- `line_follower` subscribe `/huskylens/frame` theo cấu hình strategy (`line_sensor`, `huskylens`, `huskylens_raw`, `hybrid`).
+- Với `huskylens_raw`, controller dùng công thức:
+  - `tail_offset_x = x_tail - 160`
+  - `angle_deg = atan2(x_head - x_tail, y_tail - y_head) * 180/pi`
+  rồi ưu tiên sửa góc trước, sau đó dời ngang.
 - Nếu HuskyLens invalid hoặc mất tín hiệu:
   - Với `fallback_on_invalid=true` sẽ quay về logic line sensor cũ.
   - Với `fallback_on_invalid=false` sẽ STOP để fail-safe.
@@ -34,6 +38,7 @@ Trong `robot_common/robot_common/config.json`:
 ### `line_follower.tracking`
 
 - `strategy`: `line_sensor` | `huskylens` | `hybrid`
+- `strategy`: `line_sensor` | `huskylens` | `huskylens_raw` | `hybrid`
 - `strict_mode`: strategy invalid -> STOP khi bật
 - `line_frame_stale_sec`, `huskylens_frame_stale_sec`: ngưỡng timeout dữ liệu
 - `log_invalid_period`: chu kỳ log khi input strategy không hợp lệ
@@ -46,6 +51,16 @@ Trong `robot_common/robot_common/config.json`:
 - `control_gain`: hệ số bias từ error
 - `deadband`: vùng chết quanh error=0 để đi thẳng
 - `fallback_on_invalid`: fallback về line_sensors khi HuskyLens invalid
+
+### `line_follower.huskylens_raw`
+
+- `topic_frame`, `image_center_x`
+- `speed_forward`, `speed_rotate`, `speed_lateral`
+- `alpha_tail`, `alpha_angle`
+- `tail_deadband_px`, `angle_deadband_deg`
+- `tail_hysteresis_px`, `angle_hysteresis_deg`
+- `invalid_timeout_sec`, `min_command_hold_ms`
+- `publish_rate_hz`, `debug_log_period`
 
 ### `mqtt_bridge.topics`
 

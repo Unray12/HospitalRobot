@@ -56,6 +56,7 @@ class MQTTBridgeNode(Node):
         plan_keys = config.get("plan_keys", {})
         room_plans = config.get("room_plans", {})
         log_bridge_cfg = config.get("log_bridge", {})
+        log_control_cfg = config.get("log_control", {})
         camera_face_forward_cfg = config.get("camera_face_forward", {})
         camera_plan_cfg = config.get("camera_face_plan_message", {})
 
@@ -125,6 +126,21 @@ class MQTTBridgeNode(Node):
         }
         self._plan_autoline_active = False
         self._active_plan_name = None
+        self._log_control = {
+            "bridge_in_enabled": bool(log_control_cfg.get("bridge_in_enabled", False)),
+            "bridge_out_enabled": bool(log_control_cfg.get("bridge_out_enabled", False)),
+            "bridge_traffic_period": float(max(0.0, log_control_cfg.get("bridge_traffic_period", 1.0))),
+            "plan_status_enabled": bool(log_control_cfg.get("plan_status_enabled", True)),
+            "plan_status_period": float(max(0.0, log_control_cfg.get("plan_status_period", 0.5))),
+            "plan_message_enabled": bool(log_control_cfg.get("plan_message_enabled", True)),
+            "plan_message_period": float(max(0.0, log_control_cfg.get("plan_message_period", 0.5))),
+            "huskylens_frame_enabled": bool(log_control_cfg.get("huskylens_frame_enabled", False)),
+            "huskylens_frame_period": float(max(0.0, log_control_cfg.get("huskylens_frame_period", 2.0))),
+            "huskylens_valid_enabled": bool(log_control_cfg.get("huskylens_valid_enabled", True)),
+            "huskylens_valid_log_on_change": bool(log_control_cfg.get("huskylens_valid_log_on_change", True)),
+        }
+        self._last_log_ts = {}
+        self._last_logged_value = {}
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
@@ -181,7 +197,13 @@ class MQTTBridgeNode(Node):
         data = msg.payload.decode()
         if self._is_recent_local_echo(msg.topic, data):
             return
-        self.log.info(f"MQTT -> ROS2: {data}", event="BRIDGE_IN")
+        self._log_throttled(
+            key=f"bridge_in:{msg.topic}",
+            period=self._log_control["bridge_traffic_period"],
+            enabled=self._log_control["bridge_in_enabled"],
+            message=f"MQTT -> ROS2 [{msg.topic}]: {data}",
+            event="BRIDGE_IN",
+        )
 
         ros_msg = String()
         if msg.topic == self.topic_vr:
@@ -216,7 +238,13 @@ class MQTTBridgeNode(Node):
                 self.ros_pick_pub.publish(String(data=mode_msg))
                 self.client.publish(self.topic_pick, mode_msg)
                 self._mark_local_publish(self.topic_pick, mode_msg)
-                self.log.info(f"ROS2 -> MQTT: {mode_msg}", event="BRIDGE_OUT")
+                self._log_throttled(
+                    key="bridge_out:pick",
+                    period=self._log_control["bridge_traffic_period"],
+                    enabled=self._log_control["bridge_out_enabled"],
+                    message=f"ROS2 -> MQTT pick: {mode_msg}",
+                    event="BRIDGE_OUT",
+                )
             elif key == self.key_toggle_debug_logs:
                 self._debug_logs_enabled = not self._debug_logs_enabled
                 self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
@@ -232,7 +260,13 @@ class MQTTBridgeNode(Node):
                     self.ros_plan_pub.publish(String(data=plan_name))
                     self.client.publish(self.topic_plan, mqtt_plan_cmd)
                     self._mark_local_publish(self.topic_plan, mqtt_plan_cmd)
-                    self.log.info(f"ROS2 -> MQTT: {mqtt_plan_cmd}", event="BRIDGE_OUT")
+                    self._log_throttled(
+                        key="bridge_out:plan",
+                        period=self._log_control["bridge_traffic_period"],
+                        enabled=self._log_control["bridge_out_enabled"],
+                        message=f"ROS2 -> MQTT plan: {mqtt_plan_cmd}",
+                        event="BRIDGE_OUT",
+                    )
                 else:
                     # Fallback local publish so operator key still works when MQTT is down.
                     ros_msg = String()
@@ -252,7 +286,13 @@ class MQTTBridgeNode(Node):
                 self.ros_pub.publish(String(data=cmd))
                 self.client.publish(self.topic_vr, cmd)
                 self._mark_local_publish(self.topic_vr, cmd)
-                self.log.info(f"ROS2 -> MQTT: {cmd}", event="BRIDGE_OUT")
+                self._log_throttled(
+                    key="bridge_out:vr",
+                    period=self._log_control["bridge_traffic_period"],
+                    enabled=self._log_control["bridge_out_enabled"],
+                    message=f"ROS2 -> MQTT vr: {cmd}",
+                    event="BRIDGE_OUT",
+                )
 
         self.client.disconnect()
 
@@ -287,7 +327,13 @@ class MQTTBridgeNode(Node):
             return
         self._update_plan_runtime_state(payload)
         self.client.publish(self.topic_plan_status_mqtt, payload)
-        self.log.info(f"ROS2 -> MQTT plan status: {payload}", event="PLAN_STATUS_MQTT")
+        self._log_throttled(
+            key="plan_status",
+            period=self._log_control["plan_status_period"],
+            enabled=self._log_control["plan_status_enabled"],
+            message=f"ROS2 -> MQTT plan status: {payload}",
+            event="PLAN_STATUS_MQTT",
+        )
 
     def _plan_message_cb(self, msg: String):
         if not self._mqtt_connected:
@@ -296,7 +342,13 @@ class MQTTBridgeNode(Node):
         if not payload:
             return
         self.client.publish(self.topic_plan_message_mqtt, payload)
-        self.log.info(f"ROS2 -> MQTT plan message: {payload}", event="PLAN_MESSAGE_MQTT")
+        self._log_throttled(
+            key="plan_message",
+            period=self._log_control["plan_message_period"],
+            enabled=self._log_control["plan_message_enabled"],
+            message=f"ROS2 -> MQTT plan message: {payload}",
+            event="PLAN_MESSAGE_MQTT",
+        )
 
     def _camera_cb(self, msg: String):
         if not self._mqtt_connected:
@@ -315,8 +367,11 @@ class MQTTBridgeNode(Node):
         if not payload:
             return
         self.client.publish(self.topic_huskylens_frame_mqtt, payload)
-        self.log.info(
-            f"ROS2 -> MQTT huskylens frame: {payload}",
+        self._log_throttled(
+            key="huskylens_frame",
+            period=self._log_control["huskylens_frame_period"],
+            enabled=self._log_control["huskylens_frame_enabled"],
+            message=f"ROS2 -> MQTT huskylens frame: {payload}",
             event="HUSKYLENS_MQTT",
         )
 
@@ -325,10 +380,22 @@ class MQTTBridgeNode(Node):
             return
         payload = "1" if bool(msg.data) else "0"
         self.client.publish(self.topic_huskylens_valid_mqtt, payload)
-        self.log.info(
-            f"ROS2 -> MQTT huskylens valid: {payload}",
-            event="HUSKYLENS_MQTT",
-        )
+        if self._log_control["huskylens_valid_log_on_change"]:
+            self._log_on_change(
+                key="huskylens_valid",
+                value=payload,
+                enabled=self._log_control["huskylens_valid_enabled"],
+                message=f"ROS2 -> MQTT huskylens valid: {payload}",
+                event="HUSKYLENS_MQTT",
+            )
+        else:
+            self._log_throttled(
+                key="huskylens_valid",
+                period=self._log_control["huskylens_frame_period"],
+                enabled=self._log_control["huskylens_valid_enabled"],
+                message=f"ROS2 -> MQTT huskylens valid: {payload}",
+                event="HUSKYLENS_MQTT",
+            )
 
     def _publish_camera_plan_message(self, payload: str):
         if not self._camera_face_plan_enabled:
@@ -432,6 +499,25 @@ class MQTTBridgeNode(Node):
             return True
         del self._recent_local_pub[key]
         return False
+
+    def _log_throttled(self, key: str, period: float, enabled: bool, message: str, event: str):
+        if not enabled:
+            return
+        now = time.time()
+        last = self._last_log_ts.get(key, 0.0)
+        if (now - last) < max(0.0, float(period)):
+            return
+        self._last_log_ts[key] = now
+        self.log.info(message, event=event)
+
+    def _log_on_change(self, key: str, value: str, enabled: bool, message: str, event: str):
+        if not enabled:
+            return
+        previous = self._last_logged_value.get(key)
+        if previous == value:
+            return
+        self._last_logged_value[key] = value
+        self.log.info(message, event=event)
 
 
 

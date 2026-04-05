@@ -8,6 +8,7 @@ Tài liệu mô tả cơ chế chọn thuật toán dò line runtime trong `line
 tracking.strategy
   ├─ line_sensor  -> dùng frame /line_sensors/frame
   ├─ huskylens    -> dùng frame /huskylens/frame
+  ├─ huskylens_raw -> dùng raw x/y từ /huskylens/frame
   └─ hybrid       -> ưu tiên huskylens, lỗi thì fallback line_sensor
 
 Nếu strategy trả None:
@@ -22,6 +23,7 @@ Nếu strategy trả None:
 - `tracking.strategy`:
   - `line_sensor` (mặc định, tương thích hành vi cũ)
   - `huskylens`
+  - `huskylens_raw`
   - `hybrid`
 - `tracking.strict_mode`: nếu true thì strategy invalid sẽ STOP.
 - `tracking.line_frame_stale_sec`: timeout dữ liệu line sensor.
@@ -36,6 +38,18 @@ Nếu strategy trả None:
 - `control_gain`: hệ số khuếch đại error.
 - `deadband`: vùng chết quanh 0 để đi thẳng.
 - `fallback_on_invalid`: dùng cho routing subscription/fallback policy.
+
+`line_follower.huskylens_raw`:
+
+- `topic_frame`: topic dữ liệu RAW HuskyLens.
+- `image_center_x`: tâm ảnh theo trục X (320px -> 160).
+- `speed_forward`, `speed_rotate`, `speed_lateral`.
+- `alpha_tail`, `alpha_angle`: EMA smoothing.
+- `tail_deadband_px`, `angle_deadband_deg`.
+- `tail_hysteresis_px`, `angle_hysteresis_deg`.
+- `invalid_timeout_sec`: quá timeout invalid thì STOP.
+- `min_command_hold_ms`: giữ lệnh tối thiểu để chống rung.
+- `publish_rate_hz`: giới hạn tần suất publish /motor_cmd.
 
 ## 3. Sample Config
 
@@ -70,6 +84,28 @@ Nếu strategy trả None:
 "tracking": {
   "strategy": "hybrid",
   "strict_mode": false
+}
+```
+
+### huskylens_raw mode
+
+```json
+"tracking": {
+  "strategy": "huskylens_raw",
+  "strict_mode": true
+},
+"huskylens_raw": {
+  "topic_frame": "/huskylens/frame",
+  "speed_forward": 8,
+  "speed_rotate": 6,
+  "speed_lateral": 6,
+  "alpha_tail": 0.35,
+  "alpha_angle": 0.25,
+  "tail_deadband_px": 8,
+  "angle_deadband_deg": 1.0,
+  "invalid_timeout_sec": 0.4,
+  "min_command_hold_ms": 250,
+  "publish_rate_hz": 20
 }
 ```
 
