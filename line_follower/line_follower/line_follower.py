@@ -229,6 +229,9 @@ class LineFollowerFSM:
             return "Forward", self.cross_pre_forward_speed
 
         if frame is None:
+            # HuskyLens/hybrid mode may still provide valid tracking even without line sensor frame.
+            if self._should_bypass_line_sensor_gate():
+                return self._follow_line(frame)
             return None
 
         left_count = frame["left_count"]
@@ -244,6 +247,10 @@ class LineFollowerFSM:
         self._cross_active = cross_detected
         if total_black > 0:
             self._plan_lost_line_since = None
+
+        # In HuskyLens-first tracking, ignore line-sensor cross/lost-line gate while HuskyLens is usable.
+        if self._should_bypass_line_sensor_gate():
+            return self._follow_line(frame)
 
         # Cross detected
         if cross_detected:
@@ -775,6 +782,21 @@ class LineFollowerFSM:
             self._log_warn(f"unknown strategy '{strategy_name}', fallback to line_sensor", event="STRATEGY")
             self.tracking_strategy_name = "line_sensor"
         return self._line_sensor_strategy
+
+    def _should_bypass_line_sensor_gate(self):
+        if self.tracking_strategy_name == "line_sensor":
+            return False
+        ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
+        huskylens = ctx.get("huskylens_frame")
+        if not isinstance(huskylens, dict):
+            return False
+        if bool(ctx.get("huskylens_stale", False)):
+            return False
+        return (
+            bool(huskylens.get("connected", 0))
+            and bool(huskylens.get("algorithm_set", 0))
+            and bool(huskylens.get("valid", 0))
+        )
 
     def _should_skip_cross_pre(self):
         """Skip pre-forward phase when next actionable step is rotate for immediate turn."""
