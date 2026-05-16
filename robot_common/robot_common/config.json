@@ -22,16 +22,10 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
-            "/dev/hospitalrobot/camera",
-            "/dev/ttyACM2",
-            "/dev/ttyACM1",
-            "/dev/ttyACM0"
+            "/dev/hospitalrobot/camera"
         ],
         "scan_prefixes": [
-            "/dev/hospitalrobot/",
-            "/dev/ttyACM",
-            "/dev/ttyUSB",
-            "COM"
+            "/dev/hospitalrobot/"
         ]
     },
     "line_sensors": {
@@ -53,15 +47,10 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
-            "/dev/hospitalrobot/line",
-            "/dev/ttyACM0",
-            "/dev/ttyACM1"
+            "/dev/hospitalrobot/line"
         ],
         "scan_prefixes": [
-            "/dev/hospitalrobot/",
-            "/dev/ttyACM",
-            "/dev/ttyUSB",
-            "COM"
+            "/dev/hospitalrobot/"
         ]
     },
     "line_follower": {
@@ -170,16 +159,10 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
-            "/dev/hospitalrobot/huskylens",
-            "/dev/ttyACM2",
-            "/dev/ttyACM1",
-            "/dev/ttyACM0"
+            "/dev/hospitalrobot/huskylens"
         ],
         "scan_prefixes": [
-            "/dev/hospitalrobot/",
-            "/dev/ttyACM",
-            "/dev/ttyUSB",
-            "COM"
+            "/dev/hospitalrobot/"
         ],
         "parse_log_every": 20,
         "status_log_period": 2.0

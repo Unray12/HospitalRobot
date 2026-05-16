@@ -13,19 +13,25 @@
 set -euo pipefail
 
 # role | vid:pid | mô tả
-# Sửa lại VID:PID cho khớp phần cứng thực tế của bạn (xem `lsusb`).
+# Phân loại theo VID:PID — đủ dùng khi mỗi role có VID:PID khác nhau.
 KNOWN_DEVICES=(
+  "motor|0403:6001|FTDI FT232R (motor driver)"
   "motor|1a86:7523|CH340 USB-Serial (motor driver)"
   "motor|10c4:ea60|CP210x USB-Serial (motor driver)"
-  "motor|0403:6001|FTDI USB-Serial (motor driver)"
-  "line|2341:0043|Arduino Uno (line sensor)"
-  "line|2341:0001|Arduino Uno R1 (line sensor)"
-  "line|1a86:7523|CH340 Arduino clone (line sensor)"
   "huskylens|1a86:55d3|HuskyLens CH9102"
   "huskylens|303a:1001|HuskyLens ESP32-S3"
-  "camera|2341:8036|Arduino Leonardo (camera AI)"
-  "camera|239a:800b|Adafruit ItsyBitsy (camera AI)"
 )
+
+# Khi nhiều thiết bị chia sẻ VID:PID (vd. line + camera đều là ESP32 303a:4001),
+# phân biệt bằng content signature đọc trực tiếp từ cổng.
+# role | regex khớp với bytes đầu tiên đọc được
+CONTENT_SIGNATURES=(
+  'line|LineSensor'
+  'camera|<DEV[0-9]'
+  'huskylens|HUSKYLENS'
+)
+PROBE_BAUD="${PROBE_BAUD:-115200}"
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-2}"
 
 list_tty() {
   shopt -s nullglob
@@ -55,6 +61,33 @@ classify() {
     fi
   done
   printf 'unknown\n'
+}
+
+# Mở cổng, đọc tối đa $PROBE_TIMEOUT giây, match với CONTENT_SIGNATURES.
+probe_content() {
+  local dev="$1"
+  [ -r "$dev" ] || return 0
+  # Cấu hình raw, không echo, không canonical.
+  stty -F "$dev" "$PROBE_BAUD" raw -echo -echoe -echok -echonl -ixon -crtscts 2>/dev/null || return 0
+  local data
+  data="$(timeout "$PROBE_TIMEOUT" head -c 4096 "$dev" 2>/dev/null || true)"
+  [ -z "$data" ] && return 0
+  local entry role pattern
+  for entry in "${CONTENT_SIGNATURES[@]}"; do
+    role="${entry%%|*}"
+    pattern="${entry#*|}"
+    if grep -Eq "$pattern" <<<"$data"; then
+      printf '%s\n' "$role"
+      return
+    fi
+  done
+}
+
+emit_rule_path() {
+  # Dùng khi VID:PID:serial trùng — phân biệt bằng cổng vật lý (KERNELS).
+  local role="$1" id_path="$2"
+  printf 'SUBSYSTEM=="tty", ENV{ID_PATH}=="%s", SYMLINK+="hospitalrobot/%s", MODE="0666"\n' \
+    "$id_path" "$role"
 }
 
 mode="table"
@@ -125,7 +158,12 @@ for dev in "${devices[@]}"; do
   pid="$(get_prop "$props" ID_MODEL_ID)"
   serial="$(get_prop "$props" ID_SERIAL_SHORT)"
   product="$(get_prop "$props" ID_MODEL)"
+  id_path="$(get_prop "$props" ID_PATH)"
   role="$(classify "$vid" "$pid")"
+  if [ "$role" = "unknown" ]; then
+    probed="$(probe_content "$dev" || true)"
+    [ -n "$probed" ] && role="$probed"
+  fi
 
   case "$mode" in
     table)
@@ -139,10 +177,15 @@ for dev in "${devices[@]}"; do
         "$dev" "$vid" "$pid" "$serial" "$role" "$product"
       ;;
     rules)
-      if [ "$role" != "unknown" ] && [ -n "$vid" ] && [ -n "$pid" ]; then
-        emit_rule "$role" "$vid" "$pid" "$serial"
-      else
+      if [ "$role" = "unknown" ] || [ -z "$vid" ] || [ -z "$pid" ]; then
         printf '# (bỏ qua %s: vid=%s pid=%s role=%s)\n' "$dev" "${vid:--}" "${pid:--}" "$role"
+      elif [ -n "$id_path" ] && grep -Eq '303a:4001|2341:0043' <<<"${vid}:${pid}"; then
+        # Line + camera trùng VID:PID:serial -> phân biệt bằng cổng vật lý.
+        printf '# %s (%s:%s serial=%s) phân biệt theo ID_PATH\n' \
+          "$dev" "$vid" "$pid" "${serial:--}"
+        emit_rule_path "$role" "$id_path"
+      else
+        emit_rule "$role" "$vid" "$pid" "$serial"
       fi
       ;;
     probe)
