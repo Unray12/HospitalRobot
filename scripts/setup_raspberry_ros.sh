@@ -233,18 +233,18 @@ Auto mode publish:
 MQTT test:
   mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
 
-Serial ports (sau khi cài udev rules, dùng symlink ổn định):
-  Motor:       /dev/hospitalrobot/motor      (fallback: /dev/ttyUSB0)
-  Line sensor: /dev/hospitalrobot/line       (fallback: /dev/ttyACM0)
-  HuskyLens:   /dev/hospitalrobot/huskylens  (fallback: /dev/ttyACM1)
-  Camera:      /dev/hospitalrobot/camera     (fallback: /dev/ttyACM2)
+Serial ports (cố định qua symlink):
+  Motor:       /dev/hospitalrobot/motor
+  Line sensor: /dev/hospitalrobot/line
+  HuskyLens:   /dev/hospitalrobot/huskylens
+  Camera:      /dev/hospitalrobot/camera
 
-Auto-detect & cài udev rules (1 lần):
-  python3 scripts/detect_serial_devices.py --json
-  # sửa KNOWN_DEVICES cho khớp VID:PID thực, rồi:
-  ./scripts/detect_serial_devices.sh --rules | sudo tee /etc/udev/rules.d/99-hospitalrobot-serial.rules
-  sudo udevadm control --reload-rules && sudo udevadm trigger
+Setup serial auto-detect (1 lần, content-probe + systemd):
+  sudo ./scripts/setup_serial_auto.sh
   ls -l /dev/hospitalrobot/
+
+Hoặc chạy bootstrap toàn bộ (build + serial + launch):
+  ./scripts/bootstrap_all.sh --launch
 
 Useful env overrides:
   ROS_DISTRO=humble ./scripts/setup_raspberry_ros.sh

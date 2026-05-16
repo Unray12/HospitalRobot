@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
-"""Probe nội dung mỗi /dev/ttyUSB*/ttyACM*, tạo symlink ổn định trong /dev/hospitalrobot/.
+"""Probe nội dung mỗi /dev/ttyUSB*/ttyACM*, tạo symlink /dev/hospitalrobot/<role>.
 
-Cách hoạt động:
-  - Với mỗi cổng tty, thử lần lượt các baudrate đã biết.
-  - Đọc tối đa N bytes hoặc T giây.
-  - Match với CONTENT_SIGNATURES; cổng đầu tiên khớp 1 role sẽ chiếm role đó.
-  - Tạo symlink /dev/hospitalrobot/<role> -> /dev/ttyXXX.
+Quy tắc nhận diện (theo thứ tự ưu tiên):
+  1. ttyUSB* duy nhất                 -> motor (USB-Serial adapter)
+  2. Content signature khớp regex     -> role tương ứng
+  3. Không khớp                       -> bỏ qua
 
-Phải chạy TRƯỚC khi ROS launch (vì khi đang dùng port thì không probe được).
-Cần sudo để ghi vào /dev/.
-
-Usage:
-  sudo python3 scripts/init_serial_symlinks.py
-  sudo python3 scripts/init_serial_symlinks.py --dry-run
-  sudo python3 scripts/init_serial_symlinks.py --required motor line camera
+Cần sudo để ghi /dev/.
 """
 from __future__ import annotations
 
@@ -33,68 +26,43 @@ except ImportError:
 
 LINK_DIR = Path("/dev/hospitalrobot")
 
-# role -> (regex pattern, list baudrate cần thử, read_timeout_sec, max_bytes)
 PROBES: dict[str, dict] = {
-    "motor": {
-        "pattern": re.compile(rb"<MOTOR|<CAN|MOTOR_STATUS"),
-        "bauds":   [115200],
-        "timeout": 1.5,
-        "max":     2048,
-    },
     "line": {
-        "pattern": re.compile(rb'"LineSensor"'),
-        "bauds":   [115200],
-        "timeout": 2.0,
-        "max":     4096,
+        "pattern": re.compile(rb'"LineSensor"|"0x2[345]"'),
+        "bauds":   [115200, 9600],
+        "timeout": 2.5,
     },
     "camera": {
-        "pattern": re.compile(rb"<DEV\d"),
+        "pattern": re.compile(rb"<DEV\d|<CAMERA"),
         "bauds":   [9600, 115200],
         "timeout": 2.5,
-        "max":     4096,
     },
     "huskylens": {
-        # HuskyLens dùng protocol nhị phân với preamble 0x55 0xAA 0x11
-        "pattern": re.compile(rb"\x55\xAA\x11"),
+        "pattern": re.compile(rb"\x55\xAA\x11|HUSKY"),
         "bauds":   [9600, 115200],
         "timeout": 2.5,
-        "max":     4096,
+    },
+    "motor": {
+        "pattern": re.compile(rb"<MOTOR|<CAN|MOTOR_STATUS|<STATUS"),
+        "bauds":   [115200, 9600],
+        "timeout": 2.0,
     },
 }
 
-# Heuristic dựa VID:PID để giảm số probe (không bắt buộc — vẫn fallback content probe).
-VID_PID_HINT = {
-    ("0403", "6001"): "motor",      # FTDI FT232R
-    ("1a86", "7523"): "motor",      # CH340
-    ("10c4", "ea60"): "motor",      # CP210x
-    ("1a86", "55d3"): "huskylens",  # CH9102
-}
+
+def list_tty() -> tuple[list[str], list[str]]:
+    usb = sorted(glob.glob("/dev/ttyUSB*"))
+    acm = sorted(glob.glob("/dev/ttyACM*"))
+    return usb, acm
 
 
-def list_tty() -> list[str]:
-    return sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))
-
-
-def udev_prop(dev: str, key: str) -> str | None:
-    import subprocess
-    try:
-        out = subprocess.check_output(["udevadm", "info", "-q", "property", "-n", dev],
-                                      stderr=subprocess.DEVNULL, text=True)
-    except Exception:
-        return None
-    for line in out.splitlines():
-        if line.startswith(key + "="):
-            return line.split("=", 1)[1]
-    return None
-
-
-def read_chunk(dev: str, baud: int, timeout: float, max_bytes: int) -> bytes:
+def read_chunk(dev: str, baud: int, timeout: float) -> bytes:
     try:
         with serial.Serial(dev, baud, timeout=0.3) as ser:
             ser.reset_input_buffer()
             deadline = time.monotonic() + timeout
             buf = bytearray()
-            while time.monotonic() < deadline and len(buf) < max_bytes:
+            while time.monotonic() < deadline and len(buf) < 4096:
                 chunk = ser.read(512)
                 if chunk:
                     buf.extend(chunk)
@@ -102,67 +70,78 @@ def read_chunk(dev: str, baud: int, timeout: float, max_bytes: int) -> bytes:
                     time.sleep(0.05)
             return bytes(buf)
     except (serial.SerialException, OSError) as e:
-        print(f"  [warn] không mở được {dev} @ {baud}: {e}", file=sys.stderr)
+        print(f"  [warn] mở {dev} @ {baud}: {e}", file=sys.stderr)
         return b""
 
 
-def classify(dev: str, hint_role: str | None) -> tuple[str | None, int | None]:
-    """Trả về (role, baud) hoặc (None, None) nếu không nhận diện được."""
-    role_order = list(PROBES)
-    if hint_role and hint_role in role_order:
-        role_order = [hint_role] + [r for r in role_order if r != hint_role]
-
-    for role in role_order:
+def classify(dev: str, candidate_roles: list[str]) -> tuple[str | None, int | None, bytes]:
+    last_data = b""
+    for role in candidate_roles:
         cfg = PROBES[role]
         for baud in cfg["bauds"]:
-            print(f"  probe {dev} as {role} @ {baud} ...", end="", flush=True)
-            data = read_chunk(dev, baud, cfg["timeout"], cfg["max"])
+            print(f"  probe {dev} -> {role} @ {baud}...", end="", flush=True)
+            data = read_chunk(dev, baud, cfg["timeout"])
+            last_data = data or last_data
             if data and cfg["pattern"].search(data):
-                print(" MATCH")
-                return role, baud
+                print(f" MATCH ({len(data)}B)")
+                return role, baud, data
             print(f" no ({len(data)}B)")
-    return None, None
+    return None, None, last_data
+
+
+def safe_symlink(link: Path, target: str) -> None:
+    if link.is_symlink() or link.exists():
+        link.unlink()
+    link.symlink_to(target)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dry-run", action="store_true", help="không tạo symlink")
-    ap.add_argument("--required", nargs="+", default=["motor", "line", "camera"],
-                    help="role bắt buộc — exit non-zero nếu thiếu")
+    ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--link-dir", type=Path, default=LINK_DIR)
+    ap.add_argument("--require", nargs="*", default=[],
+                    help="role bắt buộc, exit non-zero nếu thiếu")
     args = ap.parse_args()
 
-    devices = list_tty()
+    usb, acm = list_tty()
+    devices = usb + acm
     if not devices:
         print("Không tìm thấy /dev/ttyUSB*/ttyACM*", file=sys.stderr)
         return 1
 
-    print(f"Found {len(devices)} tty device(s): {', '.join(devices)}")
-    mapping: dict[str, tuple[str, int]] = {}
+    print(f"USB:  {usb or '(none)'}")
+    print(f"ACM:  {acm or '(none)'}")
 
-    for dev in devices:
-        vid = (udev_prop(dev, "ID_VENDOR_ID") or "").lower()
-        pid = (udev_prop(dev, "ID_MODEL_ID") or "").lower()
-        hint = VID_PID_HINT.get((vid, pid))
-        print(f"\n[{dev}] vid={vid or '-'} pid={pid or '-'} hint={hint or '-'}")
-        if hint and hint in mapping:
-            hint = None  # đã có rồi, để probe role khác
+    mapping: dict[str, tuple[str, int | None]] = {}
 
-        role, baud = classify(dev, hint)
-        if role is None:
-            print(f"  -> không nhận diện được, bỏ qua")
-            continue
-        if role in mapping:
-            print(f"  -> {role} đã được {mapping[role][0]} chiếm, bỏ qua")
-            continue
-        mapping[role] = (dev, baud)
-        print(f"  => {role}: {dev} @ {baud}")
+    # 1. ttyUSB duy nhất -> motor.
+    if len(usb) == 1 and "motor" not in mapping:
+        mapping["motor"] = (usb[0], None)
+        print(f"\n[auto] {usb[0]} là ttyUSB duy nhất -> motor")
 
-    print("\n=== Mapping ===")
+    # 2. Content probe các port còn lại.
+    remaining = [d for d in devices if d not in {v[0] for v in mapping.values()}]
+    for dev in remaining:
+        print(f"\n[{dev}]")
+        # role ưu tiên: line/camera/huskylens (đa số ACM), rồi motor.
+        cand = [r for r in ["line", "camera", "huskylens", "motor"] if r not in mapping]
+        if not cand:
+            break
+        role, baud, sample = classify(dev, cand)
+        if role:
+            mapping[role] = (dev, baud)
+            print(f"  => {role}")
+        else:
+            preview = sample[:120].decode("ascii", errors="replace")
+            print(f"  => không nhận diện được. Preview: {preview!r}")
+
+    print("\n=== Mapping cuối ===")
+    if not mapping:
+        print("  (rỗng)")
     for role, (dev, baud) in mapping.items():
-        print(f"  {role:<10} -> {dev}  (baud={baud})")
+        print(f"  {role:<10} -> {dev}" + (f"  (baud={baud})" if baud else ""))
 
-    missing = [r for r in args.required if r not in mapping]
+    missing = [r for r in args.require if r not in mapping]
     if missing:
         print(f"\n[ERROR] Thiếu role bắt buộc: {missing}", file=sys.stderr)
         return 2
@@ -171,17 +150,29 @@ def main() -> int:
         print("\n(dry-run) Không tạo symlink.")
         return 0
 
-    args.link_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        args.link_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        print(f"[ERROR] Cần sudo để tạo {args.link_dir}", file=sys.stderr)
+        return 3
+
+    # Xoá symlink cũ không còn dùng.
+    if args.link_dir.exists():
+        for p in args.link_dir.iterdir():
+            if p.is_symlink() and p.name not in mapping:
+                p.unlink()
+
     for role, (dev, _) in mapping.items():
         link = args.link_dir / role
         try:
-            if link.is_symlink() or link.exists():
-                link.unlink()
-            link.symlink_to(dev)
-            os.chmod(dev, 0o666)
+            safe_symlink(link, dev)
+            try:
+                os.chmod(dev, 0o666)
+            except PermissionError:
+                pass
             print(f"  symlink {link} -> {dev}")
         except PermissionError:
-            print(f"  [ERROR] cần sudo để tạo {link}", file=sys.stderr)
+            print(f"[ERROR] Cần sudo để tạo {link}", file=sys.stderr)
             return 3
     return 0
 
