@@ -124,8 +124,10 @@ build_workspace() {
   cd "$WORKSPACE_DIR"
   colcon build --symlink-install
 
+  set +u
   # shellcheck source=/dev/null
   source "$WORKSPACE_DIR/install/setup.bash"
+  set -u
 }
 
 run_tests() {
@@ -158,8 +160,10 @@ write_shell_hint() {
     {
       echo ""
       echo "# HospitalRobot ROS2 workspace"
+      echo "set +u"
       echo "source /opt/ros/${ROS_DISTRO}/setup.bash"
       echo "$workspace_source"
+      echo "set -u"
     } >> "$shell_rc"
   fi
 }
