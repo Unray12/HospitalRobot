@@ -8,7 +8,7 @@ WORKSPACE_DIR="${WORKSPACE_DIR:-$REPO_SOURCE_DIR}"
 REPO_DIR="${REPO_DIR:-$WORKSPACE_DIR/src/HospitalRobot}"
 WORKSPACE_SRC_PATH=""
 SKIP_APT="${SKIP_APT:-0}"
-SKIP_TESTS="${SKIP_TESTS:-0}"
+RUN_TESTS="${RUN_TESTS:-0}"
 
 log() {
   printf '\n[setup] %s\n' "$1"
@@ -135,8 +135,8 @@ build_workspace() {
 }
 
 run_tests() {
-  if [ "$SKIP_TESTS" = "1" ]; then
-    log "Skipping tests because SKIP_TESTS=1"
+  if [ "$RUN_TESTS" != "1" ]; then
+    log "Skipping tests by default. Set RUN_TESTS=1 to enable."
     return
   fi
 
@@ -161,7 +161,7 @@ run_tests() {
   if [ "$test_rc" -ne 0 ] || [ "$result_rc" -ne 0 ]; then
     echo "" >&2
     echo "[setup] Tests reported failures. See 'colcon test-result --verbose' output above." >&2
-    echo "[setup] You can continue runtime validation with: SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh" >&2
+    echo "[setup] Re-run with RUN_TESTS=1 only when you want to debug tests." >&2
     exit 1
   fi
 }
@@ -232,7 +232,7 @@ Useful env overrides:
   WORKSPACE_DIR=./scripts/.. ./scripts/setup_raspberry_ros.sh
   WORKSPACE_DIR=../ros2_ws ./scripts/setup_raspberry_ros.sh
   SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
-  SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh
+  RUN_TESTS=1 ./scripts/setup_raspberry_ros.sh
   REPO_DIR=./src/HospitalRobot ./scripts/setup_raspberry_ros.sh
 
 If tests fail but build succeeds and you only want to run the robot:
