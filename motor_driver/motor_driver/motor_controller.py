@@ -70,10 +70,13 @@ class MotorController:
             if item and item not in candidates:
                 candidates.append(item)
 
-        prefixes = scan_prefixes or ["/dev/ttyUSB", "/dev/ttyACM", "COM"]
-        for detected in self._discover_ports(prefixes):
-            if detected not in candidates:
-                candidates.append(detected)
+        # Empty list = intentional "không scan" (vs None = chưa cấu hình, dùng default).
+        if scan_prefixes is None:
+            scan_prefixes = ["/dev/ttyUSB", "/dev/ttyACM", "COM"]
+        if scan_prefixes:
+            for detected in self._discover_ports(scan_prefixes):
+                if detected not in candidates:
+                    candidates.append(detected)
 
         for candidate in candidates:
             if self._open_serial(candidate):
