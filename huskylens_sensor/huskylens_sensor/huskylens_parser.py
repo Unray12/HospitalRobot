@@ -1,5 +1,14 @@
+"""HuskyLens payload parser dùng HospitalRobot Device Protocol v1."""
+
 import json
 
+from robot_common.device_protocol import (
+    parse_envelope,
+    is_silent_error,
+    EVENT_DATA,
+)
+
+DEV_ID = "hrbot_huskylens"
 
 REQUIRED_BASE_FIELDS = (
     "connected",
@@ -10,24 +19,39 @@ REQUIRED_BASE_FIELDS = (
 
 def normalize_huskylens_payload(raw):
     """
-    Normalize raw HuskyLens JSON payload into a strict schema.
-    Returns (frame_dict, error_text). error_text is None on success.
+    Parse 1 envelope line từ HuskyLens firmware -> sensor frame dict.
+
+    Returns (frame_dict, error_text):
+      - (frame, None)   : parsed OK
+      - (None, "skip")  : control/banner frame, bỏ qua thầm lặng
+      - (None, "<err>") : parse failure, caller nên log warning
     """
-    payload = raw
-    if isinstance(raw, str):
-        try:
-            payload = json.loads(raw)
-        except Exception as exc:
-            return None, f"invalid_json: {exc}"
+    # Cho phép caller truyền dict trực tiếp (cho test legacy không có envelope).
+    if isinstance(raw, dict):
+        sensor = raw.get("HuskylenSensor") or raw.get("HuskyLensSensor")
+        if not isinstance(sensor, dict):
+            return None, "missing_huskylens_sensor_object"
+        return _build_frame(sensor)
 
-    if not isinstance(payload, dict):
-        return None, "payload_not_object"
+    envelope, err = parse_envelope(raw, expected_dev_id=DEV_ID)
+    if envelope is None:
+        if is_silent_error(err):
+            return None, "skip"
+        return None, f"invalid_json: {err}" if err == "not_json" else err
+    if envelope.event != EVENT_DATA:
+        return None, "skip"
 
-    sensor = payload.get("HuskylenSensor")
-    if sensor is None:
-        sensor = payload.get("HuskyLensSensor")
+    sensor = envelope.payload
+    # Backward-compat: nếu firmware cũ vẫn nhét {"HuskylenSensor":{...}} trong payload.
+    inner = sensor.get("HuskylenSensor") or sensor.get("HuskyLensSensor")
+    if isinstance(inner, dict):
+        sensor = inner
     if not isinstance(sensor, dict):
         return None, "missing_huskylens_sensor_object"
+    return _build_frame(sensor)
+
+
+def _build_frame(sensor):
 
     missing = [name for name in REQUIRED_BASE_FIELDS if name not in sensor]
     if missing:

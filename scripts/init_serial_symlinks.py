@@ -26,28 +26,29 @@ except ImportError:
 
 LINK_DIR = Path("/dev/hospitalrobot")
 
-# Mỗi firmware đã được sửa để emit banner "<HRBOT:ROLE>" khi boot + heartbeat 2s.
-# Probe match banner trước (ngắn, chắc chắn), kèm fallback theo dữ liệu sensor
-# để vẫn nhận diện được firmware cũ chưa cập nhật.
+# HospitalRobot Device Protocol v1: firmware emit envelope JSON với field "dev_id".
+# Probe chỉ cần match chữ ký dev_id — nhất quán, dễ thêm role mới (xem
+# docs/DEVICE_PROTOCOL.md).
+# Fallback regex cũ giữ lại để tương thích firmware chưa cập nhật.
 PROBES: dict[str, dict] = {
     "line": {
-        "pattern": re.compile(rb"<HRBOT:LINE>|\"LineSensor\""),
-        "bauds":   [115200, 9600],
+        "pattern": re.compile(rb'"dev_id"\s*:\s*"hrbot_line"|"LineSensor"'),
+        "bauds":   [115200],
         "timeout": 3.0,
     },
     "camera": {
-        "pattern": re.compile(rb"<HRBOT:CAMERA>|<DEV\d"),
-        "bauds":   [115200, 9600],
+        "pattern": re.compile(rb'"dev_id"\s*:\s*"hrbot_camera"|<DEV\d'),
+        "bauds":   [115200],
         "timeout": 3.0,
     },
     "huskylens": {
-        "pattern": re.compile(rb"<HRBOT:HUSKYLENS>|\"HuskylenSensor\""),
-        "bauds":   [115200, 9600],
+        "pattern": re.compile(rb'"dev_id"\s*:\s*"hrbot_huskylens"|"HuskylenSensor"'),
+        "bauds":   [115200],
         "timeout": 3.0,
     },
     "motor": {
-        "pattern": re.compile(rb"<HRBOT:MOTOR>|<MOTOR|<CAN|MOTOR_STATUS"),
-        "bauds":   [115200, 9600],
+        "pattern": re.compile(rb'"dev_id"\s*:\s*"hrbot_motor"|<MOTOR|<CAN|MOTOR_STATUS'),
+        "bauds":   [115200],
         "timeout": 2.0,
     },
 }

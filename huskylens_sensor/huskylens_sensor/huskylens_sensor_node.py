@@ -61,6 +61,9 @@ class HuskyLensSensorNode(Node):
             return
 
         frame, err = normalize_huskylens_payload(line)
+        # Control frame (boot/info/error) — không publish, không log.
+        if frame is None and err == "skip":
+            return
         if frame is None:
             self._parse_error_count += 1
             frame = default_frame()

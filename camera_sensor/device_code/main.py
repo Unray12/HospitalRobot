@@ -1,31 +1,40 @@
+# HospitalRobot Device Protocol v1 — role: camera
+# Xem docs/DEVICE_PROTOCOL.md cho spec đầy đủ.
+
 from machine import UART
 from yolo_uno import *
 from huskylens import HuskyLens, ALGORITHM_FACE_RECOGNITION
 import time
 
-DEV_ID = "DEV1"
+try:
+    import ujson as json
+except ImportError:
+    import json
 
-# Boot banner cho host probe nhận dạng role.
-ROLE_BANNER = "<HRBOT:CAMERA>"
-BANNER_INTERVAL_MS = 2000
-print(ROLE_BANNER)
-print(ROLE_BANNER)
+# Delay đầu để board settle sau cold boot (reset cứng). Nếu bỏ delay này,
+# neopix/UART có thể chưa ready -> emit() đụng neopix.show() -> crash silent.
+time.sleep_ms(500)
 
-uart = UART(1, baudrate=9600, tx=D4_PIN, rx=D3_PIN)
-hl = HuskyLens(uart)
-hl.debug = False
+DEV_ID = "hrbot_camera"
+FW_NAME = "camera"
+FW_VER = 1
+BOOT_BANNER_COUNT = 10
+
+LOOP_DELAY_MS = 100        # 10 Hz — đồng bộ với line_sensors
+RECONNECT_INTERVAL_MS = 3000
+
+# UART hardware giữa ESP32 và HuskyLens IC — giữ 9600 (mặc định HuskyLens,
+# không phải USB CDC). KHÔNG đổi trừ khi đã đổi setting trên menu HuskyLens.
+HUSKYLENS_BAUD = 9600
+
+# KHÔNG khởi tạo UART ở module level — nếu fail sẽ chết im lặng trước khi boot
+# banner được emit. Khởi tạo trong try/except sau khi boot banner đã in.
+uart = None
+hl = None
 
 current_color = (0, 0, 0)
 
-FACE_SEND_INTERVAL_MS = 5000
-NO_OBJECT_INTERVAL_MS = 7000
-RECONNECT_INTERVAL_MS = 3000
-
-last_face_sent_ms = 0
-last_no_obj_ms = 0
 last_reconnect_ms = 0
-last_banner_ms = 0
-last_face_payload = ""
 
 
 def now_ms():
@@ -39,22 +48,50 @@ def elapsed_ms(start):
 def set_led(color):
     global current_color
     current_color = color
-    neopix.show(0, color)
+    try:
+        neopix.show(0, color)
+    except Exception:
+        pass  # neopix chưa ready hoặc lỗi — không phá luồng chính
 
 
-def blink_tx(duration=0.03):
-    neopix.show(0, (255, 255, 255))
-    time.sleep_ms(int(duration * 1000))
-    neopix.show(0, current_color)
+def blink_tx(duration_ms=30):
+    try:
+        neopix.show(0, (255, 255, 255))
+        time.sleep_ms(duration_ms)
+        neopix.show(0, current_color)
+    except Exception:
+        pass
 
 
-def usb_send_frame(*fields):
-    payload = ",".join([DEV_ID] + [str(f) for f in fields])
-    print("<{}>".format(payload))
+def emit(event, payload):
+    """Gửi 1 envelope JSON theo schema HospitalRobot Device Protocol v1.
+    print() phải chạy trước mọi side-effect khác (LED) — đảm bảo luôn có output."""
+    print(json.dumps({
+        "dev_id":  DEV_ID,
+        "event":   event,
+        "payload": payload,
+    }))
     blink_tx()
 
 
+def ensure_uart():
+    """Khởi tạo UART + HuskyLens nếu chưa có. Trả True nếu OK."""
+    global uart, hl
+    if hl is not None:
+        return True
+    try:
+        uart = UART(1, baudrate=HUSKYLENS_BAUD, tx=D4_PIN, rx=D3_PIN)
+        hl = HuskyLens(uart)
+        hl.debug = False
+        return True
+    except Exception as e:
+        emit("error", {"code": "uart_init_failed", "msg": str(e)})
+        return False
+
+
 def connect_huskylens():
+    if not ensure_uart():
+        return False
     try:
         if not hl.knock():
             return False
@@ -64,30 +101,30 @@ def connect_huskylens():
         return False
 
 
+# Boot banner.
+for _ in range(BOOT_BANNER_COUNT):
+    emit("boot", {"fw": FW_NAME, "ver": FW_VER})
+
 connected = connect_huskylens()
 if connected:
     set_led((0, 0, 255))
-    usb_send_frame("INFO", "HUSKYLENS_CONNECTED")
-    usb_send_frame("INFO", "ALG_SET", "FACE_RECOGNITION")
+    emit("info", {"msg": "huskylens_connected"})
+    emit("info", {"msg": "alg_set", "alg": "face_recognition"})
 else:
     set_led((255, 0, 0))
-    usb_send_frame("ERR", "NO_CONNECTION")
+    emit("error", {"code": "no_connection"})
 
 
 while True:
-    if elapsed_ms(last_banner_ms) >= BANNER_INTERVAL_MS:
-        print(ROLE_BANNER)
-        last_banner_ms = now_ms()
-
     if not connected:
         if elapsed_ms(last_reconnect_ms) >= RECONNECT_INTERVAL_MS:
             last_reconnect_ms = now_ms()
             connected = connect_huskylens()
             if connected:
                 set_led((0, 0, 255))
-                usb_send_frame("INFO", "HUSKYLENS_RECONNECTED")
+                emit("info", {"msg": "huskylens_reconnected"})
             else:
-                usb_send_frame("ERR", "NO_CONNECTION")
+                emit("error", {"code": "no_connection"})
         time.sleep_ms(200)
         continue
 
@@ -96,18 +133,12 @@ while True:
     except Exception:
         connected = False
         set_led((255, 0, 0))
-        usb_send_frame("ERR", "READ_FAIL")
+        emit("error", {"code": "read_fail"})
         time.sleep_ms(200)
         continue
 
-    # =========================
-    # ID LOGIC:
-    # - Nếu có face nhưng ID chưa có (ID=0) -> gửi 0
-    # - Nếu có ID hợp lệ (>0) -> gửi danh sách ID
-    # =========================
     ids = []
     unknown_detected = False
-
     for b in blocks:
         fid = int(getattr(b, "ID", 0))
         if fid > 0:
@@ -115,25 +146,15 @@ while True:
                 ids.append(fid)
         else:
             unknown_detected = True
-
-    # Nếu không có ID hợp lệ nhưng có phát hiện face -> gán 0
     if not ids and unknown_detected:
         ids = [0]
 
+    # Emit data MỖI loop iteration — đồng bộ rate với line/huskylens.
     if ids:
         set_led((0, 255, 0))
-        # Gửi IDs dạng "1;2;3"
-        face_payload = ";".join([str(x) for x in ids])
-
-        if face_payload != last_face_payload or elapsed_ms(last_face_sent_ms) >= FACE_SEND_INTERVAL_MS:
-            usb_send_frame("FACE", face_payload)
-            last_face_payload = face_payload
-            last_face_sent_ms = now_ms()
+        emit("data", {"kind": "face", "ids": ids})
     else:
         set_led((255, 0, 0))
-        last_face_payload = ""
-        if elapsed_ms(last_no_obj_ms) >= NO_OBJECT_INTERVAL_MS:
-            usb_send_frame("NO_OBJECT")
-            last_no_obj_ms = now_ms()
+        emit("data", {"kind": "no_object"})
 
-    time.sleep_ms(100)
+    time.sleep_ms(LOOP_DELAY_MS)

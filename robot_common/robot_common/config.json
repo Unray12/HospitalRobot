@@ -14,7 +14,7 @@
     "camera_sensor": {
         "serial": {
             "port": "/dev/hospitalrobot/camera",
-            "baudrate": 9600,
+            "baudrate": 115200,
             "timeout": 0.2
         },
         "publish": {
@@ -132,7 +132,7 @@
     "huskylens_sensor": {
         "serial": {
             "port": "/dev/hospitalrobot/huskylens",
-            "baudrate": 9600,
+            "baudrate": 115200,
             "timeout": 0.2
         },
         "publish": {

@@ -25,7 +25,8 @@ UART_ID = 1
 UART_TX_PIN = D4_PIN
 UART_RX_PIN = D3_PIN
 
-# Baudrate UART
+# Baudrate UART hardware giữa ESP32 và HuskyLens IC — giữ 9600 (mặc định HuskyLens,
+# không phải USB CDC). KHÔNG đổi trừ khi đã đổi setting trên menu HuskyLens.
 UART_BAUDRATE = 9600
 
 # Kích thước ảnh xử lý của HuskyLens
@@ -54,8 +55,8 @@ MAX_ABS_TAIL_OFFSET_X = 110
 # Thời gian thử kết nối lại HuskyLens khi mất kết nối
 RETRY_INTERVAL_MS = 100
 
-# Chu kỳ lặp 50ms
-LOOP_DELAY_MS = 50
+# Chu kỳ lặp 100ms — 10Hz, đồng bộ với line/camera.
+LOOP_DELAY_MS = 100
 
 # Giá trị direction mặc định
 DEFAULT_DIRECTION = 0
@@ -244,22 +245,30 @@ def arrow_to_line_data(arrow):
     }
 
 
-def build_output(line_tracking, connected, algorithm_set):
-    """
-    Đóng gói output cuối cùng.
-    Toàn bộ dữ liệu được bọc trong key HuskylenSensor theo yêu cầu.
-    """
+DEV_ID = "hrbot_huskylens"
+FW_NAME = "huskylens"
+FW_VER = 1
+
+
+def emit(event, payload):
+    """Gửi 1 envelope JSON theo schema HospitalRobot Device Protocol v1."""
+    print(json.dumps({
+        "dev_id":  DEV_ID,
+        "event":   event,
+        "payload": payload,
+    }))
+
+
+def build_data_payload(line_tracking, connected, algorithm_set):
     return {
-        "HuskylenSensor": {
-            "connected": 1 if connected else 0,
-            "algorithm_set": 1 if algorithm_set else 0,
-            "valid": int(line_tracking["valid"]),
-            "tail_offset_x": int(line_tracking["tail_offset_x"]),
-            "y_type": int(line_tracking["y_type"]),
-            "line_length_y": int(line_tracking["line_length_y"]),
-            "direction": int(line_tracking["direction"]),
-            "angle_deg": float(line_tracking["angle_deg"])
-        }
+        "connected":     1 if connected else 0,
+        "algorithm_set": 1 if algorithm_set else 0,
+        "valid":         int(line_tracking["valid"]),
+        "tail_offset_x": int(line_tracking["tail_offset_x"]),
+        "y_type":        int(line_tracking["y_type"]),
+        "line_length_y": int(line_tracking["line_length_y"]),
+        "direction":     int(line_tracking["direction"]),
+        "angle_deg":     float(line_tracking["angle_deg"]),
     }
 
 
@@ -284,23 +293,14 @@ hl = None
 connected = False
 algorithm_set = False
 last_retry_ms = 0
-last_banner_ms = 0
 # ==========================================
 
-# Boot banner cho host probe nhận dạng role.
-ROLE_BANNER = "<HRBOT:HUSKYLENS>"
-BANNER_INTERVAL_MS = 2000
-print(ROLE_BANNER)
-print(ROLE_BANNER)
-print_json({"status": "App started"})
+# Boot banner — 10 lần để probe (3s window) match.
+for _ in range(10):
+    emit("boot", {"fw": FW_NAME, "ver": FW_VER})
 
 while True:
     now = time.ticks_ms()
-
-    # Heartbeat banner để probe luôn nhận dạng được.
-    if time.ticks_diff(now, last_banner_ms) >= BANNER_INTERVAL_MS:
-        print(ROLE_BANNER)
-        last_banner_ms = now
 
     # Nếu chưa kết nối, thử kết nối lại theo chu kỳ
     if (not connected) and time.ticks_diff(now, last_retry_ms) >= RETRY_INTERVAL_MS:
@@ -312,18 +312,7 @@ while True:
         except Exception:
             connected = False
             algorithm_set = False
-            print_json({
-                "HuskylenSensor": {
-                    "connected": 0,
-                    "algorithm_set": 0,
-                    "valid": 0,
-                    "tail_offset_x": 0,
-                    "y_type": 0,
-                    "line_length_y": 0,
-                    "direction": 0,
-                    "angle_deg": 0.0
-                }
-            })
+            emit("error", {"code": "uart_init_failed"})
 
     # Nếu đã kết nối nhưng chưa set thuật toán line tracking
     if connected and (not algorithm_set):
@@ -358,8 +347,7 @@ while True:
             line_tracking = no_line_tracking()
 
     # Xuất dữ liệu ra ngoài
-    out = build_output(line_tracking, connected, algorithm_set)
-    print_json(out)
+    emit("data", build_data_payload(line_tracking, connected, algorithm_set))
 
     # Lặp mỗi 50ms
     time.sleep_ms(LOOP_DELAY_MS)

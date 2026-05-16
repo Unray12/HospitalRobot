@@ -1,7 +1,12 @@
-"""Serial reader and parser for the line sensor frame stream."""
+"""Serial reader and parser for the line sensor frame stream.
+
+Đọc JSON envelope theo HospitalRobot Device Protocol v1
+(xem `docs/DEVICE_PROTOCOL.md`). Frame data:
+
+    {"dev_id":"hrbot_line","event":"data","payload":{"sensors":{"0xNN":{...}}}}
+"""
 
 import glob
-import json
 import time
 
 try:
@@ -10,6 +15,10 @@ try:
 except ImportError:
     serial = None
     list_ports = None
+
+from robot_common.device_protocol import parse_envelope, is_silent_error
+
+DEV_ID = "hrbot_line"
 
 
 class LineSensorReader:
@@ -52,42 +61,53 @@ class LineSensorReader:
                     continue
                 return self.parse_line(candidate)
             return None
-        except json.JSONDecodeError:
-            self._log_warn("Corrupted JSON skipped")
-            return None
         except Exception as exc:
             self._log_error(f"Line Sensors read error: {exc}")
             self.close()
             return None
 
     def parse_line(self, line):
-        payload = json.loads(line)
-        return self.parse_payload(payload)
+        """Parse 1 JSON envelope line. Trả về frame dict, None, hoặc None (skip thầm lặng)."""
+        envelope, err = parse_envelope(line, expected_dev_id=DEV_ID)
+        if envelope is None:
+            if is_silent_error(err):
+                return None
+            self._log_warn(f"Line envelope parse fail: {err}")
+            return None
+        if not envelope.is_data():
+            # boot/info/error — bỏ qua thầm lặng.
+            return None
+        return self.parse_payload(envelope.payload)
 
     def parse_payload(self, payload):
-        if "LineSensor" not in payload:
-            self._log_warn("LineSensor key missing")
+        """Convert payload dict thành frame có count + full cho left/mid/right.
+
+        Hỗ trợ 2 shape:
+          - mới: {"sensors": {"0xNN": {...}}}
+          - cũ:  {"0xNN": {...}}  (dùng cho test trực tiếp parse_payload)
+        """
+        if not isinstance(payload, dict):
             return None
 
-        line_data = payload["LineSensor"]
-        if not isinstance(line_data, dict) or not line_data:
+        sensors = payload.get("sensors")
+        if not isinstance(sensors, dict):
+            # Backward-compat: payload chính là dict sensors (test legacy).
+            sensors = payload
+
+        if not sensors:
             return None
 
-        left = line_data.get("0x25", {})
-        middle = line_data.get("0x24", {})
-        right = line_data.get("0x23", {})
-
-        left_count = self._count_active(left)
-        mid_count = self._count_active(middle)
-        right_count = self._count_active(right)
+        left = sensors.get("0x25", {})
+        middle = sensors.get("0x24", {})
+        right = sensors.get("0x23", {})
 
         return {
-            "left_count": left_count,
-            "mid_count": mid_count,
-            "right_count": right_count,
-            "left_full": self._is_full_black(left),
-            "mid_full": self._is_full_black(middle),
-            "right_full": self._is_full_black(right),
+            "left_count":  self._count_active(left),
+            "mid_count":   self._count_active(middle),
+            "right_count": self._count_active(right),
+            "left_full":   self._is_full_black(left),
+            "mid_full":    self._is_full_black(middle),
+            "right_full":  self._is_full_black(right),
         }
 
     def close(self):

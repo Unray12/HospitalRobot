@@ -1,12 +1,27 @@
+# HospitalRobot Device Protocol v1 — role: line
+# Xem docs/DEVICE_PROTOCOL.md cho spec đầy đủ.
+
 from machine import I2C
 import time
 import ujson
 
-# Boot banner cho host probe (init_serial_symlinks.py) nhận dạng role.
-ROLE_BANNER = "<HRBOT:LINE>"
-HEARTBEAT_INTERVAL_MS = 2000
+DEV_ID = "hrbot_line"
+FW_NAME = "line"
+FW_VER = 1
+BOOT_BANNER_COUNT = 10
+LOOP_INTERVAL_MS = 100
 
 i2c = I2C(0, freq=100000)
+
+
+def emit(event, payload):
+    """Gửi 1 envelope JSON theo schema HospitalRobot Device Protocol v1."""
+    print(ujson.dumps({
+        "dev_id":  DEV_ID,
+        "event":   event,
+        "payload": payload,
+    }))
+
 
 def read_s4(addr):
     try:
@@ -20,30 +35,22 @@ def read_s4(addr):
     except:
         return {"s1": -1, "s2": -1, "s3": -1, "s4": -1}
 
-def build_linesensor_json():
+
+def build_data_payload():
     try:
         addrs = i2c.scan()
     except:
         addrs = []
-
     sensors = {}
     for addr in addrs:
         sensors["0x%02X" % addr] = read_s4(addr)
+    return {"sensors": sensors}
 
-    payload = {"LineSensor": sensors}
-    return ujson.dumps(payload)
 
-# Banner ngay khi boot — emit sớm để probe latch được.
-print(ROLE_BANNER)
-print(ROLE_BANNER)
-print("App started")
-
-last_banner_ms = time.ticks_ms()
+# Boot banner.
+for _ in range(BOOT_BANNER_COUNT):
+    emit("boot", {"fw": FW_NAME, "ver": FW_VER})
 
 while True:
-    now = time.ticks_ms()
-    if time.ticks_diff(now, last_banner_ms) >= HEARTBEAT_INTERVAL_MS:
-        print(ROLE_BANNER)
-        last_banner_ms = now
-    print(build_linesensor_json())
-    time.sleep_ms(100)
+    emit("data", build_data_payload())
+    time.sleep_ms(LOOP_INTERVAL_MS)
