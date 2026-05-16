@@ -4,8 +4,9 @@ set -euo pipefail
 ROS_DISTRO="${ROS_DISTRO:-humble}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SOURCE_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd -- "$REPO_SOURCE_DIR/.." && pwd)}"
+WORKSPACE_DIR="${WORKSPACE_DIR:-$REPO_SOURCE_DIR}"
 REPO_DIR="${REPO_DIR:-$WORKSPACE_DIR/src/HospitalRobot}"
+WORKSPACE_SRC_PATH=""
 SKIP_APT="${SKIP_APT:-0}"
 SKIP_TESTS="${SKIP_TESTS:-0}"
 
@@ -84,6 +85,14 @@ init_rosdep() {
 
 prepare_workspace() {
   log "Preparing workspace: $WORKSPACE_DIR"
+
+  if [ -f "$WORKSPACE_DIR/robot_common/package.xml" ] && [ -f "$WORKSPACE_DIR/robot/package.xml" ]; then
+    WORKSPACE_SRC_PATH="$WORKSPACE_DIR"
+    cd "$WORKSPACE_DIR"
+    log "Using current repository as workspace root"
+    return
+  fi
+
   mkdir -p "$WORKSPACE_DIR/src"
 
   if [ ! -d "$REPO_DIR" ]; then
@@ -97,12 +106,14 @@ prepare_workspace() {
     echo "Workspace layout invalid: expected src/HospitalRobot under $WORKSPACE_DIR" >&2
     exit 1
   fi
+
+  WORKSPACE_SRC_PATH="$WORKSPACE_DIR/src"
 }
 
 install_rosdep_packages() {
   log "Installing ROS package dependencies via rosdep"
   rosdep install \
-    --from-paths "$WORKSPACE_DIR/src" \
+    --from-paths "$WORKSPACE_SRC_PATH" \
     --ignore-src \
     --rosdistro "$ROS_DISTRO" \
     -y
@@ -199,6 +210,7 @@ Serial ports to verify:
 
 Useful env overrides:
   ROS_DISTRO=humble ./scripts/setup_raspberry_ros.sh
+  WORKSPACE_DIR=./scripts/.. ./scripts/setup_raspberry_ros.sh
   WORKSPACE_DIR=../ros2_ws ./scripts/setup_raspberry_ros.sh
   SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
   SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh
