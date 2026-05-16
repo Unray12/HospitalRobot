@@ -48,9 +48,13 @@ install_apt_deps() {
     lsb-release \
     python3-colcon-common-extensions \
     python3-pip \
+    python3-pytest \
     python3-rosdep \
     python3-serial \
     python3-paho-mqtt \
+    ros-${ROS_DISTRO}-ament-copyright \
+    ros-${ROS_DISTRO}-ament-flake8 \
+    ros-${ROS_DISTRO}-ament-pep257 \
     ros-${ROS_DISTRO}-rcl-interfaces \
     ros-${ROS_DISTRO}-rclpy \
     ros-${ROS_DISTRO}-sensor-msgs \
@@ -138,6 +142,7 @@ run_tests() {
 
   log "Running package tests"
   cd "$WORKSPACE_DIR"
+  set +e
   colcon test --packages-select \
     robot_common \
     camera_sensor \
@@ -148,7 +153,17 @@ run_tests() {
     motor_driver \
     mqtt_bridge \
     robot
+  test_rc=$?
   colcon test-result --verbose
+  result_rc=$?
+  set -e
+
+  if [ "$test_rc" -ne 0 ] || [ "$result_rc" -ne 0 ]; then
+    echo "" >&2
+    echo "[setup] Tests reported failures. See 'colcon test-result --verbose' output above." >&2
+    echo "[setup] You can continue runtime validation with: SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh" >&2
+    exit 1
+  fi
 }
 
 write_shell_hint() {
@@ -219,6 +234,9 @@ Useful env overrides:
   SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
   SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh
   REPO_DIR=./src/HospitalRobot ./scripts/setup_raspberry_ros.sh
+
+If tests fail but build succeeds and you only want to run the robot:
+  SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh
 EOF
 }
 
