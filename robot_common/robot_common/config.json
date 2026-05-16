@@ -21,12 +21,8 @@
             "topic": "/face/camera"
         },
         "reconnect_period_sec": 2.0,
-        "fallback_ports": [
-            "/dev/hospitalrobot/camera"
-        ],
-        "scan_prefixes": [
-            "/dev/hospitalrobot/"
-        ]
+        "fallback_ports": [],
+        "scan_prefixes": []
     },
     "line_sensors": {
         "serial": {
@@ -46,12 +42,8 @@
             "debug_toggle": "/debug_logs_toggle"
         },
         "reconnect_period_sec": 2.0,
-        "fallback_ports": [
-            "/dev/hospitalrobot/line"
-        ],
-        "scan_prefixes": [
-            "/dev/hospitalrobot/"
-        ]
+        "fallback_ports": [],
+        "scan_prefixes": []
     },
     "line_follower": {
         "base_speed": 8,
@@ -121,17 +113,8 @@
             "debug_toggle": "/debug_logs_toggle"
         },
         "reconnect_period_sec": 2.0,
-        "fallback_ports": [
-            "/dev/hospitalrobot/motor",
-            "/dev/ttyUSB0",
-            "/dev/ttyUSB1"
-        ],
-        "scan_prefixes": [
-            "/dev/hospitalrobot/",
-            "/dev/ttyUSB",
-            "/dev/ttyACM",
-            "COM"
-        ]
+        "fallback_ports": [],
+        "scan_prefixes": []
     },
     "manual_control": {
         "base_speed": 10,
@@ -158,12 +141,8 @@
             "rate_hz": 20
         },
         "reconnect_period_sec": 2.0,
-        "fallback_ports": [
-            "/dev/hospitalrobot/huskylens"
-        ],
-        "scan_prefixes": [
-            "/dev/hospitalrobot/"
-        ],
+        "fallback_ports": [],
+        "scan_prefixes": [],
         "parse_log_every": 20,
         "status_log_period": 2.0
     },

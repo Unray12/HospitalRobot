@@ -26,24 +26,27 @@ except ImportError:
 
 LINK_DIR = Path("/dev/hospitalrobot")
 
+# Mỗi firmware đã được sửa để emit banner "<HRBOT:ROLE>" khi boot + heartbeat 2s.
+# Probe match banner trước (ngắn, chắc chắn), kèm fallback theo dữ liệu sensor
+# để vẫn nhận diện được firmware cũ chưa cập nhật.
 PROBES: dict[str, dict] = {
     "line": {
-        "pattern": re.compile(rb'"LineSensor"|"0x2[345]"'),
+        "pattern": re.compile(rb"<HRBOT:LINE>|\"LineSensor\""),
         "bauds":   [115200, 9600],
-        "timeout": 2.5,
+        "timeout": 3.0,
     },
     "camera": {
-        "pattern": re.compile(rb"<DEV\d|<CAMERA"),
-        "bauds":   [9600, 115200],
-        "timeout": 2.5,
+        "pattern": re.compile(rb"<HRBOT:CAMERA>|<DEV\d"),
+        "bauds":   [115200, 9600],
+        "timeout": 3.0,
     },
     "huskylens": {
-        "pattern": re.compile(rb"\x55\xAA\x11|HUSKY"),
-        "bauds":   [9600, 115200],
-        "timeout": 2.5,
+        "pattern": re.compile(rb"<HRBOT:HUSKYLENS>|\"HuskylenSensor\""),
+        "bauds":   [115200, 9600],
+        "timeout": 3.0,
     },
     "motor": {
-        "pattern": re.compile(rb"<MOTOR|<CAN|MOTOR_STATUS|<STATUS"),
+        "pattern": re.compile(rb"<HRBOT:MOTOR>|<MOTOR|<CAN|MOTOR_STATUS"),
         "bauds":   [115200, 9600],
         "timeout": 2.0,
     },

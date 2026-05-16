@@ -284,13 +284,23 @@ hl = None
 connected = False
 algorithm_set = False
 last_retry_ms = 0
+last_banner_ms = 0
 # ==========================================
 
-print()
+# Boot banner cho host probe nhận dạng role.
+ROLE_BANNER = "<HRBOT:HUSKYLENS>"
+BANNER_INTERVAL_MS = 2000
+print(ROLE_BANNER)
+print(ROLE_BANNER)
 print_json({"status": "App started"})
 
 while True:
     now = time.ticks_ms()
+
+    # Heartbeat banner để probe luôn nhận dạng được.
+    if time.ticks_diff(now, last_banner_ms) >= BANNER_INTERVAL_MS:
+        print(ROLE_BANNER)
+        last_banner_ms = now
 
     # Nếu chưa kết nối, thử kết nối lại theo chu kỳ
     if (not connected) and time.ticks_diff(now, last_retry_ms) >= RETRY_INTERVAL_MS:

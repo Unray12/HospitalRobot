@@ -2,6 +2,10 @@ from machine import I2C
 import time
 import ujson
 
+# Boot banner cho host probe (init_serial_symlinks.py) nhận dạng role.
+ROLE_BANNER = "<HRBOT:LINE>"
+HEARTBEAT_INTERVAL_MS = 2000
+
 i2c = I2C(0, freq=100000)
 
 def read_s4(addr):
@@ -29,8 +33,17 @@ def build_linesensor_json():
     payload = {"LineSensor": sensors}
     return ujson.dumps(payload)
 
+# Banner ngay khi boot — emit sớm để probe latch được.
+print(ROLE_BANNER)
+print(ROLE_BANNER)
 print("App started")
 
+last_banner_ms = time.ticks_ms()
+
 while True:
+    now = time.ticks_ms()
+    if time.ticks_diff(now, last_banner_ms) >= HEARTBEAT_INTERVAL_MS:
+        print(ROLE_BANNER)
+        last_banner_ms = now
     print(build_linesensor_json())
     time.sleep_ms(100)

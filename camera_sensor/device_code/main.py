@@ -5,6 +5,12 @@ import time
 
 DEV_ID = "DEV1"
 
+# Boot banner cho host probe nhận dạng role.
+ROLE_BANNER = "<HRBOT:CAMERA>"
+BANNER_INTERVAL_MS = 2000
+print(ROLE_BANNER)
+print(ROLE_BANNER)
+
 uart = UART(1, baudrate=9600, tx=D4_PIN, rx=D3_PIN)
 hl = HuskyLens(uart)
 hl.debug = False
@@ -18,6 +24,7 @@ RECONNECT_INTERVAL_MS = 3000
 last_face_sent_ms = 0
 last_no_obj_ms = 0
 last_reconnect_ms = 0
+last_banner_ms = 0
 last_face_payload = ""
 
 
@@ -68,6 +75,10 @@ else:
 
 
 while True:
+    if elapsed_ms(last_banner_ms) >= BANNER_INTERVAL_MS:
+        print(ROLE_BANNER)
+        last_banner_ms = now_ms()
+
     if not connected:
         if elapsed_ms(last_reconnect_ms) >= RECONNECT_INTERVAL_MS:
             last_reconnect_ms = now_ms()
