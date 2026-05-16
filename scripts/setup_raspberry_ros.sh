@@ -58,8 +58,10 @@ install_apt_deps() {
 
 ensure_ros_sourced() {
   if [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then
+    set +u
     # shellcheck source=/dev/null
     source "/opt/ros/${ROS_DISTRO}/setup.bash"
+    set -u
     return
   fi
 
