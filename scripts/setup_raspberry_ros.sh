@@ -173,10 +173,17 @@ write_shell_hint() {
 
   if [ -f "$shell_rc" ]; then
     tmp_rc="$(mktemp)"
+    # Dọn 2 dạng block cũ:
+    #  1) Block có marker mới  ">>> HospitalRobot ROS2 workspace >>>" ... "<<<"
+    #  2) Block legacy bắt đầu  "# HospitalRobot ROS2 workspace" cho đến "set -u"
+    #     (phiên bản cũ ghi set +u/set -u → leak nounset vào shell tương tác).
     awk -v b="$begin_marker" -v e="$end_marker" '
-      $0==b {skip=1; next}
-      $0==e {skip=0; next}
-      !skip {print}
+      $0==b           {skip=1; next}
+      $0==e           {skip=0; next}
+      $0=="# HospitalRobot ROS2 workspace" {legacy=1; next}
+      legacy && $0=="set -u" {legacy=0; next}
+      legacy          {next}
+      !skip           {print}
     ' "$shell_rc" > "$tmp_rc"
     mv "$tmp_rc" "$shell_rc"
   fi
