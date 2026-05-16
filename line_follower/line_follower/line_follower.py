@@ -1,7 +1,12 @@
+"""Finite-state controller for line following, plan execution, and HuskyLens guidance."""
+
 import time
-from .line_follow_strategies import LineSensorStrategy, HuskyLensStrategy, HybridStrategy
+
+from .line_follow_strategies import HybridStrategy, HuskyLensStrategy, LineSensorStrategy
+
 
 class LineFollowerFSM:
+    """Coordinate tracking strategies, cross handling, and plan-driven actions."""
     STATE_FOLLOWING = 0
     STATE_CROSSING = 1
     STATE_TURN_LEFT = 2
@@ -701,6 +706,12 @@ class LineFollowerFSM:
         return "Forward", self.base_speed
 
     def _compute_huskylens_command(self, frame_context):
+        """Compute a command from the normalized HuskyLens frame.
+
+        The runtime contract in this repo is based on ``tail_offset_x`` for lateral
+        drift and ``angle_deg`` for heading correction. The config knobs are applied
+        directly here so tuning the JSON file changes behavior predictably.
+        """
         huskylens = (frame_context or {}).get("huskylens_frame")
         if not isinstance(huskylens, dict):
             return None
@@ -719,19 +730,21 @@ class LineFollowerFSM:
         except Exception:
             return None
 
-        # Independent control:
-        # 1) prioritize lateral correction from tail_offset_x with threshold +/-3
-        # 2) then heading correction from angle_deg with threshold +/-3
-        if tail_offset_x < -10.0:
+        lateral_error = tail_offset_x * self.huskylens_control_gain
+        heading_error = angle_deg
+        lateral_deadband = self.huskylens_deadband
+        heading_deadband = max(0.0, min(float(self.huskylens_max_abs_error), self.huskylens_deadband))
+
+        if lateral_error < -lateral_deadband:
             self.state = self.STATE_TURN_RIGHT
             return "Right", self.turn_speed_right
-        if tail_offset_x > 10.0:
+        if lateral_error > lateral_deadband:
             self.state = self.STATE_TURN_LEFT
             return "Left", self.turn_speed_left
-        if angle_deg < -3.0:
+        if heading_error < -heading_deadband:
             self.state = self.STATE_TURN_RIGHT
             return "RotateRight", self.turn_speed_right
-        if angle_deg > 3.0:
+        if heading_error > heading_deadband:
             self.state = self.STATE_TURN_LEFT
             return "RotateLeft", self.turn_speed_left
         self.state = self.STATE_FOLLOWING

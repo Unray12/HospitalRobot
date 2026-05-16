@@ -1,11 +1,14 @@
 #!/usr/bin/python3
+"""MQTT/ROS2 bridge with keyboard control, plan routing, and status forwarding."""
+
+import json
+import os
+import queue
+import re
 import sys
 import threading
-from threading import Event
-import os
-import re
 import time
-import json
+from threading import Event
 
 try:
     import paho.mqtt.client as mqtt
@@ -45,6 +48,8 @@ def get_key():
 
 
 class MQTTBridgeNode(Node):
+    """Bridge MQTT commands, ROS topics, keyboard input, and UI-facing status flows."""
+
     def __init__(self):
         super().__init__('mqtt_bridge_ros2')
         self.log = LogAdapter(self.get_logger(), "mqtt_bridge")
@@ -141,6 +146,8 @@ class MQTTBridgeNode(Node):
         }
         self._last_log_ts = {}
         self._last_logged_value = {}
+        self._inbound_queue = queue.SimpleQueue()
+        self._shutdown_requested = False
 
         # ROS 2 publisher
         self.ros_pub = self.create_publisher(String, self.topic_vr, 10)
@@ -175,6 +182,7 @@ class MQTTBridgeNode(Node):
         # Keyboard đọc ở worker thread để không block executor
         self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
         self._keyboard_thread.start()
+        self._bridge_timer = self.create_timer(0.02, self._drain_inbound_queue)
 
         self.log.info("MQTT <-> ROS2 bridge started", event="BOOT")
 
@@ -197,30 +205,7 @@ class MQTTBridgeNode(Node):
         data = msg.payload.decode()
         if self._is_recent_local_echo(msg.topic, data):
             return
-        self._log_throttled(
-            key=f"bridge_in:{msg.topic}",
-            period=self._log_control["bridge_traffic_period"],
-            enabled=self._log_control["bridge_in_enabled"],
-            message=f"MQTT -> ROS2 [{msg.topic}]: {data}",
-            event="BRIDGE_IN",
-        )
-
-        ros_msg = String()
-        if msg.topic == self.topic_vr:
-            ros_msg.data = data
-            self.ros_pub.publish(ros_msg)
-        elif msg.topic == self.topic_pick:
-            ros_msg.data = data
-            self.ros_pick_pub.publish(ros_msg)
-        elif msg.topic == self.topic_plan:
-            resolved = self._resolve_plan_command(data)
-            if not resolved:
-                self.log.warning(f"Ignored invalid plan command: {data}", event="PLAN_MQTT")
-                return
-            ros_msg.data = resolved
-            self.ros_plan_pub.publish(ros_msg)
-            if resolved != data:
-                self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
+        self._inbound_queue.put((msg.topic, data))
 
     # Keyboard → MQTT
     def keyboard_loop(self):
@@ -235,66 +220,26 @@ class MQTTBridgeNode(Node):
             elif key == self.key_toggle_auto:
                 autoMode = not autoMode
                 mode_msg = "1" if autoMode else "0"
-                self.ros_pick_pub.publish(String(data=mode_msg))
-                self.client.publish(self.topic_pick, mode_msg)
-                self._mark_local_publish(self.topic_pick, mode_msg)
-                self._log_throttled(
-                    key="bridge_out:pick",
-                    period=self._log_control["bridge_traffic_period"],
-                    enabled=self._log_control["bridge_out_enabled"],
-                    message=f"ROS2 -> MQTT pick: {mode_msg}",
-                    event="BRIDGE_OUT",
-                )
+                self._inbound_queue.put(("__keyboard_pick__", mode_msg))
             elif key == self.key_toggle_debug_logs:
-                self._debug_logs_enabled = not self._debug_logs_enabled
-                self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
-                state = "ON" if self._debug_logs_enabled else "OFF"
-                self.log.info(
-                    f"Debug logs toggled: {state} (key={self.key_toggle_debug_logs})",
-                    event="DEBUG_TOGGLE",
-                )
+                self._inbound_queue.put(("__keyboard_debug__", "toggle"))
             elif key in self.plan_key_map:
                 plan_name = self.plan_key_map[key]
-                if self._mqtt_connected:
-                    mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
-                    self.ros_plan_pub.publish(String(data=plan_name))
-                    self.client.publish(self.topic_plan, mqtt_plan_cmd)
-                    self._mark_local_publish(self.topic_plan, mqtt_plan_cmd)
-                    self._log_throttled(
-                        key="bridge_out:plan",
-                        period=self._log_control["bridge_traffic_period"],
-                        enabled=self._log_control["bridge_out_enabled"],
-                        message=f"ROS2 -> MQTT plan: {mqtt_plan_cmd}",
-                        event="BRIDGE_OUT",
-                    )
-                else:
-                    # Fallback local publish so operator key still works when MQTT is down.
-                    ros_msg = String()
-                    ros_msg.data = plan_name
-                    self.ros_plan_pub.publish(ros_msg)
-                    self.log.warning(
-                        f"MQTT unavailable, published plan locally: {plan_name}",
-                        event="BRIDGE_FALLBACK",
-                    )
+                mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
+                self._inbound_queue.put(("__keyboard_plan__", f"{plan_name}|{mqtt_plan_cmd}"))
             elif key == self.key_quit:
                 self.log.info("Thoat chuong trinh", event="KEYBOARD")
+                self._shutdown_requested = True
                 self._stop_event.set()
-                rclpy.shutdown()
                 break
 
             if cmd:
-                self.ros_pub.publish(String(data=cmd))
-                self.client.publish(self.topic_vr, cmd)
-                self._mark_local_publish(self.topic_vr, cmd)
-                self._log_throttled(
-                    key="bridge_out:vr",
-                    period=self._log_control["bridge_traffic_period"],
-                    enabled=self._log_control["bridge_out_enabled"],
-                    message=f"ROS2 -> MQTT vr: {cmd}",
-                    event="BRIDGE_OUT",
-                )
+                self._inbound_queue.put(("__keyboard_vr__", cmd))
 
-        self.client.disconnect()
+        try:
+            self.client.disconnect()
+        except Exception:
+            pass
 
     def destroy_node(self):
         self._stop_event.set()
@@ -302,7 +247,106 @@ class MQTTBridgeNode(Node):
             self.client.disconnect()
         except Exception:
             pass
+        for thread in (getattr(self, "_keyboard_thread", None), getattr(self, "_mqtt_thread", None)):
+            if thread and thread.is_alive():
+                thread.join(timeout=0.5)
         super().destroy_node()
+
+    def _drain_inbound_queue(self):
+        while True:
+            try:
+                topic, data = self._inbound_queue.get_nowait()
+            except Exception:
+                break
+            self._handle_inbound_event(topic, data)
+
+        if self._shutdown_requested and rclpy.ok():
+            rclpy.shutdown()
+
+    def _handle_inbound_event(self, topic, data):
+        if topic == "__keyboard_vr__":
+            self.ros_pub.publish(String(data=data))
+            self.client.publish(self.topic_vr, data)
+            self._mark_local_publish(self.topic_vr, data)
+            self._log_throttled(
+                key="bridge_out:vr",
+                period=self._log_control["bridge_traffic_period"],
+                enabled=self._log_control["bridge_out_enabled"],
+                message=f"ROS2 -> MQTT vr: {data}",
+                event="BRIDGE_OUT",
+            )
+            return
+
+        if topic == "__keyboard_pick__":
+            self.ros_pick_pub.publish(String(data=data))
+            self.client.publish(self.topic_pick, data)
+            self._mark_local_publish(self.topic_pick, data)
+            self._log_throttled(
+                key="bridge_out:pick",
+                period=self._log_control["bridge_traffic_period"],
+                enabled=self._log_control["bridge_out_enabled"],
+                message=f"ROS2 -> MQTT pick: {data}",
+                event="BRIDGE_OUT",
+            )
+            return
+
+        if topic == "__keyboard_debug__":
+            self._debug_logs_enabled = not self._debug_logs_enabled
+            self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
+            state = "ON" if self._debug_logs_enabled else "OFF"
+            self.log.info(
+                f"Debug logs toggled: {state} (key={self.key_toggle_debug_logs})",
+                event="DEBUG_TOGGLE",
+            )
+            return
+
+        if topic == "__keyboard_plan__":
+            plan_name, mqtt_plan_cmd = data.split("|", 1)
+            if self._mqtt_connected:
+                self.ros_plan_pub.publish(String(data=plan_name))
+                self.client.publish(self.topic_plan, mqtt_plan_cmd)
+                self._mark_local_publish(self.topic_plan, mqtt_plan_cmd)
+                self._log_throttled(
+                    key="bridge_out:plan",
+                    period=self._log_control["bridge_traffic_period"],
+                    enabled=self._log_control["bridge_out_enabled"],
+                    message=f"ROS2 -> MQTT plan: {mqtt_plan_cmd}",
+                    event="BRIDGE_OUT",
+                )
+            else:
+                self.ros_plan_pub.publish(String(data=plan_name))
+                self.log.warning(
+                    f"MQTT unavailable, published plan locally: {plan_name}",
+                    event="BRIDGE_FALLBACK",
+                )
+            return
+
+        if self._is_recent_local_echo(topic, data):
+            return
+        self._log_throttled(
+            key=f"bridge_in:{topic}",
+            period=self._log_control["bridge_traffic_period"],
+            enabled=self._log_control["bridge_in_enabled"],
+            message=f"MQTT -> ROS2 [{topic}]: {data}",
+            event="BRIDGE_IN",
+        )
+
+        ros_msg = String()
+        if topic == self.topic_vr:
+            ros_msg.data = data
+            self.ros_pub.publish(ros_msg)
+        elif topic == self.topic_pick:
+            ros_msg.data = data
+            self.ros_pick_pub.publish(ros_msg)
+        elif topic == self.topic_plan:
+            resolved = self._resolve_plan_command(data)
+            if not resolved:
+                self.log.warning(f"Ignored invalid plan command: {data}", event="PLAN_MQTT")
+                return
+            ros_msg.data = resolved
+            self.ros_plan_pub.publish(ros_msg)
+            if resolved != data:
+                self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
 
     def _rosout_cb(self, msg: Log):
         if not self._mqtt_connected:
@@ -403,17 +447,18 @@ class MQTTBridgeNode(Node):
         if self._camera_face_require_plan_autoline:
             if (not self._plan_autoline_active) or (not self._active_plan_name):
                 return
-        face_id = self._extract_face_id(payload)
-        if face_id is None:
+        face_ids = self._extract_face_ids(payload)
+        if not face_ids:
             return
-        message = self._camera_face_plan_messages.get(str(face_id))
-        if not message:
-            return
-        self.client.publish(self.topic_plan_message_mqtt, message)
-        self.log.info(
-            f"Camera FACE id={face_id} -> MQTT {self.topic_plan_message_mqtt}: {message}",
-            event="CAMERA_PLAN_MSG",
-        )
+        for face_id in face_ids:
+            message = self._camera_face_plan_messages.get(str(face_id))
+            if not message:
+                continue
+            self.client.publish(self.topic_plan_message_mqtt, message)
+            self.log.info(
+                f"Camera FACE id={face_id} -> MQTT {self.topic_plan_message_mqtt}: {message}",
+                event="CAMERA_PLAN_MSG",
+            )
 
     def _update_plan_runtime_state(self, payload: str):
         try:
@@ -437,17 +482,21 @@ class MQTTBridgeNode(Node):
             self._active_plan_name = None
             self._plan_autoline_active = False
 
-    def _extract_face_id(self, payload: str):
+    def _extract_face_ids(self, payload: str):
         text = (payload or "").strip().upper()
         if "FACE" not in text:
-            return None
-        m = re.search(r"FACE\s*,\s*(\d+)", text)
+            return []
+        m = re.search(r"FACE\s*,\s*([0-9,;|/ ]+)", text)
         if not m:
-            return None
-        try:
-            return int(m.group(1))
-        except ValueError:
-            return None
+            return []
+        ids = []
+        for token in re.findall(r"\d+", m.group(1)):
+            try:
+                face_id = int(token)
+            except ValueError:
+                continue
+            ids.append(face_id)
+        return ids
 
     def _resolve_plan_command(self, payload: str):
         text = (payload or "").strip()

@@ -1,9 +1,11 @@
+"""ROS2 node that coordinates autonomous tracking, plans, and motor commands."""
+
 import json
 import time
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int16MultiArray, Bool, String
+from std_msgs.msg import Bool, Int16MultiArray, String
 from std_srvs.srv import SetBool
 
 from .line_follower import LineFollowerFSM
@@ -13,7 +15,10 @@ from robot_common.logging_utils import LogAdapter
 
 
 class LineFollowerNode(Node):
+    """Bridge ROS topics/services into the line-following finite-state machine."""
+
     def __init__(self):
+        """Create publishers, subscriptions, timers, and the FSM from shared config."""
         super().__init__("line_follower")
         self.log = LogAdapter(self.get_logger(), "line_follower")
 
@@ -63,9 +68,13 @@ class LineFollowerNode(Node):
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
         plan_name = config.get("cross_plan_name")
-        plan_data = cfg_mgr.load_plan(plan_name, force=True) if plan_name else None
+        plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
         plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
-        plan_end_state = plan_data.get("end_state", config.get("plan_end_state", "stop")) if plan_data else config.get("plan_end_state", "stop")
+        plan_end_state = (
+            plan_data.get("end_state", config.get("plan_end_state", "stop"))
+            if plan_data
+            else config.get("plan_end_state", "stop")
+        )
 
         self.follower = LineFollowerFSM(
             base_speed=self.base_speed,
@@ -118,11 +127,35 @@ class LineFollowerNode(Node):
             self.log.info("Line sensor input disabled (only_huskylens=true)", event="LINE_SENSOR")
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
-        self._subscribe_huskylens = (
-            self.huskylens_enabled
-            or self.tracking_strategy in {"huskylens", "hybrid"}
-            or (self.tracking_strategy == "line_sensor" and not self.huskylens_fallback_on_invalid)
-        )
+
+        self._subscribe_huskylens = self.huskylens_enabled or self.tracking_strategy in {"huskylens", "hybrid"}
+        self._line_sensor_fallback_enabled = (not self.tracking_only_huskylens) and self.huskylens_fallback_on_invalid
+        if self.tracking_strategy in {"huskylens", "hybrid"}:
+            self.log.info(
+                (
+                    f"HuskyLens fallback to line sensor={'on' if self._line_sensor_fallback_enabled else 'off'} "
+                    f"(strict_mode={int(self.tracking_strict_mode)})"
+                ),
+                event="FALLBACK",
+            )
+        elif self.huskylens_fallback_on_invalid and self.tracking_only_huskylens:
+            self.log.warning(
+                "fallback_on_invalid=true has no effect while only_huskylens=true",
+                event="FALLBACK",
+            )
+        elif self.huskylens_fallback_on_invalid and not self.huskylens_enabled:
+            self.log.warning(
+                "fallback_on_invalid=true but HuskyLens input is disabled by config/strategy",
+                event="FALLBACK",
+            )
+        if self.tracking_strategy == "line_sensor" and self.huskylens_enabled:
+            self.log.info(
+                "HuskyLens subscription kept only for observability; tracking strategy remains line_sensor",
+                event="HUSKYLENS",
+            )
+
+        self.follower.tracking_allow_line_sensor_fallback = self._line_sensor_fallback_enabled
+
         if self._subscribe_huskylens:
             self.create_subscription(String, self.huskylens_topic_frame, self._huskylens_cb, 10)
             self.log.info(f"HuskyLens input enabled: {self.huskylens_topic_frame}", event="HUSKYLENS")
@@ -211,26 +244,19 @@ class LineFollowerNode(Node):
             name = self.plan_alias[name]
 
         now = time.time()
-        if (
-            self._last_plan_name == name
-            and (now - self._last_plan_ts) < self.plan_select_debounce_sec
-        ):
+        if self._last_plan_name == name and (now - self._last_plan_ts) < self.plan_select_debounce_sec:
             self.log.info(f"Plan duplicate ignored: {name}", event="PLAN")
             return
 
         cfg_mgr = ConfigManager("line_follower", logger=self.log)
-        plan_data = cfg_mgr.load_plan(name, force=True)
+        plan_data = cfg_mgr.load_plan(name)
         if not plan_data:
             self.log.warning(f"Plan not found: {name}", event="PLAN")
             return
 
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
-        auto_flag_raw = (
-            plan_data.get("autoline")
-            if "autoline" in plan_data
-            else plan_data.get("auto_on_select")
-        )
+        auto_flag_raw = plan_data.get("autoline") if "autoline" in plan_data else plan_data.get("auto_on_select")
         auto_on_select = self._to_bool(auto_flag_raw, self.auto_on_plan_select_default)
         start_without_cross = self._to_bool(
             plan_data.get("start_without_cross", plan_data.get("start_immediately")),
@@ -251,22 +277,33 @@ class LineFollowerNode(Node):
             self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
         elif self.autoMode:
             self.follower.reset()
-        if start_without_cross:
-            if self.follower.request_plan_start():
-                self._publish_plan_status_event("triggered_without_cross", status=self.follower.get_plan_status())
-                self.log.info(f"Plan triggered without cross: {name}", event="PLAN")
+        if start_without_cross and self.follower.request_plan_start():
+            self._publish_plan_status_event("triggered_without_cross", status=self.follower.get_plan_status())
+            self.log.info(f"Plan triggered without cross: {name}", event="PLAN")
         self.log.info(f"Plan selected: {name}", event="PLAN")
 
     def _set_auto_mode(self, enabled: bool):
+        """Toggle autonomous mode while preserving explicit plan lifecycle state."""
         if enabled and not self.autoMode:
             self.autoMode = True
             self.follower.reset()
+            self._plan_completion_reported = False
             self.log.info("Auto Mode Enabled", event="MODE")
+            if self._active_plan_name:
+                self._publish_plan_status_event("auto_enabled", status=self.follower.get_plan_status())
         elif not enabled and self.autoMode:
             self.autoMode = False
             self.follower.stop()
             self._publish_stop()
             self.log.info("Auto Mode Disabled", event="MODE")
+            if self._active_plan_name:
+                self._publish_plan_status_event("paused", status=self.follower.get_plan_status())
+                self.log.info(
+                    f"Plan paused with progress preserved: {self._active_plan_name}",
+                    event="PLAN",
+                )
+        elif not enabled and self._active_plan_name and not self._plan_completion_reported:
+            self._publish_plan_status_event("paused", status=self.follower.get_plan_status())
 
     def _timer_cb(self):
         if not self.autoMode:
@@ -312,10 +349,7 @@ class LineFollowerNode(Node):
         self._active_plan_autoline = bool(requested)
         self.follower.set_autoline_mode(bool(requested))
         self._on_autoline_step_callback(bool(requested))
-        self._publish_plan_status_event(
-            "autoline_step",
-            status=self.follower.get_plan_status(),
-        )
+        self._publish_plan_status_event("autoline_step", status=self.follower.get_plan_status())
         if requested:
             self.pick_pub.publish(String(data="1"))
             self._set_auto_mode(True)
@@ -343,15 +377,9 @@ class LineFollowerNode(Node):
                 payload = str(message)
             pub = self._get_string_publisher(topic)
             pub.publish(String(data=payload))
-            self.log.info(
-                f"[PLAN_MSG] topic={topic} payload={payload}",
-                event="PLAN_MESSAGE",
-            )
+            self.log.info(f"[PLAN_MSG] topic={topic} payload={payload}", event="PLAN_MESSAGE")
             if topic == self.plan_status_topic:
-                self.log.info(
-                    f"ROS2 -> MQTT plan status: {payload}",
-                    event="PLAN_STATUS_MQTT",
-                )
+                self.log.info(f"ROS2 -> MQTT plan status: {payload}", event="PLAN_STATUS_MQTT")
         self._publish_plan_status_event("step_message_sent", status=status)
 
     def _get_string_publisher(self, topic: str):
@@ -362,26 +390,17 @@ class LineFollowerNode(Node):
         return pub
 
     def _on_autoline_step_callback(self, enabled: bool):
-        """
-        Callback hook when plan step AutoLine is applied.
-        Add your custom function call here (service call, extra publish, etc.).
-        """
+        """Run the post-autoline callback hook used by the bridge/UI layers."""
         state = "ON" if enabled else "OFF"
         self.log.info(
             f"[CALLBACK] AutoLine step applied -> {state} (plan={self._active_plan_name})",
             event="AUTOLINE_CALLBACK",
         )
-        self._publish_plan_status_event(
-            "autoline_callback",
-            status=self.follower.get_plan_status(),
-        )
+        self._publish_plan_status_event("autoline_callback", status=self.follower.get_plan_status())
         self._my_function_after_rotate_to_autoline(enabled)
 
     def _my_function_after_rotate_to_autoline(self, enabled: bool):
-        """
-        Custom hook after Rotate...until-line transitions to AutoLine step.
-        Publishes structured callback payload to /plan_callback for MQTT bridge/UI/backend.
-        """
+        """Publish structured plan callback payloads for downstream integrations."""
         status = self.follower.get_plan_status()
         payload = {
             "event": "rotate_to_autoline",
@@ -440,7 +459,6 @@ class LineFollowerNode(Node):
         self._plan_completion_reported = True
         self._publish_plan_status_event("completed", status=status)
 
-        # Return to normal idle behavior after completed stop-plan.
         end_state = str(status.get("end_state", "") or "").strip().lower()
         if end_state == "follow":
             return
@@ -488,7 +506,6 @@ class LineFollowerNode(Node):
             if text in {"0", "false", "no", "off"}:
                 return False
         return bool(value)
-
 
 
 def main(args=None):

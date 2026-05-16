@@ -14,12 +14,23 @@
     "camera_sensor": {
         "serial": {
             "port": "/dev/ttyACM2",
-            "baudrate": 115200,
+            "baudrate": 9600,
             "timeout": 0.2
         },
         "publish": {
             "topic": "/face/camera"
-        }
+        },
+        "reconnect_period_sec": 2.0,
+        "fallback_ports": [
+            "/dev/ttyACM2",
+            "/dev/ttyACM1",
+            "/dev/ttyACM0"
+        ],
+        "scan_prefixes": [
+            "/dev/ttyACM",
+            "/dev/ttyUSB",
+            "COM"
+        ]
     },
     "line_sensors": {
         "serial": {
@@ -37,7 +48,17 @@
         },
         "topics": {
             "debug_toggle": "/debug_logs_toggle"
-        }
+        },
+        "reconnect_period_sec": 2.0,
+        "fallback_ports": [
+            "/dev/ttyACM0",
+            "/dev/ttyACM1"
+        ],
+        "scan_prefixes": [
+            "/dev/ttyACM",
+            "/dev/ttyUSB",
+            "COM"
+        ]
     },
     "line_follower": {
         "base_speed": 8,

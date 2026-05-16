@@ -22,7 +22,7 @@ Tài liệu này là đặc tả chi tiết cho file plan JSON dùng bởi `line
 
 ```json
 {
-  "name": "a20",
+  "name": "a19",
   "start_without_cross": true,
   "steps": [
     { "action": "RotateRight", "speed": 5, "until": "line", "timeout": 8 },

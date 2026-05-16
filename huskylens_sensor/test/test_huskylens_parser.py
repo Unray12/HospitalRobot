@@ -15,6 +15,7 @@ def test_normalize_huskylens_payload_valid_data():
     assert frame["valid"] == 1
     assert frame["tail_offset_x"] == -72.0
     assert frame["angle_deg"] == 4.12
+    assert frame["error"] == -57
     assert frame["line_length_y"] == 84
     assert is_frame_tracking_valid(frame) is True
 

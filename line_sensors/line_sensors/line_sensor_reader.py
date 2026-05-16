@@ -1,6 +1,8 @@
-import time
-import json
+"""Serial reader and parser for the line sensor frame stream."""
+
 import glob
+import json
+import time
 
 try:
     import serial
@@ -11,6 +13,8 @@ except ImportError:
 
 
 class LineSensorReader:
+    """Read newline-delimited JSON payloads and normalize them into line frames."""
+
     def __init__(self, port="/dev/ttyACM0", baudrate=115200, timeout=0.1, logger=None):
         self._logger = logger
         self._buffer = ""
@@ -27,6 +31,7 @@ class LineSensorReader:
         self._open_serial(self.port)
 
     def read_frame(self):
+        """Return the newest complete frame available from the serial buffer."""
         if not (self.ser and self.ser.is_open):
             return None
 
@@ -39,12 +44,14 @@ class LineSensorReader:
             if "\n" not in self._buffer:
                 return None
 
-            line, self._buffer = self._buffer.split("\n", 1)
-            line = line.strip()
-            if not line:
-                return None
-
-            return self.parse_line(line)
+            lines = self._buffer.split("\n")
+            self._buffer = lines[-1]
+            for line in reversed(lines[:-1]):
+                candidate = line.strip()
+                if not candidate:
+                    continue
+                return self.parse_line(candidate)
+            return None
         except json.JSONDecodeError:
             self._log_warn("Corrupted JSON skipped")
             return None
@@ -120,7 +127,7 @@ class LineSensorReader:
                 baudrate=self.baudrate,
                 timeout=self.timeout,
             )
-            time.sleep(2)
+            time.sleep(min(self.timeout, 0.2))
             self._last_open_error = None
             self._log_info(f"Serial Line Sensors connected: {port}")
             return True
@@ -135,18 +142,17 @@ class LineSensorReader:
     def _discover_ports(self, prefixes):
         found = []
         if list_ports is not None:
-            for p in list_ports.comports():
-                name = str(getattr(p, "device", "") or "")
+            for port_info in list_ports.comports():
+                name = str(getattr(port_info, "device", "") or "")
                 if self._matches_prefix(name, prefixes):
                     found.append(name)
         for prefix in prefixes:
             if prefix.startswith("/dev/"):
                 found.extend(glob.glob(prefix + "*"))
-        # keep unique order
         dedup = []
-        for p in found:
-            if p and p not in dedup:
-                dedup.append(p)
+        for port in found:
+            if port and port not in dedup:
+                dedup.append(port)
         return dedup
 
     def _matches_prefix(self, name, prefixes):
@@ -157,14 +163,18 @@ class LineSensorReader:
         return False
 
     def _count_active(self, sensor_dict):
+        """Count active channels without trusting payload types from the serial device."""
         if not isinstance(sensor_dict, dict):
             return 0
-        return sum(sensor_dict.values())
+        return sum(1 for value in sensor_dict.values() if self._is_active(value))
 
     def _is_full_black(self, sensor_dict):
         if not isinstance(sensor_dict, dict) or not sensor_dict:
             return False
-        return all(v == 1 for v in sensor_dict.values())
+        return all(self._is_active(value) for value in sensor_dict.values())
+
+    def _is_active(self, value):
+        return value in (True, 1, "1")
 
     def _log_info(self, msg):
         if self._logger:

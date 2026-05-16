@@ -17,7 +17,7 @@ setup(
     ],
     zip_safe=True,
     maintainer='aclab',
-    maintainer_email='aclab@todo.todo',
+    maintainer_email='aclab@example.com',
     description='MQTT bridge between operator inputs and ROS2 robot topics',
     license='Apache-2.0',
     extras_require={

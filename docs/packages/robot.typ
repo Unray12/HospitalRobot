@@ -24,7 +24,7 @@
   - Section:
     `robot_common/robot_common/config.json -> robot`
   - `bringup.nodes` mặc định:
-    `line_sensor_driver`, `line_follower`, `motor_driver`, `manual_control`, `camera_sensor`
+    `line_sensor_driver`, `line_follower`, `motor_driver`, `manual_control`, `camera_sensor`, `huskylens_sensor`
 
   #inline("Default bringup nodes")
   - `line_sensor_driver`
@@ -32,6 +32,7 @@
   - `motor_driver`
   - `manual_control`
   - `camera_sensor`
+  - `huskylens_sensor`
 
   #inline("Customization")
   - Sửa danh sách node tại:

@@ -1,5 +1,7 @@
-import time
+"""Serial motor controller wrapper for mecanum wheel commands."""
+
 import glob
+import time
 
 try:
     import serial
@@ -8,8 +10,6 @@ except ImportError:
     serial = None
     list_ports = None
 
-# Direction map for mecanum wheels
-# Order: [FL, FR, RL, RR]
 DIR = {
     "Forward": (-1, -1, -1, -1),
     "Backward": (+1, +1, +1, +1),
@@ -88,7 +88,7 @@ class MotorController:
                 baudrate=self.baudrate,
                 timeout=self.timeout,
             )
-            time.sleep(2)
+            time.sleep(min(self.timeout, 0.2))
             self._last_open_error = None
             self._log_info(f"Serial CAN connected: {port}")
             return True

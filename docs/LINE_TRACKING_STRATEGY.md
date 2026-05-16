@@ -12,7 +12,7 @@ tracking.strategy
 
 Nếu strategy trả None:
   - strict_mode=true  -> STOP
-  - strict_mode=false -> fallback line_sensor
+  - strict_mode=false -> fallback line_sensor chỉ khi `fallback_on_invalid=true` và `only_huskylens=false`
 ```
 
 ## 2. Config Fields

@@ -1,3 +1,5 @@
+"""Small structured logging helpers shared by ROS2 nodes in this repo."""
+
 import os
 
 
@@ -10,6 +12,7 @@ _LEVEL_COLORS = {
 
 
 def _color_enabled(default=True):
+    """Return whether ANSI colors should be emitted for structured log lines."""
     if os.getenv("NO_COLOR"):
         return False
     value = os.getenv("ROBOT_LOG_COLOR")
@@ -19,10 +22,7 @@ def _color_enabled(default=True):
 
 
 class LogAdapter:
-    """
-    Structured logger wrapper.
-    Keeps compatibility with rclpy logger API (info/warning/error).
-    """
+    """Format component-scoped log lines while preserving the rclpy logger API."""
 
     def __init__(self, logger, component, use_color=None):
         self._logger = logger
@@ -30,15 +30,19 @@ class LogAdapter:
         self.use_color = _color_enabled(default=True) if use_color is None else bool(use_color)
 
     def info(self, message, event="INFO", **fields):
+        """Emit an informational structured log line."""
         self._logger.info(self._build("INFO", event, message, fields))
 
     def warning(self, message, event="WARN", **fields):
+        """Emit a warning structured log line."""
         self._logger.warning(self._build("WARNING", event, message, fields))
 
     def error(self, message, event="ERR", **fields):
+        """Emit an error structured log line."""
         self._logger.error(self._build("ERROR", event, message, fields))
 
     def _build(self, level, event, message, fields):
+        """Build a single structured message with optional key-value fields."""
         text = f"[{self.component}] [{event}] {message}"
         if fields:
             kv = " ".join(f"{k}={v}" for k, v in fields.items())
@@ -49,3 +53,23 @@ class LogAdapter:
         if not color:
             return text
         return f"{color}{text}{_RESET}"
+
+    def format(self, level, message, event=None, **fields):
+        """Return a formatted message without emitting it.
+
+        This is useful in tests and in code paths that need to pass a preformatted
+        message into another logging surface.
+        """
+        event_name = event or level
+        return self._build(level, event_name, message, fields)
+
+    def exception(self, message, event="EXC", **fields):
+        """Emit an exception-level message through the underlying error channel."""
+        self._logger.error(self._build("ERROR", event, message, fields))
+        if hasattr(self._logger, "exception"):
+            self._logger.exception(message)
+
+    warn = warning
+
+
+__all__ = ["LogAdapter"]

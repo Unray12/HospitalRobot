@@ -1,4 +1,9 @@
+"""Small retry state machine for syncing auto-mode requests to a ROS service."""
+
+
 class AutoModeSync:
+    """Track one pending auto-mode change until the target service accepts it."""
+
     def __init__(self, max_attempts=30):
         self.max_attempts = int(max(1, max_attempts))
         self.pending_mode = None

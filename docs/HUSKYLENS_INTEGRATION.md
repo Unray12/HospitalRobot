@@ -12,8 +12,10 @@ Tài liệu mô tả luồng `output -> input` khi dùng `huskylens_sensor` vớ
    - `connected`
    - `algorithm_set`
    - `valid`
+   - `tail_offset_x`
+   - `angle_deg`
    - `error`
-4. `line_follower` dùng `error` để tạo lệnh motor và publish `/motor_cmd`.
+4. `line_follower` dùng `tail_offset_x` + `angle_deg` để tạo lệnh motor và publish `/motor_cmd`; parser vẫn compute thêm `error` cho monitoring/downstream compatibility.
 
 ## 2. Topic contract
 
@@ -27,6 +29,8 @@ Payload canonical sau normalize:
     "connected": 1,
     "algorithm_set": 1,
     "valid": 1,
+    "tail_offset_x": -16,
+    "angle_deg": 3.7,
     "error": -12,
     "y_type": 1,
     "line_length_y": 84,
@@ -75,4 +79,4 @@ ros2 topic echo /huskylens/frame --once
 ros2 topic echo /huskylens/valid --once
 ```
 
-Nếu `/huskylens/frame` có `HuskylenSensor.error` và `line_follower` đang chạy strategy `huskylens`/`hybrid`, luồng I/O đã nối đúng.
+Nếu `/huskylens/frame` có cả `HuskylenSensor.tail_offset_x`, `HuskylenSensor.angle_deg`, `HuskylenSensor.error` và `line_follower` đang chạy strategy `huskylens`/`hybrid`, luồng I/O đã nối đúng.

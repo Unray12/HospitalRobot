@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""ROS2 node that normalizes camera serial payloads into face detection events."""
+
 import re
 
 import rclpy
@@ -11,6 +13,7 @@ from robot_common.logging_utils import LogAdapter
 
 
 class CameraSensorNode(Node):
+    """Publish normalized face/no-object events from the camera serial reader."""
     def __init__(self):
         super().__init__("camera_sensor")
         self.log = LogAdapter(self.get_logger(), "camera_sensor")
@@ -20,7 +23,7 @@ class CameraSensorNode(Node):
         pub_cfg = config.get("publish", {})
 
         port = str(serial_cfg.get("port", "/dev/ttyACM0"))
-        baudrate = int(serial_cfg.get("baudrate", 115200))
+        baudrate = int(serial_cfg.get("baudrate", 9600))
         read_timeout = float(serial_cfg.get("timeout", 0.2))
         topic = str(pub_cfg.get("topic", "/face/camera"))
         rate_hz = float(pub_cfg.get("rate_hz", 30.0))
@@ -86,7 +89,7 @@ class CameraSensorNode(Node):
             if end > start:
                 text = text[start + 1:end]
         text = text.strip("<>")
-        text = re.sub(r"[^A-Z0-9_,]", "", text)
+        text = re.sub(r"[^A-Z0-9_,;|/]", "", text)
         if not text:
             return None
 
@@ -113,20 +116,31 @@ class CameraSensorNode(Node):
         if state == "NO_OBJECT":
             return f"<{dev},NO_OBJECT>"
 
-        face_id = self._extract_face_id(rest)
-        return f"<{dev},FACE,{face_id}>"
+        face_ids = self._extract_face_ids(rest)
+        return f"<{dev},FACE,{face_ids}>"
 
     def _normalize_device(self, token):
+        """Normalize only known camera device token variants.
+
+        The old implementation accepted any token containing D/E/V plus a "1",
+        which turned corrupted strings into false-positive DEV1 events.
+        """
         t = (token or "").strip()
         if not t:
             return None
         if t.startswith("DEV") and len(t) > 3 and t[3:].isdigit():
             return t
-        if t in {"DEV", "DV1", "EV1", "D1", "V1", "DV", "EV", "DEV1"}:
-            return "DEV1"
-        if any(ch in t for ch in "DEV") and "1" in t:
-            return "DEV1"
-        return None
+        aliases = {
+            "DEV": "DEV1",
+            "DEV1": "DEV1",
+            "DV1": "DEV1",
+            "EV1": "DEV1",
+            "D1": "DEV1",
+            "V1": "DEV1",
+            "DV": "DEV1",
+            "EV": "DEV1",
+        }
+        return aliases.get(t)
 
     def _normalize_state(self, token):
         t = (token or "").strip()
@@ -141,13 +155,11 @@ class CameraSensorNode(Node):
             return "NO_OBJECT"
         return None
 
-    def _extract_face_id(self, token):
-        if not token:
-            return 0
-        m = re.search(r"\d+", token)
-        if not m:
-            return 0
-        return int(m.group(0))
+    def _extract_face_ids(self, token):
+        ids = re.findall(r"\d+", token or "")
+        if not ids:
+            return "0"
+        return ",".join(ids)
 
     def destroy_node(self):
         self.reader.close()

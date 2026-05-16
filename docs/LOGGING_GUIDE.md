@@ -20,7 +20,7 @@ Ví dụ:
 
 ```text
 [line_follower] [MODE] Auto Mode Enabled
-[line_follower] [PLAN] Plan selected: a20
+[line_follower] [PLAN] Plan selected: a19
 [line_follower] [PLAN_STATUS] a20 | state=PLAN | step=2/7 | action=RotateRight | end_state=stop
 [mqtt_bridge] [MQTT] Connected to MQTT broker
 [manual_control] [AUTO_SYNC] set_auto_mode rejected: service unavailable
