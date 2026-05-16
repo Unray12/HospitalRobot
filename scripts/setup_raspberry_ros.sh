@@ -168,19 +168,31 @@ run_tests() {
 
 write_shell_hint() {
   shell_rc="$HOME/.bashrc"
-  workspace_source="source $WORKSPACE_DIR/install/setup.bash"
+  begin_marker="# >>> HospitalRobot ROS2 workspace >>>"
+  end_marker="# <<< HospitalRobot ROS2 workspace <<<"
 
-  if ! grep -Fq "$workspace_source" "$shell_rc" 2>/dev/null; then
-    log "Adding workspace source to $shell_rc"
-    {
-      echo ""
-      echo "# HospitalRobot ROS2 workspace"
-      echo "set +u"
-      echo "source /opt/ros/${ROS_DISTRO}/setup.bash"
-      echo "$workspace_source"
-      echo "set -u"
-    } >> "$shell_rc"
+  if [ -f "$shell_rc" ]; then
+    tmp_rc="$(mktemp)"
+    awk -v b="$begin_marker" -v e="$end_marker" '
+      $0==b {skip=1; next}
+      $0==e {skip=0; next}
+      !skip {print}
+    ' "$shell_rc" > "$tmp_rc"
+    mv "$tmp_rc" "$shell_rc"
   fi
+
+  log "Refreshing workspace source block in $shell_rc"
+  {
+    echo ""
+    echo "$begin_marker"
+    echo "if [ -f /opt/ros/${ROS_DISTRO}/setup.bash ]; then"
+    echo "  source /opt/ros/${ROS_DISTRO}/setup.bash"
+    echo "fi"
+    echo "if [ -f $WORKSPACE_DIR/install/setup.bash ]; then"
+    echo "  source $WORKSPACE_DIR/install/setup.bash"
+    echo "fi"
+    echo "$end_marker"
+  } >> "$shell_rc"
 }
 
 print_next_steps() {
@@ -221,22 +233,25 @@ Auto mode publish:
 MQTT test:
   mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
 
-Serial ports to verify:
-  Motor: /dev/ttyUSB0
-  Line sensor: /dev/ttyACM0
-  HuskyLens: /dev/ttyACM1
-  Camera: /dev/ttyACM2
+Serial ports (sau khi cài udev rules, dùng symlink ổn định):
+  Motor:       /dev/hospitalrobot/motor      (fallback: /dev/ttyUSB0)
+  Line sensor: /dev/hospitalrobot/line       (fallback: /dev/ttyACM0)
+  HuskyLens:   /dev/hospitalrobot/huskylens  (fallback: /dev/ttyACM1)
+  Camera:      /dev/hospitalrobot/camera     (fallback: /dev/ttyACM2)
+
+Auto-detect & cài udev rules (1 lần):
+  python3 scripts/detect_serial_devices.py --json
+  # sửa KNOWN_DEVICES cho khớp VID:PID thực, rồi:
+  ./scripts/detect_serial_devices.sh --rules | sudo tee /etc/udev/rules.d/99-hospitalrobot-serial.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ls -l /dev/hospitalrobot/
 
 Useful env overrides:
   ROS_DISTRO=humble ./scripts/setup_raspberry_ros.sh
-  WORKSPACE_DIR=./scripts/.. ./scripts/setup_raspberry_ros.sh
   WORKSPACE_DIR=../ros2_ws ./scripts/setup_raspberry_ros.sh
   SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
   RUN_TESTS=1 ./scripts/setup_raspberry_ros.sh
   REPO_DIR=./src/HospitalRobot ./scripts/setup_raspberry_ros.sh
-
-If tests fail but build succeeds and you only want to run the robot:
-  SKIP_TESTS=1 ./scripts/setup_raspberry_ros.sh
 EOF
 }
 

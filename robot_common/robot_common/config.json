@@ -13,7 +13,7 @@
     },
     "camera_sensor": {
         "serial": {
-            "port": "/dev/ttyACM2",
+            "port": "/dev/hospitalrobot/camera",
             "baudrate": 9600,
             "timeout": 0.2
         },
@@ -22,11 +22,13 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
+            "/dev/hospitalrobot/camera",
             "/dev/ttyACM2",
             "/dev/ttyACM1",
             "/dev/ttyACM0"
         ],
         "scan_prefixes": [
+            "/dev/hospitalrobot/",
             "/dev/ttyACM",
             "/dev/ttyUSB",
             "COM"
@@ -34,7 +36,7 @@
     },
     "line_sensors": {
         "serial": {
-            "port": "/dev/ttyACM0",
+            "port": "/dev/hospitalrobot/line",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -51,10 +53,12 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
+            "/dev/hospitalrobot/line",
             "/dev/ttyACM0",
             "/dev/ttyACM1"
         ],
         "scan_prefixes": [
+            "/dev/hospitalrobot/",
             "/dev/ttyACM",
             "/dev/ttyUSB",
             "COM"
@@ -117,7 +121,7 @@
     },
     "motor_driver": {
         "serial": {
-            "port": "/dev/ttyUSB0",
+            "port": "/dev/hospitalrobot/motor",
             "baudrate": 115200,
             "timeout": 0.1
         },
@@ -126,7 +130,19 @@
         },
         "topics": {
             "debug_toggle": "/debug_logs_toggle"
-        }
+        },
+        "reconnect_period_sec": 2.0,
+        "fallback_ports": [
+            "/dev/hospitalrobot/motor",
+            "/dev/ttyUSB0",
+            "/dev/ttyUSB1"
+        ],
+        "scan_prefixes": [
+            "/dev/hospitalrobot/",
+            "/dev/ttyUSB",
+            "/dev/ttyACM",
+            "COM"
+        ]
     },
     "manual_control": {
         "base_speed": 10,
@@ -143,7 +159,7 @@
     },
     "huskylens_sensor": {
         "serial": {
-            "port": "/dev/ttyACM1",
+            "port": "/dev/hospitalrobot/huskylens",
             "baudrate": 9600,
             "timeout": 0.2
         },
@@ -154,11 +170,13 @@
         },
         "reconnect_period_sec": 2.0,
         "fallback_ports": [
+            "/dev/hospitalrobot/huskylens",
             "/dev/ttyACM2",
             "/dev/ttyACM1",
             "/dev/ttyACM0"
         ],
         "scan_prefixes": [
+            "/dev/hospitalrobot/",
             "/dev/ttyACM",
             "/dev/ttyUSB",
             "COM"
