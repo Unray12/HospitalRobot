@@ -1,176 +1,436 @@
-######################## WORKSPACE ########################
-Path: ~/Desktop/workspaces/HospitalRobot
-Git branch: feature/dev-20260514
+================================================================================
+  HOSPITAL ROBOT — HƯỚNG DẪN VẬN HÀNH & PHÁT TRIỂN
+================================================================================
+  Project:  HospitalRobot (ROS2 Humble + MicroPython ESP32)
+  Branch:   feature/dev-20260514
+  Platform: Raspberry Pi 4 (Ubuntu 22.04) + 3x ESP32 + Motor MCU
+================================================================================
 
-######################## SETUP TỪ ĐẦU (1 LỆNH) ########################
-# Lần đầu trên máy mới (build + serial symlinks + launch):
-./scripts/bootstrap_all.sh --launch
 
-# Đã setup rồi, chỉ launch:
-./scripts/bootstrap_all.sh --launch-only
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. KIẾN TRÚC HỆ THỐNG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Đã build rồi, làm lại serial auto-detect:
-sudo ./scripts/setup_serial_auto.sh
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                        Raspberry Pi 4 (ROS2)                        │
+  │                                                                     │
+  │  mqtt_bridge ←→ MQTT Broker (mosquitto :1883)  ←→  App / VR Client │
+  │       │                                                             │
+  │       ├── manual_control  → /motor_cmd                              │
+  │       ├── line_follower   → /motor_cmd  (auto mode)                 │
+  │       └── motor_driver    → Serial → Motor MCU                      │
+  │                                                                     │
+  │  line_sensors   ← Serial ← ESP32 (hrbot_line)                      │
+  │  camera_sensor  ← Serial ← ESP32 (hrbot_camera + HuskyLens UART)   │
+  │  huskylens_sensor ← Serial ← ESP32 (hrbot_huskylens)               │
+  └─────────────────────────────────────────────────────────────────────┘
 
-# Re-probe serial (sau khi cắm/đổi thiết bị):
-sudo systemctl restart hospitalrobot-serial
-ls -l /dev/hospitalrobot/
+  Packages (8):
+    robot_common     Shared config, protocol, logging, serial base class
+    robot            Bringup launcher (chạy tất cả node)
+    line_sensors     Đọc cảm biến line từ ESP32
+    huskylens_sensor Đọc HuskyLens tracking data
+    camera_sensor    Đọc face detection từ ESP32 camera
+    line_follower    FSM điều khiển tự động theo line + plan
+    motor_driver     Gửi lệnh motor qua serial CAN
+    manual_control   Xử lý lệnh tay từ VR/keyboard
+    mqtt_bridge      Cầu nối MQTT ↔ ROS2 + keyboard teleop
 
-# Gỡ serial service:
-sudo ./scripts/setup_serial_auto.sh --uninstall
 
-######################## BUILD THỦ CÔNG ########################
-cd ~/Desktop/workspaces/HospitalRobot
-colcon build --symlink-install
-source /opt/ros/humble/setup.bash
-source ./install/setup.bash
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. SETUP TỪ ĐẦU (MÁY MỚI)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Build 1 vài package thôi (nhanh hơn):
-colcon build --packages-select robot_common line_sensors camera_sensor huskylens_sensor --symlink-install
+  # Bước 1: Clone repo
+  cd ~/Desktop/workspaces
+  git clone <repo-url> HospitalRobot
+  cd HospitalRobot
 
-# Check packages:
-ros2 pkg list | grep -E "robot|line_sensors|line_follower|motor_driver|manual_control|mqtt_bridge|camera_sensor|huskylens_sensor"
+  # Bước 2: Setup toàn bộ (apt + build + serial symlinks)
+  ./scripts/bootstrap_all.sh
 
-######################## SERIAL PORTS (SYMLINK ỔN ĐỊNH) ########################
-# Tự động tạo bởi systemd service hospitalrobot-serial:
-/dev/hospitalrobot/motor       -> motor MCU (ttyUSB0)
-/dev/hospitalrobot/line        -> ESP32 line sensor   (firmware: hrbot_line)
-/dev/hospitalrobot/camera      -> ESP32 camera        (firmware: hrbot_camera)
-/dev/hospitalrobot/huskylens   -> ESP32 huskylens     (firmware: hrbot_huskylens)
+  # Bước 3 (tuỳ chọn): Launch ngay sau setup
+  ./scripts/bootstrap_all.sh --launch
 
-# Kiểm tra:
-ls -l /dev/hospitalrobot/
-journalctl -u hospitalrobot-serial -n 30 --no-pager
+  Script bootstrap_all.sh tự động:
+    ✓ Cài ROS2 Humble + dependencies (nếu chưa có)
+    ✓ colcon build --symlink-install
+    ✓ Tạo systemd service serial auto-detect
+    ✓ Probe firmware → tạo symlink /dev/hospitalrobot/*
 
-# Debug probe (in raw bytes mỗi port):
-sudo ./scripts/setup_serial_auto.sh --probe
+  ┌─ LƯU Ý ─────────────────────────────────────────────────────────────┐
+  │ Nếu đã setup rồi, chỉ cần:                                         │
+  │   ./scripts/bootstrap_all.sh --launch-only                          │
+  │                                                                     │
+  │ Nếu chỉ muốn rebuild:                                              │
+  │   colcon build --symlink-install                                    │
+  │   source install/setup.bash                                         │
+  └─────────────────────────────────────────────────────────────────────┘
 
-######################## DEVICE PROTOCOL v1 ########################
-# Spec đầy đủ: docs/DEVICE_PROTOCOL.md
-# Shared parser:  robot_common/robot_common/device_protocol.py
-#
-# Schema JSON 1 dòng / 1 envelope:
-#   {"dev_id":"hrbot_<role>","event":"<type>","payload":{...}}
-#
-# event ∈ { boot, data, info, error, ack }
-# Mọi firmware emit @ 10Hz, baud USB 115200, baud HuskyLens UART 9600.
 
-# Xem trực tiếp output device:
-sudo systemctl stop hospitalrobot-serial
-cat /dev/ttyACM0     # Đọc raw 1 port
-sudo systemctl start hospitalrobot-serial
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 3. SERIAL PORTS & DEVICE PROTOCOL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-######################## RUN ROBOT ########################
-# Bringup full (chạy tất cả node):
-ros2 run robot robot
+  3.1  Symlink ổn định (tạo bởi systemd service hospitalrobot-serial)
+  ─────────────────────────────────────────────────────────────────────
+  /dev/hospitalrobot/motor       → Motor MCU (ttyUSB0)       115200 baud
+  /dev/hospitalrobot/line        → ESP32 line sensor         115200 baud
+  /dev/hospitalrobot/camera      → ESP32 camera              115200 baud
+  /dev/hospitalrobot/huskylens   → ESP32 huskylens bridge    115200 baud
 
-# MQTT bridge riêng (cần cho keyboard + MQTT):
-ros2 run mqtt_bridge mqtt_bridge
+  3.2  Device Protocol v1 (JSON envelope)
+  ─────────────────────────────────────────────────────────────────────
+  Mỗi dòng serial = 1 JSON object:
+    {"dev_id":"hrbot_<role>","event":"<type>","payload":{...}}
 
-# Hoặc chạy từng node:
-ros2 run line_sensors line_sensor_driver
-ros2 run camera_sensor camera_sensor
-ros2 run huskylens_sensor huskylens_sensor
-ros2 run line_follower line_follower
-ros2 run motor_driver motor_driver
-ros2 run manual_control manual_control
+  event types:
+    boot   — thiết bị vừa khởi động (chứa firmware version)
+    data   — dữ liệu sensor chính (10 Hz)
+    info   — thông tin phụ (không critical)
+    error  — lỗi từ firmware
+    ack    — xác nhận lệnh đã nhận
 
-######################## TOPICS / SERVICES ########################
-Topics:
-  /VR_control           (std_msgs/String)             manual command (w/a/s/d/space/j/p/k/e/q)
-  /pick_robot           (std_msgs/String)             auto mode plan select ("0"=clear, "1"=a19, ...)
-  /line_sensors/frame   (std_msgs/Int16MultiArray)    [L_count, M_count, R_count, L_full, M_full, R_full]
-  /huskylens/frame      (std_msgs/String)             JSON {"HuskylenSensor":{...}}
-  /huskylens/valid      (std_msgs/Bool)               line tracking valid?
-  /face/camera          (std_msgs/String)             "<DEV1,FACE,1,2>" / "<DEV1,NO_OBJECT>"
-  /motor_cmd            (std_msgs/Int32MultiArray)    [left, right] speed [-10..10]
-  /auto_mode            (std_msgs/Bool)
-  /plan_status          (std_msgs/String)             JSON plan event
-  /plan_message         (std_msgs/String)             câu nói cho speaker
-  /debug_logs_toggle    (std_msgs/Bool)
+  Spec đầy đủ:  docs/DEVICE_PROTOCOL.md
+  Parser:       robot_common/robot_common/device_protocol.py
 
-Service:
-  /set_auto_mode        (std_srvs/SetBool)
+  3.3  Quản lý serial service
+  ─────────────────────────────────────────────────────────────────────
+  # Xem trạng thái symlinks:
+  ls -l /dev/hospitalrobot/
 
-# Echo:
-ros2 topic echo /huskylens/frame
-ros2 topic echo /face/camera
-ros2 topic echo /motor_cmd
-ros2 topic echo /line_sensors/frame
-ros2 topic echo /auto_mode
-ros2 topic hz   /huskylens/frame   # kiểm tra rate ~10Hz
+  # Xem log service:
+  journalctl -u hospitalrobot-serial -n 30 --no-pager
 
-######################## ĐIỀU KHIỂN ########################
-# Auto mode + plan select:
-ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once    # plan a19
-ros2 topic pub /pick_robot std_msgs/msg/String "{data: '0'}" --once    # clear / stop
+  # Re-probe (sau khi cắm/rút USB):
+  sudo systemctl restart hospitalrobot-serial
 
-# Manual qua MQTT (broker 127.0.0.1:1883):
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "w"      # forward
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "s"      # backward
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "a"      # left
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "d"      # right
-mosquitto_pub -h 127.0.0.1 -t VR_control -m " "      # stop
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "j"      # rotate left
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "p"      # rotate right
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "k"      # toggle auto
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "e"      # toggle debug log
-mosquitto_pub -h 127.0.0.1 -t VR_control -m "q"      # quit mqtt_bridge
+  # Debug probe thủ công:
+  sudo ./scripts/setup_serial_auto.sh --probe
 
-# Bàn phím trực tiếp trong shell mqtt_bridge (w/a/s/d/space/j/p/k/e/q)
+  # Cài lại service:
+  sudo ./scripts/setup_serial_auto.sh
 
-# Test motor cứng:
-ros2 topic pub /motor_cmd std_msgs/msg/Int32MultiArray "{data: [5, 5]}" --once   # tiến
-ros2 topic pub /motor_cmd std_msgs/msg/Int32MultiArray "{data: [0, 0]}" --once   # dừng
+  # Gỡ service:
+  sudo ./scripts/setup_serial_auto.sh --uninstall
 
-######################## MQTT BROKER ########################
-# Subscribe để xem tin nhắn vào:
-mosquitto_sub -h 127.0.0.1 -p 1883 -t "#" -v          # tất cả topic
-mosquitto_sub -h 127.0.0.1 -p 1883 -t VR_control -v   # 1 topic
 
-# Broker cũ test ngoài LAN:
-mosquitto_sub -h 172.28.182.106 -p 1883 -t VR_control -v
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4. CHẠY ROBOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-######################## FIRMWARE (NẠP VÀO ESP32) ########################
-# Chỉ nạp các file device_code/main.py (KHÔNG nạp file ROS node):
-camera_sensor/device_code/main.py          -> ESP32 camera     (dev_id=hrbot_camera)
-huskylens_sensor/device_code/main.py       -> ESP32 huskylens  (dev_id=hrbot_huskylens)
-line_sensors/device_code/main.py           -> ESP32 line       (dev_id=hrbot_line)
+  4.1  Bringup đầy đủ (khuyến nghị)
+  ─────────────────────────────────────────────────────────────────────
+  # Terminal 1: Tất cả sensor + follower + motor
+  ros2 run robot robot
 
-# Sau khi nạp, hard reset board (rút cắm USB hoặc nhấn EN).
-# Verify bằng cách đọc raw output:
-sudo systemctl stop hospitalrobot-serial
-PORT=/dev/ttyACM0; stty -F $PORT 115200 raw -echo; timeout 5 cat $PORT
-sudo systemctl start hospitalrobot-serial
+  # Terminal 2: MQTT bridge + keyboard
+  ros2 run mqtt_bridge mqtt_bridge
 
-######################## SỬA LỖI THƯỜNG GẶP ########################
-# "COLCON_TRACE: unbound variable" khi source install/setup.bash
-#   -> .bashrc còn block set -u cũ. Chạy lại setup script tự dọn:
-SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
-exec bash    # reload shell
+  4.2  Chạy từng node riêng lẻ (debug)
+  ─────────────────────────────────────────────────────────────────────
+  ros2 run line_sensors line_sensor_driver
+  ros2 run camera_sensor camera_sensor
+  ros2 run huskylens_sensor huskylens_sensor
+  ros2 run line_follower line_follower
+  ros2 run motor_driver motor_driver
+  ros2 run manual_control manual_control
 
-# Symlink /dev/hospitalrobot/<role> không có
-#   -> Firmware chưa emit dev_id banner. Debug:
-sudo ./scripts/setup_serial_auto.sh --probe
+  4.3  Kiểm tra node đang chạy
+  ─────────────────────────────────────────────────────────────────────
+  ros2 node list
+  ros2 pkg list | grep -E "robot|line_sensors|line_follower|motor_driver|manual_control|mqtt_bridge|camera_sensor|huskylens_sensor"
 
-# Node bị "Resource temporarily unavailable" / port tranh chấp
-#   -> Pkill ros2 + restart probe:
-pkill -f "ros2 run|ros2 launch"
-sudo systemctl restart hospitalrobot-serial
-ls -l /dev/hospitalrobot/
 
-# Camera/line node spam "Dropped malformed frame"
-#   -> Firmware cũ chưa nâng cấp envelope schema. Nạp lại firmware mới.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 5. ROS2 TOPICS & SERVICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# IDE (Thonny/mpremote) giữ port, ROS không vào được
-sudo lsof /dev/ttyACM*
-pkill -f thonny || pkill -f mpremote
+  Topic                    Type                       Mô tả
+  ─────────────────────────────────────────────────────────────────────
+  /VR_control              std_msgs/String            Lệnh điều khiển tay
+  /pick_robot              std_msgs/String            Bật/tắt auto ("1"/"0")
+  /plan_select             std_msgs/String            Chọn plan (tên plan)
+  /line_sensors/frame      std_msgs/Int16MultiArray   [L,M,R,Lfull,Mfull,Rfull]
+  /huskylens/frame         std_msgs/String            JSON HuskyLens data
+  /huskylens/valid         std_msgs/Bool              Line tracking valid?
+  /face/camera             std_msgs/String            Face detection result
+  /motor_cmd               std_msgs/Int32MultiArray   [left, right] speed
+  /auto_mode               std_msgs/Bool              Trạng thái auto mode
+  /plan_status             std_msgs/String            JSON plan progress
+  /plan_message            std_msgs/String            Câu nói cho speaker
+  /plan_callback           std_msgs/String            Callback từ speaker
+  /debug_logs_toggle       std_msgs/Bool              Toggle debug output
 
-######################## REFERENCE FILES ########################
-docs/DEVICE_PROTOCOL.md                   <- spec serial JSON envelope v1
-robot_common/robot_common/config.json     <- toàn bộ config node
-robot_common/robot_common/device_protocol.py  <- shared parser
-scripts/bootstrap_all.sh                  <- entry point all-in-one
-scripts/setup_raspberry_ros.sh            <- build workspace + apt deps
-scripts/setup_serial_auto.sh              <- udev + systemd serial probe
-scripts/init_serial_symlinks.py           <- content-probe + create symlinks
+  Service                  Type                       Mô tả
+  ─────────────────────────────────────────────────────────────────────
+  /set_auto_mode           std_srvs/SetBool           Set auto mode on/off
+
+  Echo nhanh:
+  ─────────────────────────────────────────────────────────────────────
+  ros2 topic echo /huskylens/frame
+  ros2 topic echo /face/camera
+  ros2 topic echo /motor_cmd
+  ros2 topic echo /line_sensors/frame
+  ros2 topic echo /plan_status
+  ros2 topic hz /huskylens/frame          # kỳ vọng ~10-20 Hz
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6. ĐIỀU KHIỂN ROBOT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  6.1  Keyboard (trong terminal mqtt_bridge)
+  ─────────────────────────────────────────────────────────────────────
+  Phím     Hành động              Phím     Hành động
+  ────     ─────────              ────     ─────────
+  W        Tiến                   J        Xoay trái
+  S        Lùi                    P        Xoay phải
+  A        Rẽ trái                K        Toggle auto mode
+  D        Rẽ phải                E        Toggle debug logs
+  Space    Dừng                   Q        Thoát mqtt_bridge
+  1-5      Chọn plan (a19→a15)    0        Clear plan
+
+  6.2  MQTT (từ app hoặc mosquitto CLI)
+  ─────────────────────────────────────────────────────────────────────
+  # Điều khiển tay:
+  mosquitto_pub -h 127.0.0.1 -t VR_control -m "Forward"
+  mosquitto_pub -h 127.0.0.1 -t VR_control -m "Stop"
+  mosquitto_pub -h 127.0.0.1 -t VR_control -m "RotateLeft"
+
+  # Auto mode:
+  mosquitto_pub -h 127.0.0.1 -t pick_robot -m "1"       # bật
+  mosquitto_pub -h 127.0.0.1 -t pick_robot -m "0"       # tắt
+
+  # Chọn plan:
+  mosquitto_pub -h 127.0.0.1 -t plan_select -m "room:1"     # → a19
+  mosquitto_pub -h 127.0.0.1 -t plan_select -m "room:a19"   # trực tiếp
+  mosquitto_pub -h 127.0.0.1 -t plan_select -m "clear"      # xoá plan
+
+  # Subscribe theo dõi:
+  mosquitto_sub -h 127.0.0.1 -t "#" -v                  # tất cả
+  mosquitto_sub -h 127.0.0.1 -t plan_status -v          # plan progress
+
+  6.3  ROS2 CLI (test trực tiếp)
+  ─────────────────────────────────────────────────────────────────────
+  # Chọn plan:
+  ros2 topic pub /pick_robot std_msgs/msg/String "{data: '1'}" --once
+
+  # Motor test:
+  ros2 topic pub /motor_cmd std_msgs/msg/Int32MultiArray "{data: [5, 5]}" --once
+  ros2 topic pub /motor_cmd std_msgs/msg/Int32MultiArray "{data: [0, 0]}" --once
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7. PLAN SYSTEM (LINE FOLLOWER FSM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Plans nằm tại: robot_common/robot_common/plans/*.json
+  Hiện có: a15, a16, a17, a18, a19
+
+  Plan mapping (keyboard/MQTT → plan name):
+    0 → clear    1 → a19    2 → a18    3 → a17    4 → a16    5 → a15
+
+  Cấu trúc plan JSON:
+  ─────────────────────────────────────────────────────────────────────
+  {
+    "name": "a19",
+    "start_without_cross": true,
+    "steps": [
+      {"label": "S1", "action": "RotateRight", "until": "line", "speed": 5,
+       "messages": [{"topic": "/plan_message", "message": "say: ..."}]},
+      {"action": "AutoLine", "enabled": true},
+      {"action": "Forward", "duration": 2.0, "speed": 8},
+      {"action": "Stop"}
+    ],
+    "end_state": "stop"
+  }
+
+  Các action hỗ trợ:
+    Forward / Backward / Left / Right   — di chuyển có duration
+    RotateLeft / RotateRight            — xoay (until: "line" hoặc duration)
+    Follow                              — auto-follow line có thời gian
+    Stop / Wait                         — dừng (có/không duration)
+    AutoLine                            — bật/tắt chế độ auto line-follow
+    GOTO                                — nhảy đến label khác
+    LABEL                               — đánh dấu vị trí (không thực thi)
+
+  Tham số step:
+    speed                 tốc độ (default: base_speed = 8)
+    duration              thời gian thực hiện (giây)
+    until                 điều kiện dừng ("line" = gặp lại line)
+    timeout               timeout cho rotate-until-line
+    min_duration          thời gian tối thiểu trước khi check until
+    continue_immediately  không đợi cross event, chạy step tiếp ngay
+    strict_line           chỉ dừng khi line ở giữa (center_only)
+    messages              danh sách message gửi khi bắt đầu step
+    end_state             kết thúc plan sau step này
+
+  Spec đầy đủ: docs/PLAN_GUIDE.md
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 8. FIRMWARE (NẠP VÀO ESP32)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File firmware (MicroPython):
+    camera_sensor/device_code/main.py      → ESP32 camera     (hrbot_camera)
+    huskylens_sensor/device_code/main.py   → ESP32 huskylens  (hrbot_huskylens)
+    line_sensors/device_code/main.py       → ESP32 line       (hrbot_line)
+
+  Nạp firmware:
+  ─────────────────────────────────────────────────────────────────────
+  # Dùng Thonny hoặc mpremote:
+  mpremote connect /dev/ttyACM0 cp camera_sensor/device_code/main.py :main.py
+  mpremote connect /dev/ttyACM0 reset
+
+  # Hoặc dùng Thonny IDE: mở file → Save to MicroPython device → Reset
+
+  Verify sau nạp:
+  ─────────────────────────────────────────────────────────────────────
+  sudo systemctl stop hospitalrobot-serial
+  PORT=/dev/ttyACM0; stty -F $PORT 115200 raw -echo; timeout 5 cat $PORT
+  # Kỳ vọng: dòng JSON {"dev_id":"hrbot_xxx","event":"boot",...}
+  sudo systemctl start hospitalrobot-serial
+
+  ┌─ LƯU Ý BAUDRATE ────────────────────────────────────────────────────┐
+  │ USB CDC (ESP32 ↔ Pi):     115200 baud (config trong config.json)    │
+  │ UART HuskyLens (IC ↔ IC): 9600 baud  (hằng số trong firmware)      │
+  │ Hai baudrate KHÁC NHAU — không nhầm lẫn khi cấu hình.              │
+  └─────────────────────────────────────────────────────────────────────┘
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 9. CẤU HÌNH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File config chính: robot_common/robot_common/config.json
+
+  Cấu trúc: mỗi package 1 section top-level
+  ─────────────────────────────────────────────────────────────────────
+  {
+    "robot":           { bringup nodes list },
+    "camera_sensor":   { serial, publish, reconnect },
+    "line_sensors":    { serial, filter, publish, reconnect },
+    "line_follower":   { speed, crossing, rotate, tracking, plans },
+    "motor_driver":    { serial, subscribe, reconnect },
+    "manual_control":  { speed, topics, service },
+    "huskylens_sensor":{ serial, publish, reconnect },
+    "mqtt_bridge":     { broker, topics, keyboard, plans, log_bridge }
+  }
+
+  Thay đổi config → restart node tương ứng (hoặc restart robot).
+  Không cần rebuild (symlink-install).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 10. BUILD & TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Build:
+  ─────────────────────────────────────────────────────────────────────
+  cd ~/Desktop/workspaces/HospitalRobot
+  colcon build --symlink-install
+  source install/setup.bash
+
+  # Build 1 vài package (nhanh hơn):
+  colcon build --packages-select robot_common line_follower --symlink-install
+
+  Test (pytest, chạy trên dev machine hoặc Pi):
+  ─────────────────────────────────────────────────────────────────────
+  # Toàn bộ:
+  python -m pytest
+
+  # 1 package:
+  python -m pytest line_follower/test/
+
+  # 1 test cụ thể:
+  python -m pytest line_follower/test/test_line_follower_fsm.py::test_plan_goto_label -v
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 11. SỬA LỖI THƯỜNG GẶP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Lỗi                                    Nguyên nhân & Cách sửa
+  ─────────────────────────────────────────────────────────────────────
+  "COLCON_TRACE: unbound variable"        .bashrc còn block set -u cũ
+                                          → SKIP_APT=1 ./scripts/setup_raspberry_ros.sh
+                                          → exec bash
+
+  /dev/hospitalrobot/<role> không có      Firmware chưa emit dev_id banner
+                                          → sudo ./scripts/setup_serial_auto.sh --probe
+                                          → Nạp lại firmware mới
+
+  "Resource temporarily unavailable"      Port bị chiếm bởi process khác
+                                          → pkill -f "ros2 run|ros2 launch"
+                                          → sudo systemctl restart hospitalrobot-serial
+
+  "Dropped malformed frame" liên tục     Firmware cũ chưa dùng envelope v1
+                                          → Nạp lại firmware mới cho ESP32
+
+  IDE giữ port (Thonny/mpremote)          Process IDE lock serial port
+                                          → sudo lsof /dev/ttyACM*
+                                          → pkill -f thonny || pkill -f mpremote
+
+  MQTT message gửi nhưng robot không     mqtt_bridge không chạy hoặc topic sai
+  phản hồi                                → ros2 node list (check mqtt_bridge)
+                                          → Chú ý case-sensitive: "VR_control"
+
+  Plan select nhưng robot không chạy      line_follower chưa load plan file
+                                          → ros2 topic echo /plan_select
+                                          → Kiểm tra plan file tồn tại trong plans/
+
+  Auto mode không chuyển                  Service /set_auto_mode không phản hồi
+                                          → ros2 service call /set_auto_mode ...
+                                          → Xem log manual_control (AUTO_SYNC)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 12. MQTT BROKER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Broker mặc định: 127.0.0.1:1883 (mosquitto local)
+
+  # Cài mosquitto (nếu chưa có):
+  sudo apt install mosquitto mosquitto-clients
+
+  # Kiểm tra broker đang chạy:
+  systemctl status mosquitto
+
+  # Subscribe tất cả topic (debug):
+  mosquitto_sub -h 127.0.0.1 -p 1883 -t "#" -v
+
+  Topics MQTT:
+    VR_control       (in)   Lệnh điều khiển tay
+    pick_robot       (in)   Auto mode on/off
+    plan_select      (in)   Chọn plan
+    plan_status      (out)  Trạng thái plan JSON
+    plan_message     (out)  Câu nói speaker
+    face/camera      (out)  Face detection
+    huskylens/frame  (out)  HuskyLens data
+    huskylens/valid  (out)  Line tracking valid
+    robot_logs       (out)  Filtered ROS logs
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 13. TÀI LIỆU THAM KHẢO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  File                                         Nội dung
+  ─────────────────────────────────────────────────────────────────────
+  docs/DEVICE_PROTOCOL.md                      Spec serial JSON envelope v1
+  docs/MQTT_MESSAGE_GUIDE.md                   Contract MQTT đầy đủ
+  docs/PLAN_GUIDE.md                           Hướng dẫn viết plan JSON
+  docs/LINE_TRACKING_STRATEGY.md               Chiến lược tracking line
+  docs/HUSKYLENS_INTEGRATION.md                Tích hợp HuskyLens
+  docs/LOGGING_GUIDE.md                        Hệ thống logging
+  docs/PROJECT_FLOW.md                         Luồng hoạt động tổng thể
+  robot_common/robot_common/config.json        Config tất cả node
+  robot_common/robot_common/plans/             Plan files (a15-a19)
+  scripts/bootstrap_all.sh                     Entry point setup all-in-one
+  scripts/setup_raspberry_ros.sh               Build workspace + apt deps
+  scripts/setup_serial_auto.sh                 Systemd serial probe service
+  scripts/init_serial_symlinks.py              Content-probe + symlink creation
+
+================================================================================

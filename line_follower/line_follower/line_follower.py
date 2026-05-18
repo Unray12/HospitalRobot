@@ -634,18 +634,20 @@ class LineFollowerFSM:
         lateral_deadband = self.huskylens_deadband
         heading_deadband = max(0.0, min(float(self.huskylens_max_abs_error), self.huskylens_deadband))
 
+        # tail_offset_x < 0 → tail lệch trái → robot rẽ trái để bám line
         if lateral_error < -lateral_deadband:
-            self.state = self.STATE_TURN_RIGHT
-            return "Right", self.turn_speed_right
-        if lateral_error > lateral_deadband:
             self.state = self.STATE_TURN_LEFT
             return "Left", self.turn_speed_left
-        if heading_error < -heading_deadband:
+        if lateral_error > lateral_deadband:
             self.state = self.STATE_TURN_RIGHT
-            return "RotateRight", self.turn_speed_right
+            return "Right", self.turn_speed_right
+        # angle_deg > 0 → line nghiêng phải → robot xoay trái để chỉnh heading
         if heading_error > heading_deadband:
             self.state = self.STATE_TURN_LEFT
             return "RotateLeft", self.turn_speed_left
+        if heading_error < -heading_deadband:
+            self.state = self.STATE_TURN_RIGHT
+            return "RotateRight", self.turn_speed_right
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
 

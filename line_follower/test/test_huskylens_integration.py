@@ -64,8 +64,8 @@ def test_huskylens_strategy_tail_priority_when_both_exceed_threshold():
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": -6, "angle_deg": 10},
     )
     direction, speed = fsm.update(line_frame, now=0.0)
-    assert direction == "Right"
-    assert speed == 7
+    assert direction == "Left"
+    assert speed == 6
 
 
 def test_huskylens_strategy_safe_zone_goes_forward():
@@ -174,7 +174,7 @@ def test_huskylens_deadband_controls_turn_threshold():
         line_sensor_frame=line_frame,
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": 6.0, "angle_deg": 1.0},
     )
-    assert fsm.update(line_frame, now=0.1) == ("Left", 6)
+    assert fsm.update(line_frame, now=0.1) == ("Right", 7)
 
 
 def test_huskylens_control_gain_amplifies_lateral_error():
@@ -192,7 +192,7 @@ def test_huskylens_control_gain_amplifies_lateral_error():
         line_sensor_frame=line_frame,
         huskylens_frame={"connected": 1, "algorithm_set": 1, "valid": 1, "tail_offset_x": 3.0, "angle_deg": 0.0},
     )
-    assert fsm.update(line_frame, now=0.0) == ("Left", 6)
+    assert fsm.update(line_frame, now=0.0) == ("Right", 7)
 
 
 def test_disabled_line_sensor_fallback_stops_when_huskylens_invalid():
