@@ -1,6 +1,6 @@
 import json
 
-from line_sensors.line_sensors.line_sensor_reader import LineSensorReader
+from line_sensors.line_sensor_reader import LineSensorReader
 
 
 class _FakeSerial:

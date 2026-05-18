@@ -36,7 +36,14 @@ class ConfigManager:
 
             ConfigManager._global_cache[cache_key] = data
 
-        package_data = ConfigManager._global_cache.get(cache_key, {}).get(self.package, {})
+        raw = ConfigManager._global_cache.get(cache_key, {})
+        if not isinstance(raw, dict):
+            self._log_warn(f"robot_common/{self.filename} is not a valid JSON object, using defaults")
+            raw = {}
+        package_data = raw.get(self.package, {})
+        if not isinstance(package_data, dict):
+            self._log_warn(f"Section '{self.package}' in config is not a valid JSON object, using defaults")
+            package_data = {}
         data = copy.deepcopy(package_data)
         if defaults:
             data = self._deep_merge(defaults, data)

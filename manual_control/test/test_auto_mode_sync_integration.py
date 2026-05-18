@@ -1,4 +1,4 @@
-from manual_control.manual_control.auto_mode_sync import AutoModeSync
+from manual_control.auto_mode_sync import AutoModeSync
 
 
 def test_auto_mode_retry_then_send_flow():

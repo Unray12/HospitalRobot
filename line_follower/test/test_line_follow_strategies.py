@@ -1,4 +1,4 @@
-from line_follower.line_follower.line_follow_strategies import (
+from line_follower.line_follow_strategies import (
     HybridStrategy,
     HuskyLensStrategy,
     LineSensorStrategy,

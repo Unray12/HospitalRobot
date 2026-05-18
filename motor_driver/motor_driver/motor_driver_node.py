@@ -51,7 +51,8 @@ class MotorDriverNode(Node):
         if not direction:
             return
         wheel_speeds = self.motor.move(direction, speed)
-        self._log_motor_debug(direction, speed, wheel_speeds)
+        if wheel_speeds is not None:
+            self._log_motor_debug(direction, speed, wheel_speeds)
 
     def _reconnect_cb(self):
         if self.motor.is_connected():

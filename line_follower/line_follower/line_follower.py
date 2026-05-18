@@ -75,66 +75,13 @@ class LineFollowerFSM:
         self._hybrid_strategy = HybridStrategy(self._huskylens_strategy, self._line_sensor_strategy)
         self._tracking_strategy = self._resolve_tracking_strategy(self.tracking_strategy_name)
 
-        self.state = self.STATE_FOLLOWING
-        self.crossing_start_time = None
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
-        self._cross_active = False
-        self._plan_new_step = True
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
 
-    def reset(self):
-        self.state = self.STATE_FOLLOWING
+    def _reset_state(self, state=STATE_FOLLOWING, reset_plan_index=True, clear_plan_fields=False):
+        self.state = state
         self.crossing_start_time = None
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
-        self._plan_new_step = True
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
-
-    def stop(self):
-        # Preserve current plan progress when stopping so status does not jump to step 1/N.
-        self._enter_stopped(reset_plan_progress=False)
-
-    def _enter_stopped(self, reset_plan_progress=True):
-        self.state = self.STATE_STOPPED
-        self.crossing_start_time = None
-        if reset_plan_progress:
+        if reset_plan_index:
             self._plan_index = 0
         self._plan_step_start = None
         self._plan_action_until = None
@@ -157,62 +104,39 @@ class LineFollowerFSM:
         self._autoline_mode = False
         self._plan_lost_line_since = None
         self._last_plan_lost_line_warn_ts = 0.0
+        if clear_plan_fields:
+            self.cross_plan = []
+            self.plan_end_state = "stop"
+            self._plan_labels = {}
+
+    def _clear_plan_action_state(self):
+        self._plan_action = None
+        self._plan_action_speed = None
+        self._plan_action_until = None
+        self._plan_action_until_line = False
+        self._plan_action_min_until = None
+        self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_rotate_strict_center = False
+
+    def reset(self):
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
+
+    def stop(self):
+        self._enter_stopped(reset_plan_progress=False)
+
+    def _enter_stopped(self, reset_plan_progress=True):
+        self._reset_state(state=self.STATE_STOPPED, reset_plan_index=reset_plan_progress)
 
     def set_plan(self, steps, end_state=None):
         self.cross_plan = steps or []
         if end_state:
             self.plan_end_state = end_state
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._plan_new_step = True
-        self._cross_active = False
-        self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
 
     def clear_plan(self):
-        self.cross_plan = []
-        self.plan_end_state = "stop"
-        self._plan_labels = {}
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
-        self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True, clear_plan_fields=True)
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -338,7 +262,6 @@ class LineFollowerFSM:
             if self._plan_index >= len(self.cross_plan):
                 if self.plan_end_state == "follow":
                     return self._follow_default()
-                # Keep plan progress at end so status remains completed (not step 1/N).
                 self._enter_stopped(reset_plan_progress=False)
                 return "Stop", 0
 
@@ -350,19 +273,8 @@ class LineFollowerFSM:
                 continue
 
             action = self._normalize_action(step.get("action", "Stop"))
-            speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
-            duration = self._to_float(step.get("duration"), 0.0, "duration", step)
-            until = str(step.get("until", "") or "").strip().lower()
-            timeout = self._to_float(step.get("timeout"), None, "timeout", step)
-            continue_immediately = self._to_bool(
-                step.get("continue_immediately", step.get("no_wait_cross")),
-                False,
-            )
-            end_after_step = self._to_bool(step.get("end_state"), False)
-
             if action in ("LABEL",):
                 continue
-
             if action == "GOTO":
                 target = self._resolve_goto_target(step.get("target"))
                 if target is None:
@@ -372,122 +284,21 @@ class LineFollowerFSM:
                 self._plan_index = target
                 continue
 
-            if action == "AUTOLINE":
-                enabled = self._to_bool(
-                    step.get("enabled", step.get("value", step.get("autoline"))),
-                    True,
-                )
-                self._requested_autoline = enabled
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
-                # After AutoLine step, return to FOLLOWING and wait next cross event
-                # before executing the next plan step.
-                return self._follow_default()
+            speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
+            duration = self._to_float(step.get("duration"), 0.0, "duration", step)
+            until = str(step.get("until", "") or "").strip().lower()
+            timeout = self._to_float(step.get("timeout"), None, "timeout", step)
+            continue_immediately = self._to_bool(
+                step.get("continue_immediately", step.get("no_wait_cross")), False,
+            )
+            end_after_step = self._to_bool(step.get("end_state"), False)
 
-            if action in ("AUTO",):
-                return self._follow_default()
-
-            if action in ("WAIT", "STOP"):
-                if duration and duration > 0:
-                    self.state = self.STATE_PLAN
-                    self._plan_action = "Stop"
-                    self._plan_action_speed = 0
-                    self._queue_step_messages(step)
-                    self._plan_continue_immediate = continue_immediately
-                    self._plan_force_complete = end_after_step
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._plan_action_min_until = None
-                    self._plan_action_timeout = None
-                    self._log_plan_step(self._plan_index, step, "timed-stop")
-                    return "Stop", 0
-                if action == "WAIT":
-                    duration = 0.3
-                    self.state = self.STATE_PLAN
-                    self._plan_action = "Stop"
-                    self._plan_action_speed = 0
-                    self._queue_step_messages(step)
-                    self._plan_continue_immediate = continue_immediately
-                    self._plan_force_complete = end_after_step
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._plan_action_min_until = None
-                    self._plan_action_timeout = None
-                    self._log_plan_step(self._plan_index, step, "wait-default")
-                    return "Stop", 0
-                if self.plan_end_state == "follow":
-                    self._log_info("[PLAN] Stop step reached, returning to follow")
-                    return self._follow_default()
-                self._enter_stopped(reset_plan_progress=False)
-                self._log_info("[PLAN] Stop step reached, robot stopped")
-                return "Stop", 0
-
-            if action == "FOLLOW":
-                if duration <= 0:
-                    duration = 0.6
-                self.state = self.STATE_PLAN
-                self._plan_action = "AutoFollow"
-                self._plan_action_speed = self.base_speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = now + duration
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._log_plan_step(self._plan_index, step, "follow")
-                return "Forward", self.base_speed
-
-            if action in ("ROTATELEFT", "ROTATERIGHT"):
-                move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
-                strict_line = self._to_bool(
-                    step.get("strict_line", step.get("center_only")),
-                    False,
-                )
-                min_duration = self._to_float(
-                    step.get("min_duration"),
-                    self.rotate_min_duration,
-                    "min_duration",
-                    step,
-                )
-                self.state = self.STATE_PLAN
-                self._plan_action = move_action
-                self._plan_action_speed = speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = None
-                self._plan_action_min_until = now + max(0.0, float(min_duration))
-                self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
-                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side) and (not strict_line)
-                self._plan_rotate_strict_center = bool(strict_line)
-                if duration > 0:
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._log_plan_step(self._plan_index, step, "rotate-duration")
-                    return move_action, speed
-                self._plan_action_until_line = (until == "line") or (until == "")
-                self._log_plan_step(self._plan_index, step, "rotate-until-line")
-                return move_action, speed
-
-            if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
-                if duration <= 0:
-                    duration = 0.5
-                move_action = action.capitalize()
-                self.state = self.STATE_PLAN
-                self._plan_action = move_action
-                self._plan_action_speed = speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = now + duration
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._log_plan_step(self._plan_index, step, "move")
-                return move_action, speed
+            result = self._dispatch_plan_action(
+                action, step, now, speed, duration, until, timeout,
+                continue_immediately, end_after_step,
+            )
+            if result is not None:
+                return result
 
             self._log_warn(f"Unknown plan action skipped: {step.get('action')}")
             continue
@@ -495,6 +306,119 @@ class LineFollowerFSM:
         self._log_warn("Plan jump loop exceeded safety guard")
         self.stop()
         return "Stop", 0
+
+    def _dispatch_plan_action(
+        self, action, step, now, speed, duration, until, timeout,
+        continue_immediately, end_after_step,
+    ):
+        if action == "AUTOLINE":
+            return self._exec_autoline(step, continue_immediately, end_after_step)
+        if action in ("AUTO",):
+            return self._follow_default()
+        if action in ("WAIT", "STOP"):
+            return self._exec_wait_stop(action, step, now, duration, continue_immediately, end_after_step)
+        if action == "FOLLOW":
+            return self._exec_follow(step, now, duration, continue_immediately, end_after_step)
+        if action in ("ROTATELEFT", "ROTATERIGHT"):
+            return self._exec_rotate(action, step, now, speed, duration, until, timeout, continue_immediately, end_after_step)
+        if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
+            return self._exec_move(action, step, now, speed, duration, continue_immediately, end_after_step)
+        return None
+
+    def _exec_autoline(self, step, continue_immediately, end_after_step):
+        enabled = self._to_bool(
+            step.get("enabled", step.get("value", step.get("autoline"))), True,
+        )
+        self._requested_autoline = enabled
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
+        return self._follow_default()
+
+    def _exec_wait_stop(self, action, step, now, duration, continue_immediately, end_after_step):
+        if duration and duration > 0:
+            self.state = self.STATE_PLAN
+            self._plan_action = "Stop"
+            self._plan_action_speed = 0
+            self._queue_step_messages(step)
+            self._plan_continue_immediate = continue_immediately
+            self._plan_force_complete = end_after_step
+            self._plan_action_until = now + duration
+            self._log_plan_step(self._plan_index, step, "timed-stop")
+            return "Stop", 0
+        if action == "WAIT":
+            duration = 0.3
+            self.state = self.STATE_PLAN
+            self._plan_action = "Stop"
+            self._plan_action_speed = 0
+            self._queue_step_messages(step)
+            self._plan_continue_immediate = continue_immediately
+            self._plan_force_complete = end_after_step
+            self._plan_action_until = now + duration
+            self._log_plan_step(self._plan_index, step, "wait-default")
+            return "Stop", 0
+        if self.plan_end_state == "follow":
+            self._log_info("[PLAN] Stop step reached, returning to follow")
+            return self._follow_default()
+        self._enter_stopped(reset_plan_progress=False)
+        self._log_info("[PLAN] Stop step reached, robot stopped")
+        return "Stop", 0
+
+    def _exec_follow(self, step, now, duration, continue_immediately, end_after_step):
+        if duration <= 0:
+            duration = 0.6
+        self.state = self.STATE_PLAN
+        self._plan_action = "AutoFollow"
+        self._plan_action_speed = self.base_speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = now + duration
+        self._log_plan_step(self._plan_index, step, "follow")
+        return "Forward", self.base_speed
+
+    def _exec_rotate(self, action, step, now, speed, duration, until, timeout, continue_immediately, end_after_step):
+        move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
+        strict_line = self._to_bool(
+            step.get("strict_line", step.get("center_only")), False,
+        )
+        min_duration = self._to_float(
+            step.get("min_duration"), self.rotate_min_duration, "min_duration", step,
+        )
+        self.state = self.STATE_PLAN
+        self._plan_action = move_action
+        self._plan_action_speed = speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = None
+        self._plan_action_min_until = now + max(0.0, float(min_duration))
+        self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side) and (not strict_line)
+        self._plan_rotate_strict_center = bool(strict_line)
+        if duration > 0:
+            self._plan_action_until = now + duration
+            self._plan_action_until_line = False
+            self._log_plan_step(self._plan_index, step, "rotate-duration")
+            return move_action, speed
+        self._plan_action_until_line = (until == "line") or (until == "")
+        self._log_plan_step(self._plan_index, step, "rotate-until-line")
+        return move_action, speed
+
+    def _exec_move(self, action, step, now, speed, duration, continue_immediately, end_after_step):
+        if duration <= 0:
+            duration = 0.5
+        move_action = action.capitalize()
+        self.state = self.STATE_PLAN
+        self._plan_action = move_action
+        self._plan_action_speed = speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = now + duration
+        self._log_plan_step(self._plan_index, step, "move")
+        return move_action, speed
 
     def _run_plan_action(self, frame, now):
         if self._plan_action is None:
@@ -506,56 +430,31 @@ class LineFollowerFSM:
                 if frame is None:
                     return "Forward", self.base_speed
                 return self._follow_line(frame)
-            self._plan_action = None
-            self._plan_action_speed = None
-            self._plan_action_until = None
-            self._plan_action_until_line = False
-            self._plan_action_min_until = None
-            self._plan_action_timeout = None
-            self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-            self._plan_rotate_strict_center = False
+            self._clear_plan_action_state()
             return self._after_plan_action(now)
 
         if self._plan_action_until_line:
             if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
                 self._log_warn(f"Plan rotate timeout reached: {self._plan_action}")
-                self._plan_action = None
-                self._plan_action_speed = None
+                self._clear_plan_action_state()
                 self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
                 self._plan_rotate_strict_center = False
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
             if frame is not None and self._is_line_reacquired(
-                frame,
-                self._plan_action,
+                frame, self._plan_action,
                 allow_side_stop=self._plan_rotate_allow_side_stop,
                 strict_center=self._plan_rotate_strict_center,
             ):
-                self._plan_action = None
-                self._plan_action_speed = None
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-                self._plan_rotate_strict_center = False
+                self._clear_plan_action_state()
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
         if self._plan_action_until is not None and now < self._plan_action_until:
             return self._plan_action, int(self._plan_action_speed)
 
-        # action done
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
+        self._clear_plan_action_state()
         return self._after_plan_action(now)
 
     def _follow_default(self):

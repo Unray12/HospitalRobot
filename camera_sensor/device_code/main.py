@@ -25,6 +25,11 @@ RECONNECT_INTERVAL_MS = 3000
 
 # UART hardware giữa ESP32 và HuskyLens IC — giữ 9600 (mặc định HuskyLens,
 # không phải USB CDC). KHÔNG đổi trừ khi đã đổi setting trên menu HuskyLens.
+#
+# LƯU Ý dual-baudrate:
+# - USB CDC (kết nối xuống ROS, config trong config.json "serial.baudrate"): 115200
+# - UART hardware (kết nối với HuskyLens IC): 9600 (hằng số này)
+# Hai baudrate KHÁC NHAU — không nhầm lẫn khi cấu hình.
 HUSKYLENS_BAUD = 9600
 
 # KHÔNG khởi tạo UART ở module level — nếu fail sẽ chết im lặng trước khi boot

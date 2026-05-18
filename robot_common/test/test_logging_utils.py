@@ -1,4 +1,4 @@
-from robot_common.robot_common.logging_utils import LogAdapter
+from robot_common.logging_utils import LogAdapter
 
 
 class DummyLogger:

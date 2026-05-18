@@ -1,4 +1,4 @@
-from robot_common.robot_common.config_manager import ConfigManager
+from robot_common.config_manager import ConfigManager
 
 
 class DummyLogger:

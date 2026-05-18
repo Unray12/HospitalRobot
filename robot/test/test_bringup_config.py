@@ -3,7 +3,7 @@ import pytest
 pytest.importorskip("launch")
 pytest.importorskip("launch_ros")
 
-from robot.robot.main import _node_map
+from robot.main import _node_map
 
 
 def test_node_map_contains_all_default_bringup_nodes():

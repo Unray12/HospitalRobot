@@ -1,4 +1,4 @@
-from robot_common.robot_common.command_protocol import format_command, parse_command
+from robot_common.command_protocol import format_command, parse_command
 
 
 def test_parse_command_direction_speed():

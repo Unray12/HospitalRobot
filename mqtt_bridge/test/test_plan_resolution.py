@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("rclpy")
 
-from mqtt_bridge.mqtt_bridge.MQTTBridgeROS import MQTTBridgeNode
+from mqtt_bridge.MQTTBridgeROS import MQTTBridgeNode
 
 
 class _NodeStub:

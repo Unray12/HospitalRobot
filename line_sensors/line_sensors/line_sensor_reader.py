@@ -6,38 +6,18 @@
     {"dev_id":"hrbot_line","event":"data","payload":{"sensors":{"0xNN":{...}}}}
 """
 
-import glob
-import time
-
-try:
-    import serial
-    from serial.tools import list_ports
-except ImportError:
-    serial = None
-    list_ports = None
-
+from robot_common.serial_device import SerialDevice
 from robot_common.device_protocol import parse_envelope, is_silent_error
 
 DEV_ID = "hrbot_line"
 
 
-class LineSensorReader:
+class LineSensorReader(SerialDevice):
     """Read newline-delimited JSON payloads and normalize them into line frames."""
 
     def __init__(self, port="/dev/ttyACM0", baudrate=115200, timeout=0.1, logger=None):
-        self._logger = logger
         self._buffer = ""
-        self.ser = None
-        self.port = str(port)
-        self.baudrate = baudrate
-        self.timeout = timeout
-        self._last_open_error = None
-
-        if serial is None:
-            self._log_error("pyserial is not installed; line sensor serial is unavailable")
-            return
-
-        self._open_serial(self.port)
+        super().__init__(port=port, baudrate=baudrate, timeout=timeout, logger=logger)
 
     def read_frame(self):
         """Return the newest complete frame available from the serial buffer."""
@@ -75,7 +55,6 @@ class LineSensorReader:
             self._log_warn(f"Line envelope parse fail: {err}")
             return None
         if not envelope.is_data():
-            # boot/info/error — bỏ qua thầm lặng.
             return None
         return self.parse_payload(envelope.payload)
 
@@ -91,7 +70,6 @@ class LineSensorReader:
 
         sensors = payload.get("sensors")
         if not isinstance(sensors, dict):
-            # Backward-compat: payload chính là dict sensors (test legacy).
             sensors = payload
 
         if not sensors:
@@ -110,81 +88,6 @@ class LineSensorReader:
             "right_full":  self._is_full_black(right),
         }
 
-    def close(self):
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-        self.ser = None
-
-    def is_connected(self):
-        return bool(self.ser and self.ser.is_open)
-
-    def reconnect(self, fallback_ports=None, scan_prefixes=None):
-        if self.is_connected() or serial is None:
-            return self.is_connected()
-
-        candidates = []
-        if self.port:
-            candidates.append(self.port)
-        for item in (fallback_ports or []):
-            if item and item not in candidates:
-                candidates.append(item)
-
-        # Empty list = intentional "không scan" (vs None = chưa cấu hình, dùng default).
-        if scan_prefixes is None:
-            scan_prefixes = ["/dev/ttyACM", "/dev/ttyUSB", "COM"]
-        if scan_prefixes:
-            for detected in self._discover_ports(scan_prefixes):
-                if detected not in candidates:
-                    candidates.append(detected)
-
-        for candidate in candidates:
-            if self._open_serial(candidate):
-                self.port = candidate
-                return True
-        return False
-
-    def _open_serial(self, port):
-        try:
-            self.ser = serial.Serial(
-                port=port,
-                baudrate=self.baudrate,
-                timeout=self.timeout,
-            )
-            time.sleep(min(self.timeout, 0.2))
-            self._last_open_error = None
-            self._log_info(f"Serial Line Sensors connected: {port}")
-            return True
-        except Exception as exc:
-            self.ser = None
-            msg = str(exc)
-            if msg != self._last_open_error:
-                self._log_error(f"Serial error on {port}: {exc}")
-                self._last_open_error = msg
-            return False
-
-    def _discover_ports(self, prefixes):
-        found = []
-        if list_ports is not None:
-            for port_info in list_ports.comports():
-                name = str(getattr(port_info, "device", "") or "")
-                if self._matches_prefix(name, prefixes):
-                    found.append(name)
-        for prefix in prefixes:
-            if prefix.startswith("/dev/"):
-                found.extend(glob.glob(prefix + "*"))
-        dedup = []
-        for port in found:
-            if port and port not in dedup:
-                dedup.append(port)
-        return dedup
-
-    def _matches_prefix(self, name, prefixes):
-        upper = name.upper()
-        for prefix in prefixes:
-            if upper.startswith(prefix.upper()):
-                return True
-        return False
-
     def _count_active(self, sensor_dict):
         """Count active channels without trusting payload types from the serial device."""
         if not isinstance(sensor_dict, dict):
@@ -198,21 +101,3 @@ class LineSensorReader:
 
     def _is_active(self, value):
         return value in (True, 1, "1")
-
-    def _log_info(self, msg):
-        if self._logger:
-            self._logger.info(msg)
-        else:
-            print(msg)
-
-    def _log_warn(self, msg):
-        if self._logger:
-            self._logger.warning(msg)
-        else:
-            print(msg)
-
-    def _log_error(self, msg):
-        if self._logger:
-            self._logger.error(msg)
-        else:
-            print(msg)

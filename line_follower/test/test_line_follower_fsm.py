@@ -1,4 +1,4 @@
-from line_follower.line_follower.line_follower import LineFollowerFSM
+from line_follower.line_follower import LineFollowerFSM
 
 
 def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, right_full=False):
@@ -71,10 +71,12 @@ def test_rotate_until_line_timeout_moves_next_step():
     )
     fsm.update(_frame(1, 1, 1, True, True, True), now=0.0)
     fsm.update(_frame(1, 1, 1, True, True, True), now=3.2)
+    # After timeout returns to following.  Right-bias frame triggers RotateRight
+    # from normal line-following (speed = turn_speed_right, default = base_speed).
     out = fsm.update(_frame(0, 1, 3, False, False, False), now=4.3)
-    assert out == ("RotateRight", 6)
+    assert out == ("RotateRight", 8)
     out = fsm.update(_frame(0, 1, 3, False, False, False), now=4.7)
-    assert out == ("Forward", 8)
+    assert out == ("RotateRight", 8)
 
 
 def test_plan_goto_label():

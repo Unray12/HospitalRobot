@@ -2,10 +2,8 @@
 """MQTT/ROS2 bridge with keyboard control, plan routing, and status forwarding."""
 
 import json
-import os
 import queue
 import re
-import sys
 import threading
 import time
 from threading import Event
@@ -21,30 +19,8 @@ from rcl_interfaces.msg import Log
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
-if os.name == "nt":
-    import msvcrt
-else:
-    import termios
-    import tty
-
-
-# Hàm đọc phím 1 ký tự
-def get_key():
-    if os.name == "nt":
-        key = msvcrt.getch()
-        try:
-            return key.decode("utf-8", errors="ignore")
-        except Exception:
-            return ""
-
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
+from .keyboard_input import KeyboardInput
+from .log_bridge import LogBridge
 
 
 class MQTTBridgeNode(Node):
@@ -57,10 +33,8 @@ class MQTTBridgeNode(Node):
         config = ConfigManager("mqtt_bridge", logger=self.log).load()
         broker_cfg = config.get("broker", {})
         topics_cfg = config.get("topics", {})
-        keyboard_cfg = config.get("keyboard", {})
         plan_keys = config.get("plan_keys", {})
         room_plans = config.get("room_plans", {})
-        log_bridge_cfg = config.get("log_bridge", {})
         log_control_cfg = config.get("log_control", {})
         camera_face_forward_cfg = config.get("camera_face_forward", {})
         camera_plan_cfg = config.get("camera_face_plan_message", {})
@@ -82,22 +56,9 @@ class MQTTBridgeNode(Node):
         self.topic_huskylens_frame_mqtt = topics_cfg.get("huskylens_frame_mqtt", "huskylens/frame")
         self.topic_huskylens_valid_ros = topics_cfg.get("huskylens_valid_ros", "/huskylens/valid")
         self.topic_huskylens_valid_mqtt = topics_cfg.get("huskylens_valid_mqtt", "huskylens/valid")
-        self.keyboard_map = {
-            str(keyboard_cfg.get("forward", "w")).lower(): "Forward",
-            str(keyboard_cfg.get("backward", "s")).lower(): "Backward",
-            str(keyboard_cfg.get("left", "a")).lower(): "Left",
-            str(keyboard_cfg.get("right", "d")).lower(): "Right",
-            str(keyboard_cfg.get("stop", " ")).lower(): "Stop",
-            str(keyboard_cfg.get("rotate_left", "j")).lower(): "RotateLeft",
-            str(keyboard_cfg.get("rotate_right", "p")).lower(): "RotateRight",
-        }
-        self.key_toggle_auto = str(keyboard_cfg.get("toggle_auto", "k")).lower()
-        self.key_toggle_debug_logs = str(keyboard_cfg.get("toggle_debug_logs", "e")).lower()
-        self.key_quit = str(keyboard_cfg.get("quit", "q")).lower()
         self.plan_key_map = plan_keys
         self.room_plan_map = {str(k).strip().lower(): str(v).strip() for k, v in room_plans.items()}
         if not self.room_plan_map:
-            # Backward compatible: if no room_plans, reuse numeric plan hotkeys.
             self.room_plan_map = {
                 str(k).strip().lower(): str(v).strip()
                 for k, v in self.plan_key_map.items()
@@ -107,18 +68,6 @@ class MQTTBridgeNode(Node):
         self._debug_logs_enabled = False
         self._echo_suppress_window_sec = float(config.get("echo_suppress_window_sec", 0.35))
         self._recent_local_pub = {}
-        self._log_bridge_enabled = bool(log_bridge_cfg.get("enabled", True))
-        self._log_bridge_ros_topic = str(log_bridge_cfg.get("ros_topic", "/rosout"))
-        self._log_bridge_sources = {
-            str(name).strip().lower()
-            for name in log_bridge_cfg.get("source_nodes", ["line_follower"])
-            if str(name).strip()
-        }
-        self._log_bridge_keywords = [
-            str(word)
-            for word in log_bridge_cfg.get("keywords", ["[PLAN_STATUS]", "[PLAN]"])
-            if str(word)
-        ]
         self._camera_face_plan_enabled = bool(camera_plan_cfg.get("enabled", False))
         self._camera_face_require_plan_autoline = bool(
             camera_plan_cfg.get("require_plan_autoline", True)
@@ -159,18 +108,16 @@ class MQTTBridgeNode(Node):
         self.create_subscription(String, self.topic_plan_message_ros, self._plan_message_cb, 20)
         self.create_subscription(String, self.topic_huskylens_frame_ros, self._huskylens_frame_cb, 20)
         self.create_subscription(Bool, self.topic_huskylens_valid_ros, self._huskylens_valid_cb, 20)
-        if self._log_bridge_enabled:
-            self.create_subscription(Log, self._log_bridge_ros_topic, self._rosout_cb, 100)
 
         if mqtt is None:
             raise RuntimeError("paho-mqtt is not installed")
 
         # MQTT client
         self.client = mqtt.Client()
-        self.client.on_connect = self.on_connect
-        self.client.on_disconnect = self.on_disconnect
-        self.client.on_message = self.on_message
-        self._mqtt_connected = False
+        self.client.on_connect = self._on_connect
+        self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
+        self._mqtt_connected = threading.Event()
 
         self.client.connect(self.broker_address, self.broker_port, 60)
 
@@ -179,17 +126,28 @@ class MQTTBridgeNode(Node):
         self._mqtt_thread = threading.Thread(target=self.client.loop_forever, daemon=True)
         self._mqtt_thread.start()
 
-        # Keyboard đọc ở worker thread để không block executor
-        self._keyboard_thread = threading.Thread(target=self.keyboard_loop, daemon=True)
-        self._keyboard_thread.start()
+        # Log bridge
+        self._log_bridge = LogBridge(config, self._mqtt_publish, self.log)
+        if self._log_bridge.enabled:
+            self.create_subscription(Log, self._log_bridge.ros_topic, self._log_bridge.rosout_cb, 100)
+
+        # Keyboard
+        self._keyboard = KeyboardInput(
+            config, plan_keys, self.room_plan_map,
+            self._inbound_queue, self.log, self._stop_event,
+        )
+        self._keyboard.start()
         self._bridge_timer = self.create_timer(0.02, self._drain_inbound_queue)
 
         self.log.info("MQTT <-> ROS2 bridge started", event="BOOT")
 
+    def _mqtt_publish(self, text):
+        self.client.publish(self.topic_log_out, text)
+
     # MQTT callbacks
-    def on_connect(self, client, userdata, flags, rc):
+    def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
-            self._mqtt_connected = True
+            self._mqtt_connected.set()
             self.log.info("Connected to MQTT broker", event="MQTT")
             client.subscribe(self.topic_vr)
             client.subscribe(self.topic_pick)
@@ -197,49 +155,15 @@ class MQTTBridgeNode(Node):
         else:
             self.log.error(f"MQTT connect failed: {rc}", event="MQTT")
 
-    def on_disconnect(self, client, userdata, rc):
-        self._mqtt_connected = False
+    def _on_disconnect(self, client, userdata, rc):
+        self._mqtt_connected.clear()
         self.log.warning(f"Disconnected from MQTT broker: rc={rc}", event="MQTT")
 
-    def on_message(self, client, userdata, msg):
-        data = msg.payload.decode()
+    def _on_message(self, client, userdata, msg):
+        data = msg.payload.decode(errors="replace")
         if self._is_recent_local_echo(msg.topic, data):
             return
         self._inbound_queue.put((msg.topic, data))
-
-    # Keyboard → MQTT
-    def keyboard_loop(self):
-        self.log.info("Dieu khien WASD | q de thoat", event="KEYBOARD")
-        autoMode = False
-        while rclpy.ok() and not self._stop_event.is_set():
-            key = get_key().lower()
-            cmd = ""
-
-            if key in self.keyboard_map:
-                cmd = self.keyboard_map[key]
-            elif key == self.key_toggle_auto:
-                autoMode = not autoMode
-                mode_msg = "1" if autoMode else "0"
-                self._inbound_queue.put(("__keyboard_pick__", mode_msg))
-            elif key == self.key_toggle_debug_logs:
-                self._inbound_queue.put(("__keyboard_debug__", "toggle"))
-            elif key in self.plan_key_map:
-                plan_name = self.plan_key_map[key]
-                mqtt_plan_cmd = f"room:{key}" if key.isdigit() else plan_name
-                self._inbound_queue.put(("__keyboard_plan__", f"{plan_name}|{mqtt_plan_cmd}"))
-            elif key == self.key_quit:
-                self.log.info("Thoat chuong trinh", event="KEYBOARD")
-                self._shutdown_requested = True
-                self._stop_event.set()
-                break
-
-            if cmd:
-                self._inbound_queue.put(("__keyboard_vr__", cmd))
-
-        try:
-            self.client.disconnect()
-        except Exception:
-            pass
 
     def destroy_node(self):
         self._stop_event.set()
@@ -247,7 +171,7 @@ class MQTTBridgeNode(Node):
             self.client.disconnect()
         except Exception:
             pass
-        for thread in (getattr(self, "_keyboard_thread", None), getattr(self, "_mqtt_thread", None)):
+        for thread in (getattr(self, "_mqtt_thread", None),):
             if thread and thread.is_alive():
                 thread.join(timeout=0.5)
         super().destroy_node()
@@ -295,14 +219,13 @@ class MQTTBridgeNode(Node):
             self.ros_debug_pub.publish(Bool(data=self._debug_logs_enabled))
             state = "ON" if self._debug_logs_enabled else "OFF"
             self.log.info(
-                f"Debug logs toggled: {state} (key={self.key_toggle_debug_logs})",
-                event="DEBUG_TOGGLE",
+                f"Debug logs toggled: {state}", event="DEBUG_TOGGLE",
             )
             return
 
         if topic == "__keyboard_plan__":
             plan_name, mqtt_plan_cmd = data.split("|", 1)
-            if self._mqtt_connected:
+            if self._mqtt_connected.is_set():
                 self.ros_plan_pub.publish(String(data=plan_name))
                 self.client.publish(self.topic_plan, mqtt_plan_cmd)
                 self._mark_local_publish(self.topic_plan, mqtt_plan_cmd)
@@ -348,23 +271,8 @@ class MQTTBridgeNode(Node):
             if resolved != data:
                 self.log.info(f"Normalized plan command: {data} -> {resolved}", event="PLAN_MQTT")
 
-    def _rosout_cb(self, msg: Log):
-        if not self._mqtt_connected:
-            return
-
-        logger_name = str(msg.name or "").strip().lower()
-        if self._log_bridge_sources and logger_name not in self._log_bridge_sources:
-            return
-
-        text = str(msg.msg or "")
-        if self._log_bridge_keywords and not any(word in text for word in self._log_bridge_keywords):
-            return
-
-        # Publish only filtered plan logs for UI consumption.
-        self.client.publish(self.topic_log_out, text)
-
     def _plan_status_cb(self, msg: String):
-        if not self._mqtt_connected:
+        if not self._mqtt_connected.is_set():
             return
         payload = str(msg.data or "").strip()
         if not payload:
@@ -380,7 +288,7 @@ class MQTTBridgeNode(Node):
         )
 
     def _plan_message_cb(self, msg: String):
-        if not self._mqtt_connected:
+        if not self._mqtt_connected.is_set():
             return
         payload = str(msg.data or "").strip()
         if not payload:
@@ -395,7 +303,7 @@ class MQTTBridgeNode(Node):
         )
 
     def _camera_cb(self, msg: String):
-        if not self._mqtt_connected:
+        if not self._mqtt_connected.is_set():
             return
         payload = str(msg.data or "")
         if payload == "":
@@ -405,7 +313,7 @@ class MQTTBridgeNode(Node):
         self._publish_camera_plan_message(payload)
 
     def _huskylens_frame_cb(self, msg: String):
-        if not self._mqtt_connected:
+        if not self._mqtt_connected.is_set():
             return
         payload = str(msg.data or "").strip()
         if not payload:
@@ -420,7 +328,7 @@ class MQTTBridgeNode(Node):
         )
 
     def _huskylens_valid_cb(self, msg: Bool):
-        if not self._mqtt_connected:
+        if not self._mqtt_connected.is_set():
             return
         payload = "1" if bool(msg.data) else "0"
         self.client.publish(self.topic_huskylens_valid_mqtt, payload)
@@ -532,7 +440,6 @@ class MQTTBridgeNode(Node):
         if text in self._known_plans:
             return text
 
-        # Keep compatibility: allow direct plan names even if not listed in mappings.
         return text
 
     def _mark_local_publish(self, topic: str, payload: str):
@@ -567,7 +474,6 @@ class MQTTBridgeNode(Node):
             return
         self._last_logged_value[key] = value
         self.log.info(message, event=event)
-
 
 
 def main(args=None):

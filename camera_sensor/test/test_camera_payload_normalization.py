@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("rclpy")
 
-from camera_sensor.camera_sensor.main import CameraSensorNode
+from camera_sensor.main import CameraSensorNode
 
 
 class _NodeStub:

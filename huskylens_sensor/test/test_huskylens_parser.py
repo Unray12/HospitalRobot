@@ -1,6 +1,6 @@
 import json
 
-from huskylens_sensor.huskylens_sensor.huskylens_parser import (
+from huskylens_sensor.huskylens_parser import (
     default_frame,
     is_frame_tracking_valid,
     normalize_huskylens_payload,

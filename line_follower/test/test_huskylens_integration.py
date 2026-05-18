@@ -1,4 +1,4 @@
-from line_follower.line_follower.line_follower import LineFollowerFSM
+from line_follower.line_follower import LineFollowerFSM
 
 
 def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, right_full=False):
