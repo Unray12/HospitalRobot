@@ -1,0 +1,25 @@
+# =============================================================================
+# HospitalRobot — Main Config Index
+# =============================================================================
+# File này là entry point. Mỗi package được import từ config/<package>.yaml.
+# Để chỉnh config, sửa file tương ứng trong thư mục config/.
+#
+# Cấu trúc:
+#   config/robot.yaml            — bringup node list
+#   config/camera_sensor.yaml    — ESP32 camera face detection
+#   config/huskylens_sensor.yaml — ESP32 HuskyLens line tracking
+#   config/line_sensors.yaml     — ESP32 line sensor (3 zone I2C)
+#   config/line_follower.yaml    — FSM auto-tracking + plan execution
+#   config/motor_driver.yaml     — serial motor controller (mecanum x4)
+#   config/manual_control.yaml   — operator VR/keyboard control
+#   config/mqtt_bridge.yaml      — MQTT <-> ROS2 bridge
+# =============================================================================
+
+robot:            !include config/robot.yaml
+camera_sensor:    !include config/camera_sensor.yaml
+huskylens_sensor: !include config/huskylens_sensor.yaml
+line_sensors:     !include config/line_sensors.yaml
+line_follower:    !include config/line_follower.yaml
+motor_driver:     !include config/motor_driver.yaml
+manual_control:   !include config/manual_control.yaml
+mqtt_bridge:      !include config/mqtt_bridge.yaml

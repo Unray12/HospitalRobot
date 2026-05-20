@@ -1,7 +1,7 @@
 """Serial reader and parser for the line sensor frame stream.
 
 Đọc JSON envelope theo HospitalRobot Device Protocol v1
-(xem `docs/DEVICE_PROTOCOL.md`). Frame data:
+(xem `docs/20-device-protocol.md`). Frame data:
 
     {"dev_id":"hrbot_line","event":"data","payload":{"sensors":{"0xNN":{...}}}}
 """
@@ -17,18 +17,27 @@ class LineSensorReader(SerialDevice):
 
     def __init__(self, port="/dev/ttyACM0", baudrate=115200, timeout=0.1, logger=None):
         self._buffer = ""
-        super().__init__(port=port, baudrate=baudrate, timeout=timeout, logger=logger)
+        super().__init__(port=port, baudrate=baudrate, timeout=timeout, logger=logger,
+                         exclusive=True)
 
     def read_frame(self):
         """Return the newest complete frame available from the serial buffer."""
-        if not (self.ser and self.ser.is_open):
-            return None
-
-        try:
-            data = self.ser.read(self.ser.in_waiting or 1)
-            if not data:
+        with self._lock:
+            if not (self.ser and self.ser.is_open):
+                return None
+            try:
+                waiting = self.ser.in_waiting
+                if not waiting:
+                    return None
+                data = self.ser.read(waiting)
+                if not data:
+                    return None
+            except Exception as exc:
+                self._log_error(f"Line Sensors read error: {exc}")
+                self.ser = None
                 return None
 
+        try:
             self._buffer += data.decode(errors="ignore")
             if "\n" not in self._buffer:
                 return None
@@ -39,11 +48,12 @@ class LineSensorReader(SerialDevice):
                 candidate = line.strip()
                 if not candidate:
                     continue
-                return self.parse_line(candidate)
+                parsed = self.parse_line(candidate)
+                if parsed is not None:
+                    return parsed
             return None
         except Exception as exc:
-            self._log_error(f"Line Sensors read error: {exc}")
-            self.close()
+            self._log_error(f"Line Sensors parse error: {exc}")
             return None
 
     def parse_line(self, line):

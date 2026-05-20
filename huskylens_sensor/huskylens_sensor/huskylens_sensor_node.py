@@ -23,7 +23,7 @@ class HuskyLensSensorNode(Node):
         pub_cfg = config.get("publish", {})
 
         port = str(serial_cfg.get("port", "/dev/ttyACM2"))
-        baudrate = int(serial_cfg.get("baudrate", 9600))
+        baudrate = int(serial_cfg.get("baudrate", 115200))
         read_timeout = float(serial_cfg.get("timeout", 0.2))
         topic_frame = str(pub_cfg.get("topic_frame", "/huskylens/frame"))
         topic_valid = str(pub_cfg.get("topic_valid", "/huskylens/valid"))

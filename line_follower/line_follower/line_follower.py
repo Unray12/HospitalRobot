@@ -2,11 +2,22 @@
 
 import time
 
+from robot_common.logging_utils import to_bool
 from .line_follow_strategies import HybridStrategy, HuskyLensStrategy, LineSensorStrategy
+
+# HuskyLens y_type classification codes -- must stay in sync with the firmware
+# `huskylens_sensor/device_code/main.py` (Y_TYPE_* constants).
+Y_TYPE_NO_LINE       = 0
+Y_TYPE_BOTTOM_TO_MID = 1
+Y_TYPE_MID_TO_TOP    = 2
+Y_TYPE_BOTTOM_TO_TOP = 3
+Y_TYPE_MID_TO_MID    = 4
 
 
 class LineFollowerFSM:
     """Coordinate tracking strategies, cross handling, and plan-driven actions."""
+
+    # ── FSM state constants ────────────────────────────────────────────────────
     STATE_FOLLOWING = 0
     STATE_CROSSING = 1
     STATE_TURN_LEFT = 2
@@ -15,6 +26,21 @@ class LineFollowerFSM:
     STATE_PLAN = 5
     STATE_CROSS_PRE = 6
     STATE_STOPPED = 7
+
+    # ── Default durations (seconds) ───────────────────────────────────────────
+    # Used as fallback when no duration is specified in a plan step.
+    # WAIT default: brief pause before continuing (sub-second so it feels snappy)
+    _DEFAULT_WAIT_DURATION = 0.3
+    # FOLLOW default: minimum forward-follow time before plan advances
+    _DEFAULT_FOLLOW_DURATION = 0.6
+    # MOVE (Forward/Backward/Left/Right) default: half-second nudge
+    _DEFAULT_MOVE_DURATION = 0.5
+
+    # ── Jump-guard constants ───────────────────────────────────────────────────
+    # Safety cap on Goto/Label hops to prevent infinite plan loops.
+    # Max iterations = max(_JUMP_GUARD_MIN, plan_length * _JUMP_GUARD_MULTIPLIER)
+    _JUMP_GUARD_MIN = 4
+    _JUMP_GUARD_MULTIPLIER = 2
 
     def __init__(
         self,
@@ -38,9 +64,9 @@ class LineFollowerFSM:
         tracking_strict_mode=False,
         tracking_log_invalid_period=1.0,
         tracking_allow_line_sensor_fallback=True,
-        huskylens_max_abs_error=120,
-        huskylens_control_gain=1.0,
-        huskylens_deadband=1.0,
+        huskylens_lateral_deadband=10.0,
+        huskylens_heading_deadband=3.0,
+        huskylens_y_type_rotate_timeout=5.0,
         logger=None,
     ):
         self._logger = logger
@@ -64,9 +90,9 @@ class LineFollowerFSM:
         self.tracking_strict_mode = bool(tracking_strict_mode)
         self.tracking_log_invalid_period = float(max(0.1, tracking_log_invalid_period))
         self.tracking_allow_line_sensor_fallback = bool(tracking_allow_line_sensor_fallback)
-        self.huskylens_max_abs_error = int(max(1, huskylens_max_abs_error))
-        self.huskylens_control_gain = float(max(0.0, huskylens_control_gain))
-        self.huskylens_deadband = float(max(0.0, huskylens_deadband))
+        self.huskylens_lateral_deadband = float(max(0.0, huskylens_lateral_deadband))
+        self.huskylens_heading_deadband = float(max(0.0, huskylens_heading_deadband))
+        self.huskylens_y_type_rotate_timeout = float(max(0.0, huskylens_y_type_rotate_timeout))
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
@@ -88,6 +114,7 @@ class LineFollowerFSM:
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_action_until_line = False
+        self._plan_action_until_y_type = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
@@ -95,6 +122,7 @@ class LineFollowerFSM:
         self._plan_continue_immediate = False
         self._plan_force_complete = False
         self._cross_active = False
+        self._y_type_cross_active = False
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
@@ -114,6 +142,7 @@ class LineFollowerFSM:
         self._plan_action_speed = None
         self._plan_action_until = None
         self._plan_action_until_line = False
+        self._plan_action_until_y_type = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
@@ -147,6 +176,9 @@ class LineFollowerFSM:
             return self._run_plan_action(frame, now)
         if self.state == self.STATE_CROSS_PRE:
             return self._handle_cross_pre(now)
+        # Plan trigger via /plan_select with start_without_cross=true. Skips
+        # waiting for a physical line cross — useful when robot is hand-placed
+        # at a starting position with no nearby crossing.
         if self._plan_start_requested and self.cross_plan:
             self._plan_start_requested = False
             self._cross_active = False
@@ -158,6 +190,30 @@ class LineFollowerFSM:
             self._cross_pre_until = now + self.cross_pre_forward_duration
             self._log_info("===> PLAN trigger: start without cross")
             return "Forward", self.cross_pre_forward_speed
+
+        # HuskyLens y_type-based crossing trigger: fires before line-sensor logic so
+        # huskylens-mode plans can advance without 3-sensor cross detection.
+        # Always runs the pre-forward phase since the user explicitly requested the
+        # robot drive forward a bit when y_type==BOTTOM_TO_MID before rotating.
+        if (
+            self.tracking_strategy_name == "huskylens"
+            and self.cross_plan
+            and self._next_rotate_uses_y_type()
+        ):
+            y_type = self._huskylens_y_type()
+            if y_type is not None:
+                # Edge-triggered: only fire on the BOTTOM_TO_MID transition,
+                # not on every frame that stays BOTTOM_TO_MID. _y_type_cross_active
+                # latches True until y_type leaves the BOTTOM_TO_MID band.
+                if y_type == Y_TYPE_BOTTOM_TO_MID and not self._y_type_cross_active:
+                    self._y_type_cross_active = True
+                    self.state = self.STATE_CROSS_PRE
+                    self._cross_pre_phase = 0
+                    self._cross_pre_until = now + self.cross_pre_forward_duration
+                    self._log_info("===> PLAN trigger (y_type): enter cross_pre")
+                    return "Forward", self.cross_pre_forward_speed
+                if y_type != Y_TYPE_BOTTOM_TO_MID:
+                    self._y_type_cross_active = False
 
         if frame is None:
             # HuskyLens/hybrid mode may still provide valid tracking even without line sensor frame.
@@ -173,6 +229,10 @@ class LineFollowerFSM:
         right_full = frame["right_full"]
 
         total_black = left_count + mid_count + right_count
+        # Cross is detected only when ALL 3 zones are fully black. The
+        # cross_event flag distinguishes the rising edge from a sustained
+        # cross (e.g. robot sitting on top of the crossing) — we only act
+        # once per crossing.
         cross_detected = left_full and mid_full and right_full
         cross_event = cross_detected and not self._cross_active
         self._cross_active = cross_detected
@@ -196,12 +256,15 @@ class LineFollowerFSM:
                 return self._follow_line(frame)
             self.state = self.STATE_CROSSING
             self.crossing_start_time = now
-            self._log_info("===> CROSS detected: move forward 2s")
+            self._log_info(f"===> CROSS detected: move forward {self.crossing_duration}s")
             return "Forward", self.base_speed
 
         # Lost line -> stop
         if total_black == 0:
             if self._has_pending_plan():
+                # Don't reset plan_index here; operator may want to resume
+                # after re-aligning the robot. _hold_stop_for_plan_lost_line
+                # logs a periodic warning so the operator notices.
                 self._hold_stop_for_plan_lost_line(now)
                 self.state = self.STATE_FOLLOWING
                 return "Stop", 0
@@ -231,6 +294,10 @@ class LineFollowerFSM:
         return "Stop", 0
 
     def _handle_cross_pre(self, now):
+        # Two-phase pause-then-act executed before any plan action triggered
+        # by a cross. Phase 0: drive forward to fully cross the intersection
+        # so the rotate axis sits on the crossing center. Phase 1: brief stop
+        # to bleed off momentum before rotating.
         if self._cross_pre_until is None:
             self._cross_pre_phase = 0
             self._cross_pre_until = now + self.cross_pre_forward_duration
@@ -252,12 +319,25 @@ class LineFollowerFSM:
             self._cross_pre_until = None
             return self._start_plan_action(now)
 
+        # Defensive fallback: if _cross_pre_phase somehow lands outside {0, 1}
+        # (e.g. partial reset on plan reload), recover by re-arming phase 0
+        # rather than returning None — None would leave the FSM stuck in
+        # STATE_CROSS_PRE forever because the timer callback skips publish.
+        self._log_warn(f"cross_pre invalid phase={self._cross_pre_phase}; reset")
+        self._cross_pre_phase = 0
+        self._cross_pre_until = now + self.cross_pre_forward_duration
+        return "Forward", self.cross_pre_forward_speed
+
     def _start_plan_action(self, now):
         if not self.cross_plan:
             return self._follow_default()
 
+        # Loop guard: Goto/Label steps don't consume real time, so a plan that
+        # only contains Goto/Label could loop forever. Cap iterations at 2x
+        # the plan length to break runaway loops (real plans should never need
+        # this many no-op hops in a row).
         jump_guard = 0
-        while jump_guard < max(4, len(self.cross_plan) * 2):
+        while jump_guard < max(self._JUMP_GUARD_MIN, len(self.cross_plan) * self._JUMP_GUARD_MULTIPLIER):
             jump_guard += 1
             if self._plan_index >= len(self.cross_plan):
                 if self.plan_end_state == "follow":
@@ -274,6 +354,7 @@ class LineFollowerFSM:
 
             action = self._normalize_action(step.get("action", "Stop"))
             if action in ("LABEL",):
+                # Label is a marker for Goto targets, not an executable step.
                 continue
             if action == "GOTO":
                 target = self._resolve_goto_target(step.get("target"))
@@ -348,7 +429,7 @@ class LineFollowerFSM:
             self._log_plan_step(self._plan_index, step, "timed-stop")
             return "Stop", 0
         if action == "WAIT":
-            duration = 0.3
+            duration = self._DEFAULT_WAIT_DURATION
             self.state = self.STATE_PLAN
             self._plan_action = "Stop"
             self._plan_action_speed = 0
@@ -367,7 +448,7 @@ class LineFollowerFSM:
 
     def _exec_follow(self, step, now, duration, continue_immediately, end_after_step):
         if duration <= 0:
-            duration = 0.6
+            duration = self._DEFAULT_FOLLOW_DURATION
         self.state = self.STATE_PLAN
         self._plan_action = "AutoFollow"
         self._plan_action_speed = self.base_speed
@@ -400,15 +481,27 @@ class LineFollowerFSM:
         if duration > 0:
             self._plan_action_until = now + duration
             self._plan_action_until_line = False
+            self._plan_action_until_y_type = False
             self._log_plan_step(self._plan_index, step, "rotate-duration")
             return move_action, speed
+        if until == "y_type":
+            self._plan_action_until_line = False
+            self._plan_action_until_y_type = True
+            # Reset edge tracker so the *next* BOTTOM_TO_MID after rotation can retrigger.
+            self._y_type_cross_active = False
+            # Apply a default safety timeout if step doesn't supply one.
+            if self._plan_action_timeout is None and self.huskylens_y_type_rotate_timeout > 0:
+                self._plan_action_timeout = now + self.huskylens_y_type_rotate_timeout
+            self._log_plan_step(self._plan_index, step, "rotate-until-y_type")
+            return move_action, speed
         self._plan_action_until_line = (until == "line") or (until == "")
+        self._plan_action_until_y_type = False
         self._log_plan_step(self._plan_index, step, "rotate-until-line")
         return move_action, speed
 
     def _exec_move(self, action, step, now, speed, duration, continue_immediately, end_after_step):
         if duration <= 0:
-            duration = 0.5
+            duration = self._DEFAULT_MOVE_DURATION
         move_action = action.capitalize()
         self.state = self.STATE_PLAN
         self._plan_action = move_action
@@ -447,6 +540,18 @@ class LineFollowerFSM:
                 allow_side_stop=self._plan_rotate_allow_side_stop,
                 strict_center=self._plan_rotate_strict_center,
             ):
+                self._clear_plan_action_state()
+                return self._after_plan_action(now)
+            return self._plan_action, int(self._plan_action_speed)
+
+        if self._plan_action_until_y_type:
+            if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
+                self._log_warn(f"Plan rotate y_type timeout reached: {self._plan_action}")
+                self._clear_plan_action_state()
+                return self._after_plan_action(now)
+            if self._plan_action_min_until is not None and now < self._plan_action_min_until:
+                return self._plan_action, int(self._plan_action_speed)
+            if self._huskylens_y_type() == Y_TYPE_MID_TO_TOP:
                 self._clear_plan_action_state()
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
@@ -562,12 +667,12 @@ class LineFollowerFSM:
         if bool((frame_context or {}).get("line_sensor_stale", False)):
             return None
 
-        left_count = frame["left_count"]
-        mid_count = frame["mid_count"]
-        right_count = frame["right_count"]
-        left_full = frame["left_full"]
-        mid_full = frame["mid_full"]
-        right_full = frame["right_full"]
+        left_count = int(frame.get("left_count", 0) or 0)
+        mid_count = int(frame.get("mid_count", 0) or 0)
+        right_count = int(frame.get("right_count", 0) or 0)
+        left_full = bool(frame.get("left_full", False))
+        mid_full = bool(frame.get("mid_full", False))
+        right_full = bool(frame.get("right_full", False))
 
         total_black = left_count + mid_count + right_count
         if total_black > 0:
@@ -607,9 +712,9 @@ class LineFollowerFSM:
     def _compute_huskylens_command(self, frame_context):
         """Compute a command from the normalized HuskyLens frame.
 
-        The runtime contract in this repo is based on ``tail_offset_x`` for lateral
-        drift and ``angle_deg`` for heading correction. The config knobs are applied
-        directly here so tuning the JSON file changes behavior predictably.
+        Lateral correction comes from ``tail_offset_x`` (sign of the tail offset),
+        heading correction from ``angle_deg``. Lateral takes priority over heading;
+        within each axis the deadband from config decides when to start steering.
         """
         huskylens = (frame_context or {}).get("huskylens_frame")
         if not isinstance(huskylens, dict):
@@ -629,25 +734,26 @@ class LineFollowerFSM:
         except Exception:
             return None
 
-        lateral_error = tail_offset_x * self.huskylens_control_gain
-        heading_error = angle_deg
-        lateral_deadband = self.huskylens_deadband
-        heading_deadband = max(0.0, min(float(self.huskylens_max_abs_error), self.huskylens_deadband))
+        lateral_deadband = self.huskylens_lateral_deadband
+        heading_deadband = self.huskylens_heading_deadband
 
-        # tail_offset_x < 0 → tail lệch trái → robot rẽ trái để bám line
-        if lateral_error < -lateral_deadband:
-            self.state = self.STATE_TURN_LEFT
-            return "Left", self.turn_speed_left
-        if lateral_error > lateral_deadband:
+        # Lateral correction first (mecanum strafe). Strafing preserves heading
+        # so the robot can recenter on the line without losing forward bearing.
+        # Only after we are within the lateral deadband do we apply heading
+        # correction (rotate). Doing rotate first would oscillate when the
+        # robot is both offset AND tilted.
+        if tail_offset_x < -lateral_deadband:
             self.state = self.STATE_TURN_RIGHT
             return "Right", self.turn_speed_right
-        # angle_deg > 0 → line nghiêng phải → robot xoay trái để chỉnh heading
-        if heading_error > heading_deadband:
+        if tail_offset_x > lateral_deadband:
             self.state = self.STATE_TURN_LEFT
-            return "RotateLeft", self.turn_speed_left
-        if heading_error < -heading_deadband:
+            return "Left", self.turn_speed_left
+        if angle_deg < -heading_deadband:
             self.state = self.STATE_TURN_RIGHT
             return "RotateRight", self.turn_speed_right
+        if angle_deg > heading_deadband:
+            self.state = self.STATE_TURN_LEFT
+            return "RotateLeft", self.turn_speed_left
         self.state = self.STATE_FOLLOWING
         return "Forward", self.base_speed
 
@@ -702,11 +808,6 @@ class LineFollowerFSM:
     def set_tracking_context(self, frame_context):
         self._tracking_context = frame_context if isinstance(frame_context, dict) else {}
 
-    def set_huskylens_frame(self, frame):
-        if not isinstance(self._tracking_context, dict):
-            self._tracking_context = {}
-        self._tracking_context["huskylens_frame"] = frame if isinstance(frame, dict) else None
-
     def _resolve_tracking_strategy(self, strategy_name):
         normalized = str(strategy_name or "line_sensor").strip().lower()
         if normalized == "huskylens":
@@ -750,6 +851,43 @@ class LineFollowerFSM:
                 continue
             return action in ("ROTATELEFT", "ROTATERIGHT")
         return False
+
+    def _next_rotate_uses_y_type(self):
+        """Return True when the next actionable plan step is a rotate-until-y_type."""
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL", "GOTO"):
+                continue
+            if action not in ("ROTATELEFT", "ROTATERIGHT"):
+                return False
+            until = str(step.get("until", "") or "").strip().lower()
+            return until == "y_type"
+        return False
+
+    def _huskylens_y_type(self):
+        ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
+        if bool(ctx.get("huskylens_stale", False)):
+            return None
+        huskylens = ctx.get("huskylens_frame")
+        if not isinstance(huskylens, dict):
+            return None
+        if not (
+            bool(huskylens.get("connected", 0))
+            and bool(huskylens.get("algorithm_set", 0))
+            and bool(huskylens.get("valid", 0))
+        ):
+            return None
+        try:
+            return int(huskylens.get("y_type", 0))
+        except Exception:
+            return None
 
     def _next_action_is_autoline(self):
         idx = self._plan_index
@@ -881,18 +1019,7 @@ class LineFollowerFSM:
             return default
 
     def _to_bool(self, raw, default):
-        if raw is None:
-            return bool(default)
-        if isinstance(raw, bool):
-            return raw
-        if isinstance(raw, (int, float)):
-            return bool(raw)
-        text = str(raw).strip().lower()
-        if text in {"1", "true", "yes", "on", "enable", "enabled"}:
-            return True
-        if text in {"0", "false", "no", "off", "disable", "disabled"}:
-            return False
-        return bool(default)
+        return to_bool(raw, default)
 
     def _queue_step_messages(self, step):
         raw = step.get("messages")

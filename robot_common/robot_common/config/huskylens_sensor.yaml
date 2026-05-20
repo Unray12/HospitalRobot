@@ -1,0 +1,39 @@
+# =============================================================================
+# huskylens_sensor — ESP32 HuskyLens line tracking
+# =============================================================================
+# Đọc bởi: huskylens_sensor/huskylens_sensor/huskylens_sensor_node.py
+# Xem thêm: docs/22-huskylens-integration.md
+#
+# Phần cứng: ESP32 (hrbot_huskylens) nối HuskyLens IC qua UART 9600 baud.
+# Firmware dùng ALGORITHM_LINE_TRACKING, emit tail_offset_x + angle_deg +
+# y_type theo Device Protocol v1 @ USB-CDC 115200.
+# =============================================================================
+
+serial:
+  port: /dev/hospitalrobot/huskylens
+  baudrate: 115200   # USB-CDC (KHÔNG phải UART HuskyLens IC 9600)
+  timeout: 0.2
+
+publish:
+  # Frame canonical: {"HuskylenSensor": {connected, algorithm_set, valid,
+  #   tail_offset_x, angle_deg, y_type, line_length_y, direction}}
+  topic_frame: /huskylens/frame
+
+  # true khi connected=1 && algorithm_set=1 && valid=1
+  topic_valid: /huskylens/valid
+
+  # Publish rate. Firmware emit 10 Hz; node đọc @ rate_hz.
+  # 20 Hz đủ để capture mọi firmware frame kèm 1 lần buffer drain.
+  rate_hz: 20
+
+reconnect_period_sec: 2.0
+fallback_ports: []
+scan_prefixes: []
+
+# Log parse error mỗi parse_log_every frame bị malformed.
+# Tránh log spam khi ESP32 bật lên và emit banner/noise.
+parse_log_every: 20
+
+# Log trạng thái HuskyLens (connected/valid) mỗi status_log_period giây
+# hoặc khi trạng thái thay đổi (whichever comes first).
+status_log_period: 2.0

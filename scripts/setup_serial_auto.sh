@@ -44,8 +44,8 @@ uninstall() {
 
 probe_only() {
   require_root
-  say "Stop ROS nodes (nếu có)"
-  pkill -f "ros2 launch|ros2 run" 2>/dev/null || true
+  say "Stop HospitalRobot ROS nodes (nếu có)"
+  pkill -f "ros2 (launch|run) (line_sensors|camera_sensor|huskylens_sensor|motor_driver|line_follower|manual_control|mqtt_bridge|robot)( |$)" 2>/dev/null || true
   sleep 1
   say "Stop service (tránh tranh port)"
   systemctl stop hospitalrobot-serial.service 2>/dev/null || true
@@ -90,9 +90,9 @@ if ! python3 -c "import serial" 2>/dev/null; then
 fi
 
 # ---- 3. Dừng ROS đang chiếm port (nếu có) ----
-if pgrep -f "ros2 launch|ros2 run|line_sensor_driver|camera_sensor|huskylens|motor_driver" >/dev/null 2>&1; then
-  warn "Đang có ROS node chạy — tạm dừng để probe được port"
-  pkill -f "ros2 launch|ros2 run" || true
+if pgrep -f "ros2 (launch|run) (line_sensors|camera_sensor|huskylens_sensor|motor_driver|line_follower|manual_control|mqtt_bridge|robot)" >/dev/null 2>&1; then
+  warn "Đang có HospitalRobot ROS node chạy — tạm dừng để probe được port"
+  pkill -f "ros2 (launch|run) (line_sensors|camera_sensor|huskylens_sensor|motor_driver|line_follower|manual_control|mqtt_bridge|robot)( |$)" || true
   sleep 2
 fi
 
@@ -108,7 +108,7 @@ Wants=systemd-udev-settle.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/python3 ${PROBE_SCRIPT}
+ExecStart=/usr/bin/python3 "${PROBE_SCRIPT}"
 ExecStop=/bin/sh -c 'rm -rf /dev/hospitalrobot'
 TimeoutStartSec=120
 

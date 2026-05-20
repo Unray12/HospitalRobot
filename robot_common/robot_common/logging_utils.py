@@ -1,6 +1,7 @@
 """Small structured logging helpers shared by ROS2 nodes in this repo."""
 
 import os
+import sys
 
 
 _RESET = "\033[0m"
@@ -16,9 +17,14 @@ def _color_enabled(default=True):
     if os.getenv("NO_COLOR"):
         return False
     value = os.getenv("ROBOT_LOG_COLOR")
-    if value is None:
-        return default
-    return value.strip().lower() not in ("0", "false", "off", "no")
+    if value is not None:
+        return value.strip().lower() not in ("0", "false", "off", "no")
+    if not default:
+        return False
+    try:
+        return sys.stderr.isatty()
+    except Exception:
+        return False
 
 
 class LogAdapter:
@@ -72,4 +78,20 @@ class LogAdapter:
     warn = warning
 
 
-__all__ = ["LogAdapter"]
+def to_bool(raw, default=False):
+    """Parse bool from YAML/config values (True/False/1/0/'true'/'yes'/...)."""
+    if raw is None:
+        return bool(default)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return bool(raw)
+    text = str(raw).strip().lower()
+    if text in {"1", "true", "yes", "on", "enable", "enabled"}:
+        return True
+    if text in {"0", "false", "no", "off", "disable", "disabled"}:
+        return False
+    return bool(default)
+
+
+__all__ = ["LogAdapter", "to_bool"]

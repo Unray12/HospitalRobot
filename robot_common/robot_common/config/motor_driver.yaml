@@ -1,0 +1,41 @@
+# =============================================================================
+# motor_driver — serial motor controller (mecanum x4)
+# =============================================================================
+# Đọc bởi: motor_driver/motor_driver/motor_driver_node.py
+# Xem thêm: docs/20-device-protocol.md §Motor MCU
+#
+# Motor MCU nhận lệnh qua serial ở wire format: (fl,fr,rl,rr)\n
+# Trong đó fl/fr/rl/rr là tốc độ 4 bánh integer (positive/negative).
+# Ví dụ Forward:8 → (-8,-8,-8,-8) (dấu âm do motor wiring convention).
+#
+# Khác với ESP32 (Device Protocol v1 JSON), motor MCU là legacy device:
+# nó KHÔNG emit JSON envelope — không có dev_id, không boot banner.
+# =============================================================================
+
+serial:
+  port: /dev/hospitalrobot/motor
+  baudrate: 115200
+
+  # read timeout — motor_driver không đọc response từ MCU (no ACK protocol).
+  # Timeout chỉ ảnh hưởng nếu code gọi read(), hiện không dùng.
+  timeout: 0.1
+
+subscribe:
+  # Topic nhận lệnh motor từ line_follower hoặc manual_control.
+  # Format string: "Direction:Speed" (vd "Forward:8", "Stop:0").
+  cmd_vel: /motor_cmd
+
+topics:
+  # Bật/tắt wheel speed debug log runtime.
+  debug_toggle: /debug_logs_toggle
+
+# Retry mở serial mỗi 2s sau khi mất kết nối.
+# udev restart service khi cắm lại nhưng node tự heal nếu cần.
+reconnect_period_sec: 2.0
+
+# Chỉ scan nếu port trên không mở được:
+# fallback_ports:
+#   - /dev/ttyUSB1
+#   - /dev/ttyUSB0
+fallback_ports: []
+scan_prefixes: []

@@ -1,5 +1,5 @@
 # HospitalRobot Device Protocol v1 — role: camera
-# Xem docs/DEVICE_PROTOCOL.md cho spec đầy đủ.
+# Xem docs/20-device-protocol.md cho spec đầy đủ.
 
 from machine import UART
 from yolo_uno import *
@@ -27,7 +27,7 @@ RECONNECT_INTERVAL_MS = 3000
 # không phải USB CDC). KHÔNG đổi trừ khi đã đổi setting trên menu HuskyLens.
 #
 # LƯU Ý dual-baudrate:
-# - USB CDC (kết nối xuống ROS, config trong config.json "serial.baudrate"): 115200
+# - USB CDC (kết nối xuống ROS, config trong config.yaml "serial.baudrate"): 115200
 # - UART hardware (kết nối với HuskyLens IC): 9600 (hằng số này)
 # Hai baudrate KHÁC NHAU — không nhầm lẫn khi cấu hình.
 HUSKYLENS_BAUD = 9600

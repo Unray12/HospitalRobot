@@ -2,6 +2,9 @@
 
 from robot_common.serial_device import SerialDevice
 
+# Mecanum kinematics: each tuple is (front-left, front-right, rear-left, rear-right)
+# direction sign. Multiplied by scalar speed at runtime. Negative sign reflects
+# the motor wiring convention used by the on-board MCU firmware.
 DIR = {
     "Forward": (-1, -1, -1, -1),
     "Backward": (+1, +1, +1, +1),
@@ -22,12 +25,18 @@ class MotorController(SerialDevice):
             self._log_error("Invalid direction command")
             return None
 
-        wheel_speeds = [s * speed for s in DIR[direction]]
-        cmd = ",".join(f"{v}" for v in wheel_speeds) + "\n"
-        if self.ser and self.ser.is_open:
+        # MCU parser expects integer wheel speeds, not floats. Rounding here
+        # avoids "8.0" / "8.7" tokens that the firmware tokenizer would reject.
+        wheel_speeds = [int(round(s * speed)) for s in DIR[direction]]
+        with self._lock:
+            if not (self.ser and self.ser.is_open):
+                self._log_warn(f"Motor serial disconnected, command dropped: {direction}")
+                return None
+            frame = "(" + ",".join(str(v) for v in wheel_speeds) + ")\n"
             try:
-                self.ser.write(f"({cmd})".encode())
+                self.ser.write(frame.encode())
             except Exception as exc:
-                self._log_error(f"Serial write error: {exc}")
-                self.close()
+                self._log_warn(f"Serial write failed, command dropped: {exc}")
+                self.ser = None
+                return None
         return wheel_speeds

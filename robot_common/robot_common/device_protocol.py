@@ -3,7 +3,7 @@
 Schema:
     {"dev_id":"hrbot_<role>", "event":"<type>", "payload":{...}, "ts"?:int}
 
-Xem `docs/DEVICE_PROTOCOL.md` cho spec đầy đủ. Mọi ROS-side reader nên dùng
+Xem `docs/20-device-protocol.md` cho spec đầy đủ. Mọi ROS-side reader nên dùng
 `parse_envelope()` để decode + validate, không tự parse JSON.
 """
 

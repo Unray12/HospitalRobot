@@ -37,7 +37,8 @@ def test_envelope_data_parses_ok():
     assert frame["valid"] == 1
     assert frame["tail_offset_x"] == -72.0
     assert frame["angle_deg"] == 4.12
-    assert frame["error"] == -57
+    # error is not synthesized; firmware must emit it explicitly when needed.
+    assert "error" not in frame
     assert is_frame_tracking_valid(frame) is True
 
 

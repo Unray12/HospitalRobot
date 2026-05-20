@@ -11,7 +11,7 @@ from std_srvs.srv import SetBool
 from .line_follower import LineFollowerFSM
 from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
-from robot_common.logging_utils import LogAdapter
+from robot_common.logging_utils import LogAdapter, to_bool
 
 
 class LineFollowerNode(Node):
@@ -23,11 +23,16 @@ class LineFollowerNode(Node):
         self.log = LogAdapter(self.get_logger(), "line_follower")
 
         config = ConfigManager("line_follower", logger=self.log).load()
+        plan_mapping = ConfigManager("robot_common", "plan_mapping.yaml", logger=self.log).load()
+        self._cfg_mgr = ConfigManager("line_follower", logger=self.log)
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
         tracking_cfg = config.get("tracking", {})
         huskylens_cfg = config.get("huskylens", {})
-        self.plan_alias = config.get("plan_alias", {})
+        # Centralized digit→plan mapping lives in robot_common/plan_mapping.yaml.
+        # Local plan_alias key in line_follower.yaml kept as backwards-compatible
+        # fallback for installs that haven't synced robot_common yet.
+        self.plan_alias = plan_mapping.get("plan_keys", config.get("plan_alias", {}))
         self.auto_on_plan_select_default = bool(config.get("auto_on_plan_select", True))
         self.tracking_strategy = str(tracking_cfg.get("strategy", "line_sensor")).strip().lower() or "line_sensor"
         if self.tracking_strategy not in {"line_sensor", "huskylens", "hybrid"}:
@@ -66,7 +71,7 @@ class LineFollowerNode(Node):
         self._active_plan_autoline = None
         self._plan_completion_reported = False
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.log)
+        cfg_mgr = self._cfg_mgr
         plan_name = config.get("cross_plan_name")
         plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
         plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
@@ -97,9 +102,9 @@ class LineFollowerNode(Node):
             tracking_strict_mode=self.tracking_strict_mode,
             tracking_log_invalid_period=self.tracking_log_invalid_period,
             tracking_allow_line_sensor_fallback=not self.tracking_only_huskylens,
-            huskylens_max_abs_error=huskylens_cfg.get("max_abs_error", 120),
-            huskylens_control_gain=huskylens_cfg.get("control_gain", 1.0),
-            huskylens_deadband=huskylens_cfg.get("deadband", 1.0),
+            huskylens_lateral_deadband=huskylens_cfg.get("lateral_deadband", 10.0),
+            huskylens_heading_deadband=huskylens_cfg.get("heading_deadband", 3.0),
+            huskylens_y_type_rotate_timeout=huskylens_cfg.get("y_type_rotate_timeout", 5.0),
             logger=self.log,
         )
         if plan_name:
@@ -206,12 +211,16 @@ class LineFollowerNode(Node):
                 self._last_huskylens_ts = time.time()
                 return
             self._last_huskylens_frame = {
-                "connected": int(sensor.get("connected", 0)),
+                "connected":     int(sensor.get("connected", 0)),
                 "algorithm_set": int(sensor.get("algorithm_set", 0)),
-                "valid": int(sensor.get("valid", 0)),
-                "tail_offset_x": float(sensor.get("tail_offset_x")),
-                "angle_deg": float(sensor.get("angle_deg")),
-                "direction": int(sensor.get("direction", 0)),
+                "valid":         int(sensor.get("valid", 0)),
+                "tail_offset_x": float(sensor.get("tail_offset_x", 0.0)),
+                "angle_deg":     float(sensor.get("angle_deg", 0.0)),
+                "direction":     int(sensor.get("direction", 0)),
+                "y_type":        int(sensor.get("y_type", 0)),
+                "line_length_y": int(sensor.get("line_length_y", 0)),
+                "y_head":        int(sensor.get("y_head", 0)),
+                "y_tail":        int(sensor.get("y_tail", 0)),
             }
             self._last_huskylens_ts = time.time()
         except Exception:
@@ -248,8 +257,7 @@ class LineFollowerNode(Node):
             self.log.info(f"Plan duplicate ignored: {name}", event="PLAN")
             return
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.log)
-        plan_data = cfg_mgr.load_plan(name)
+        plan_data = self._cfg_mgr.load_plan(name)
         if not plan_data:
             self.log.warning(f"Plan not found: {name}", event="PLAN")
             return
@@ -495,22 +503,17 @@ class LineFollowerNode(Node):
         self.log.info(msg.data, event="PLAN_EVENT")
 
     def _to_bool(self, value, default):
-        if value is None:
-            return default
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            text = value.strip().lower()
-            if text in {"1", "true", "yes", "on"}:
-                return True
-            if text in {"0", "false", "no", "off"}:
-                return False
-        return bool(value)
+        return to_bool(value, default)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = LineFollowerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

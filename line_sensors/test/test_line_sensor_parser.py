@@ -1,4 +1,5 @@
 import json
+import threading
 
 from line_sensors.line_sensor_reader import LineSensorReader
 
@@ -21,6 +22,7 @@ def _new_reader():
     reader._logger = None
     reader._buffer = ""
     reader.ser = None
+    reader._lock = threading.Lock()
     return reader
 
 

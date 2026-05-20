@@ -30,7 +30,8 @@ def parse_command(text):
 
     The accepted wire format is ``Direction:Speed``. For backward compatibility we
     also accept comma- and space-delimited variants that already exist in tests and
-    older tooling.
+    older tooling. Extra segments beyond the first two are tolerated and ignored
+    (see ``test_parse_command_trims_whitespace_and_ignores_extra_segments``).
     """
     raw = str(text or "").strip()
     if not raw:

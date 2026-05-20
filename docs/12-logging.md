@@ -29,6 +29,7 @@ Ví dụ:
 ## 3. Thành phần API dùng chung
 
 File dùng chung:
+
 - `robot_common/robot_common/logging_utils.py`
 
 Khởi tạo trong node:
@@ -45,18 +46,31 @@ self.log.error("Serial write error", event="SERIAL")
 ## 4. Màu log và env control
 
 Color mapping:
+
 - `INFO`: cyan
 - `WARNING`: yellow
 - `ERROR`: red
 
-Tắt màu:
-- `NO_COLOR=1`
-- hoặc `ROBOT_LOG_COLOR=0`
+Behavior (từ 2026-05-19):
+
+- Tự động **tắt màu** khi `sys.stderr` không phải TTY (vd journalctl, file
+  redirect, systemd) → log không dính ANSI escape sequences.
+- Vẫn bật màu khi chạy interactive terminal.
+
+Force override:
+
+- `NO_COLOR=1` — tắt màu (chuẩn `no-color.org`)
+- `ROBOT_LOG_COLOR=0` / `false` / `off` / `no` — tắt
+- `ROBOT_LOG_COLOR=1` / `true` / `on` / `yes` — bật ngay cả khi không TTY
 
 Ví dụ:
 
 ```bash
+# Tắt màu cho session hiện tại
 export NO_COLOR=1
+
+# Bật màu khi pipe qua tee (debug)
+ROBOT_LOG_COLOR=1 ros2 run line_follower line_follower 2>&1 | tee debug.log
 ```
 
 ## 5. Event taxonomy theo package
@@ -122,24 +136,70 @@ export NO_COLOR=1
 
 ## 7. Chống spam log
 
+### 7.1 Built-in throttling
+
 Cơ chế hiện có:
+
 - `line_follower` throttle `PLAN_STATUS` theo `plan_status_log_period`
 - `line_sensors` throttle debug theo `debug_log_period`
 - `motor_driver` throttle debug theo `debug_log_period`
 - `camera_sensor` chỉ log drop malformed theo chu kỳ đếm
 
-Khuyến nghị:
+### 7.2 LogThrottler helper
+
+`mqtt_bridge/log_throttler.py` cung cấp 2 mode:
+
+```python
+from mqtt_bridge.log_throttler import LogThrottler
+
+throttler = LogThrottler()
+
+# Throttle theo period
+if throttler.should_emit_throttled(key="plan_status", period=0.5, enabled=True):
+    log.info(message)
+
+# Emit on change (vd huskylens/valid 0↔1)
+if throttler.should_emit_on_change(key="huskylens_valid", value="1", enabled=True):
+    log.info(message)
+```
+
+Cùng class này được dùng bởi `MQTTBridgeNode._log_throttled` / `_log_on_change`.
+
+### 7.3 Config-driven enable
+
+Mỗi log channel trong `mqtt_bridge.log_control` có `_enabled` flag riêng để
+bật/tắt mà không cần đổi code:
+
+```json
+"log_control": {
+    "bridge_in_enabled": false,
+    "bridge_out_enabled": false,
+    "bridge_traffic_period": 1.0,
+    "plan_status_enabled": true,
+    "plan_status_period": 0.5,
+    "huskylens_frame_enabled": false,
+    "huskylens_frame_period": 2.0,
+    "huskylens_valid_enabled": true,
+    "huskylens_valid_log_on_change": true
+}
+```
+
+### 7.4 Khuyến nghị
+
 - Dùng event code cố định trước khi tăng tần suất log.
-- Khi cần trace sâu, bật debug tạm thời qua `/debug_logs_toggle`.
+- Khi cần trace sâu, bật debug tạm thời qua `/debug_logs_toggle` (topic Bool).
+- Throttle bất cứ log nào nằm trong vòng lặp ≥ 10 Hz.
 
 ## 8. Cầu nối log ROS2 -> MQTT
 
 `mqtt_bridge` có chế độ log bridge:
+
 - subscribe `/rosout`
 - lọc theo `source_nodes` và `keywords`
 - publish sang MQTT topic `robot_logs`
 
 Mục tiêu:
+
 - dashboard/UI có thể nhận sự kiện plan quan trọng không cần đọc trực tiếp ROS logs.
 
 ## 9. Checklist review log khi thêm tính năng mới

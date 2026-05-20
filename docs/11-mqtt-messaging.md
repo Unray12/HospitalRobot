@@ -1,8 +1,9 @@
 # MQTT Message Guide (HospitalRobot)
 
 Tài liệu này mô tả đầy đủ cách điều khiển robot bằng MQTT, bám theo code hiện tại trong:
+
 - `mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py`
-- `robot_common/robot_common/config.json`
+- `robot_common/robot_common/config.yaml`
 
 ## 1. Mục đích
 
@@ -13,15 +14,18 @@ Tài liệu này mô tả đầy đủ cách điều khiển robot bằng MQTT, 
 ## 2. Thông số broker và topic
 
 Thông số mặc định:
+
 - Broker host: `127.0.0.1`
 - Broker port: `1883`
 
 Topic điều khiển (MQTT -> ROS2):
+
 - `VR_control`
 - `pick_robot`
 - `plan_select`
 
 Topic trạng thái (ROS2 -> MQTT):
+
 - `plan_status`
 - `plan_message`
 - `face/camera`
@@ -36,6 +40,7 @@ Topic trạng thái (ROS2 -> MQTT):
 Ý nghĩa: gửi lệnh điều khiển tay.
 
 Payload hợp lệ:
+
 - `Forward`
 - `Backward`
 - `Left`
@@ -45,6 +50,7 @@ Payload hợp lệ:
 - `RotateRight`
 
 ROS2 tương ứng:
+
 - Bridge publish sang `/VR_control` (`std_msgs/String`)
 - `manual_control` chuyển thành `/motor_cmd` theo `base_speed`
 
@@ -53,10 +59,12 @@ ROS2 tương ứng:
 Ý nghĩa: bật/tắt auto mode toàn cục.
 
 Payload hợp lệ:
+
 - `1`: bật auto mode
 - `0`: tắt auto mode
 
 ROS2 tương ứng:
+
 - Bridge publish sang `/pick_robot` (`std_msgs/String`)
 - `manual_control` đồng bộ sang `/auto_mode` (`std_msgs/Bool`)
 - `manual_control` gọi service `/set_auto_mode`
@@ -66,17 +74,20 @@ ROS2 tương ứng:
 Ý nghĩa: chọn plan cho `line_follower`.
 
 Payload khuyến nghị:
+
 - `room:a19`, `room:a18`, `room:a17`, `room:a16`, `room:a15`
 - `room:1` đến `room:5`
 - `clear` hoặc `room:0` để clear plan
 
 Payload tương thích:
+
 - `1..5`
 - `phong:1..5`
 - `plan:1..5`
 - tên plan trực tiếp như `a19`, `plan_turn_right`
 
 Map mặc định:
+
 - `1 -> a19`
 - `2 -> a18`
 - `3 -> a17`
@@ -84,8 +95,14 @@ Map mặc định:
 - `5 -> a15`
 
 Lưu ý:
+
 - Bridge normalize payload trước khi publish ROS topic `/plan_select`.
+- Logic normalize tách thành module riêng `mqtt_bridge/plan_resolver.py`
+  (`PlanCommandResolver`), có 10 unit tests pure-Python.
 - Nếu room id không map được sẽ bị bỏ qua và warning log.
+- Plan name truyền thẳng (vd `freestyle_plan`) **được pass-through** xuống
+  ROS, nhưng `ConfigManager.load_plan` ở `line_follower` reject tên không
+  khớp `^[A-Za-z0-9_-]+$` (chống path traversal — fix 2026-05-19).
 
 ## 4. Ví dụ publish chuẩn
 
@@ -141,6 +158,7 @@ ros2 topic echo /motor_cmd
 ```
 
 Kỳ vọng:
+
 - `plan_select=room:1` -> `/plan_select` nhận `a19`
 - `pick_robot=1` -> `/auto_mode` chuyển `True`
 - `VR_control=Forward` -> `/motor_cmd` xuất `Forward:<speed>`
@@ -148,6 +166,7 @@ Kỳ vọng:
 ## 7. Keyboard teleop tích hợp trong mqtt_bridge
 
 Mapping mặc định:
+
 - `w/s/a/d`: `Forward/Backward/Left/Right`
 - `space`: `Stop`
 - `j/p`: `RotateLeft/RotateRight`
@@ -160,10 +179,36 @@ Mapping mặc định:
 ## 8. Echo suppression (tránh loop MQTT)
 
 Bridge có cơ chế đánh dấu local publish và suppress message echo trong:
-- `echo_suppress_window_sec = 0.35`
+
+- `echo_suppress_window_sec = 0.35` (config-driven)
 
 Mục đích:
+
 - tránh lặp command khi bridge vừa publish vừa subscribe cùng topic.
+
+Implementation detail:
+
+- Dict `_recent_local_pub: {(topic, payload): timestamp}` ghi mọi local publish.
+- Inbound message trùng `(topic, payload)` trong cửa sổ → drop.
+- Dict được prune opportunistically khi > 64 entries (chống leak — High-3 fix
+  2026-05-19; trước đây entries có thể tồn tại vĩnh viễn nếu không có echo).
+
+## 8.1 MQTT broker resilience
+
+Từ 2026-05-19, `mqtt_bridge` dùng `connect_async()` + `loop_start()` +
+`reconnect_delay_set(min_delay=1, max_delay=10)`:
+
+- Bridge **không crash** khi mosquitto chưa ready lúc Pi boot.
+- Tự retry với exponential backoff (1s → 2s → ... → 10s cap).
+- Khi broker disconnect runtime, paho tự reconnect; `_mqtt_connected` event
+  được sync với `on_connect`/`on_disconnect` callback.
+
+Nếu bridge log warn `MQTT initial connect_async failed`, kiểm tra:
+
+```bash
+systemctl status mosquitto
+mosquitto_sub -h 127.0.0.1 -p 1883 -t '$SYS/broker/uptime' -C 1
+```
 
 ## 9. Python client mẫu
 

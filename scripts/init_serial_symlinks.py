@@ -28,7 +28,7 @@ LINK_DIR = Path("/dev/hospitalrobot")
 
 # HospitalRobot Device Protocol v1: firmware emit envelope JSON với field "dev_id".
 # Probe chỉ cần match chữ ký dev_id — nhất quán, dễ thêm role mới (xem
-# docs/DEVICE_PROTOCOL.md).
+# docs/20-device-protocol.md).
 # Fallback regex cũ giữ lại để tương thích firmware chưa cập nhật.
 PROBES: dict[str, dict] = {
     "line": {
@@ -94,9 +94,14 @@ def classify(dev: str, candidate_roles: list[str]) -> tuple[str | None, int | No
 
 
 def safe_symlink(link: Path, target: str) -> None:
-    if link.is_symlink() or link.exists():
-        link.unlink()
-    link.symlink_to(target)
+    tmp = link.with_name(f".{link.name}.tmp.{os.getpid()}")
+    try:
+        if tmp.is_symlink() or tmp.exists():
+            tmp.unlink()
+    except FileNotFoundError:
+        pass
+    os.symlink(target, tmp)
+    os.replace(tmp, link)
 
 
 def main() -> int:

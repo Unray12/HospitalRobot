@@ -1,87 +1,159 @@
-# Import các module phần cứng:
-# - Pin, UART: giao tiếp UART với HuskyLens
-# - HuskyLens, ALGORITHM_LINE_TRACKING: thư viện HuskyLens và chế độ dò line
-from machine import Pin, UART
-from yolo_uno import D4_PIN, D3_PIN
+"""
+HuskyLens line-tracking firmware for the HospitalRobot sensor node.
+
+Reads the ARROW output of the HuskyLens line-tracking algorithm over UART,
+filters it into a compact decision payload, and streams the result as JSON
+envelopes at 10 Hz on stdout for the upstream host (MQTT bridge / line follower).
+
+Protocol: HospitalRobot Device Protocol v1 (see Note.txt).
+Target:   MicroPython on YoloUNO (ESP32-class).
+"""
+
+from machine import UART, WDT
+from yolo_uno import *
 from huskylens import HuskyLens, ALGORITHM_LINE_TRACKING
 import time
 import math
 
-# Ưu tiên ujson vì nhẹ hơn trên MicroPython
+# ujson is the MicroPython-native, lower-footprint encoder; fall back to json
+# on CPython for off-device unit testing.
 try:
     import ujson as json
 except ImportError:
     import json
 
+# Settle delay sau cold boot — neopix/UART có thể chưa ready ngay khi reset
+# cứng. Giống pattern trong camera_sensor/device_code/main.py.
+time.sleep_ms(500)
 
-# ================== CONFIG ==================
-# UART số mấy trên board
-UART_ID = 1
 
-# Chân TX/RX dùng để nối với HuskyLens
-# TX board -> RX HuskyLens
-# RX board <- TX HuskyLens
-# Nếu board không có D4_PIN / D3_PIN thì thay bằng GPIO thực tế
-UART_TX_PIN = D4_PIN
-UART_RX_PIN = D3_PIN
+# ---------------------------------------------------------------------------
+# Hardware configuration
+# ---------------------------------------------------------------------------
 
-# Baudrate UART hardware giữa ESP32 và HuskyLens IC — giữ 9600 (mặc định HuskyLens,
-# không phải USB CDC). KHÔNG đổi trừ khi đã đổi setting trên menu HuskyLens.
+UART_ID       = 1
+UART_TX_PIN   = D4_PIN           # board TX -> HuskyLens RX
+UART_RX_PIN   = D3_PIN           # board RX <- HuskyLens TX
+
+# HuskyLens IC defaults to 9600 baud on its hardware UART (independent of the
+# USB-CDC link). Only change if the rate was reconfigured from the device menu.
 UART_BAUDRATE = 9600
 
-# Kích thước ảnh xử lý của HuskyLens
-IMAGE_WIDTH = 320
-IMAGE_HEIGHT = 240
 
-# Trục giữa ảnh theo X
+# ---------------------------------------------------------------------------
+# Image geometry (HuskyLens default frame 320x240)
+# ---------------------------------------------------------------------------
+
+IMAGE_WIDTH    = 320
+IMAGE_HEIGHT   = 240
 IMAGE_CENTER_X = IMAGE_WIDTH // 2   # 160
 
-# Cắt bớt mép trái/phải để giảm nhiễu ở rìa ảnh
-X_CROP_LEFT = 20
+# Horizontal dead zone: drop edge artifacts before computing tail offset.
+X_CROP_LEFT  = 20
 X_CROP_RIGHT = 20
 
-# Nếu y_tail nằm sát đáy ảnh thì coi là line gần xe
-Y_BOTTOM_THRESHOLD = IMAGE_HEIGHT - 20
+# Vertical zone thresholds. The frame is partitioned into three bands:
+#   TOP : y < MID_Y_THRESHOLD                     (far away from the robot)
+#   MID : MID_Y_THRESHOLD <= y < Y_BOTTOM_THRESHOLD
+#   BOT : y >= Y_BOTTOM_THRESHOLD                 (closest to the robot)
+MID_Y_THRESHOLD    = 80
+Y_BOTTOM_THRESHOLD = IMAGE_HEIGHT - 20   # 220
 
-# Độ dài line tối thiểu theo trục Y để coi là hợp lệ
-MIN_LINE_LENGTH_Y = 50
-
-# y_tail phải đủ thấp trong ảnh thì mới coi là line đáng tin
-MIN_Y_START_FOR_VALID_LINE = 170
-
-# Nếu tail lệch quá lớn thì bỏ qua
+# Maximum tail deviation (in pixels) from the image center that we will still
+# steer on. Beyond this the arrow is treated as spurious.
 MAX_ABS_TAIL_OFFSET_X = 110
 
-# Thời gian thử kết nối lại HuskyLens khi mất kết nối
-RETRY_INTERVAL_MS = 100
 
-# Chu kỳ lặp 100ms — 10Hz, đồng bộ với line/camera.
-LOOP_DELAY_MS = 100
+# ---------------------------------------------------------------------------
+# Runtime configuration
+# ---------------------------------------------------------------------------
 
-# Giá trị direction mặc định
+RETRY_INTERVAL_MS = 100   # backoff between HuskyLens reconnect attempts
+LOOP_DELAY_MS     = 100   # main loop period; 10 Hz matches the line follower
 DEFAULT_DIRECTION = 0
 
-# Phân loại line theo vị trí trên ảnh
-Y_TYPE_UNKNOWN = 0
-Y_TYPE_BOTTOM_TO_MID = 1
-Y_TYPE_MID_TO_TOP = 2
-# ============================================
+# Hardware watchdog. Sized for the worst-case stage time:
+#   - boot banner: 10 × 150 ms = 1.5 s (fed every iteration)
+#   - HuskyLens detect_version on cold start: up to ~2 s (V2 then V1 probe)
+#   - Stage C read_arrows has its own 500 ms ceiling (see main loop)
+# 8 s leaves comfortable headroom while still recovering from a true freeze
+# (e.g. driver internal hang) within ~8 s.
+WDT_TIMEOUT_MS = 8000
 
 
-def print_json(data):
-    """
-    In dữ liệu ra dạng JSON để thiết bị khác dễ đọc.
-    """
+# ---------------------------------------------------------------------------
+# Line classification codes (y_type)
+#
+# Naming convention X_TO_Y reads as "tail in X band, head in Y band"; the
+# arrow always points from tail (bottom) to head (top) in image space.
+# ---------------------------------------------------------------------------
+
+Y_TYPE_NO_LINE       = 0   # no arrow available or rejected as invalid
+Y_TYPE_BOTTOM_TO_MID = 1   # tail BOT, head MID -- short line near robot (cross)
+Y_TYPE_MID_TO_TOP    = 2   # tail MID, head TOP -- long line ahead (follow)
+Y_TYPE_BOTTOM_TO_TOP = 3   # tail BOT, head TOP -- full-frame line
+Y_TYPE_MID_TO_MID    = 4   # tail and head both in MID -- floating segment
+
+
+# ---------------------------------------------------------------------------
+# LED feedback (onboard NeoPixel)
+#
+# Colour by visible state — operator can diagnose firmware health from across
+# the room. Updated once per main-loop iteration so the LED never flickers.
+# ---------------------------------------------------------------------------
+
+LED_DISCONNECTED   = (255, 0,   0  )   # red    -- no HuskyLens / set_alg failed
+LED_NO_LINE        = (255, 80,  0  )   # orange -- connected but no valid arrow
+LED_CROSS          = (255, 255, 0  )   # yellow -- BOTTOM_TO_MID  (short, cross)
+LED_FOLLOW         = (0,   255, 0  )   # green  -- MID_TO_TOP     (good follow)
+LED_FULL_LINE      = (0,   180, 255)   # cyan   -- BOTTOM_TO_TOP  (full frame)
+LED_FLOATING       = (180, 0,   255)   # purple -- MID_TO_MID     (floating)
+
+_current_led = (0, 0, 0)
+
+
+def set_led(color):
+    """Update the onboard NeoPixel; swallow errors so LED issues never abort the loop."""
+    global _current_led
+    if color == _current_led:
+        return
+    _current_led = color
     try:
-        print(json.dumps(data))
-    except Exception as e:
-        print('{"error":"json_dump_failed","detail":"%s"}' % str(e))
+        neopix.show(0, color)
+    except Exception:
+        pass
 
+
+def led_for_state(connected, algorithm_set, y_type):
+    """Pick the LED colour for the current sample."""
+    if not connected or not algorithm_set:
+        return LED_DISCONNECTED
+    if y_type == Y_TYPE_BOTTOM_TO_MID:
+        return LED_CROSS
+    if y_type == Y_TYPE_MID_TO_TOP:
+        return LED_FOLLOW
+    if y_type == Y_TYPE_BOTTOM_TO_TOP:
+        return LED_FULL_LINE
+    if y_type == Y_TYPE_MID_TO_MID:
+        return LED_FLOATING
+    return LED_NO_LINE
+
+
+# ---------------------------------------------------------------------------
+# Device protocol identity
+# ---------------------------------------------------------------------------
+
+DEV_ID  = "hrbot_huskylens"
+FW_NAME = "huskylens"
+FW_VER  = 1
+
+
+# ---------------------------------------------------------------------------
+# Pure helpers
+# ---------------------------------------------------------------------------
 
 def clamp(value, min_value, max_value):
-    """
-    Giới hạn value trong khoảng [min_value, max_value].
-    """
+    """Clamp `value` into the closed interval [min_value, max_value]."""
     if value < min_value:
         return min_value
     if value > max_value:
@@ -90,168 +162,125 @@ def clamp(value, min_value, max_value):
 
 
 def no_line_tracking():
-    """
-    Trạng thái mặc định khi:
-    - không thấy line
-    - dữ liệu line không hợp lệ
-    """
+    """Neutral payload emitted when no valid arrow is available."""
     return {
-        "valid": 0,
-        "direction": DEFAULT_DIRECTION,
+        "valid":         0,
+        "direction":     DEFAULT_DIRECTION,
         "tail_offset_x": 0,
-        "y_type": Y_TYPE_UNKNOWN,
+        "y_type":        Y_TYPE_NO_LINE,
         "line_length_y": 0,
-        "angle_deg": 0.0
+        "angle_deg":     0.0,
+        "y_head":        0,
+        "y_tail":        0,
     }
 
 
 def classify_line_y(y_head, y_tail):
     """
-    Phân loại line theo vị trí trên ảnh.
+    Map a (head, tail) pair to one of the Y_TYPE_* classes.
 
-    Trả về:
-    - Y_TYPE_UNKNOWN: line không hợp lệ
-    - Y_TYPE_BOTTOM_TO_MID: line gần đáy ảnh
-    - Y_TYPE_MID_TO_TOP: line ở cao hơn
+    Precondition: `y_head < y_tail` (enforced by the caller).
     """
-    y_start = int(y_tail)
-    y_end = int(y_head)
-    line_length_y = abs(y_tail - y_head)
+    head_in_top = (int(y_head) < MID_Y_THRESHOLD)
+    tail_in_bot = (int(y_tail) >= Y_BOTTOM_THRESHOLD)
 
-    # Line quá ngắn
-    if line_length_y < MIN_LINE_LENGTH_Y:
-        return Y_TYPE_UNKNOWN
-
-    # Head phải nằm phía trên tail
-    if y_end >= y_start:
-        return Y_TYPE_UNKNOWN
-
-    # Tail phải đủ thấp trong ảnh
-    if y_start < MIN_Y_START_FOR_VALID_LINE:
-        return Y_TYPE_UNKNOWN
-
-    # Nếu tail rất gần đáy ảnh
-    if y_start >= Y_BOTTOM_THRESHOLD:
+    if head_in_top and tail_in_bot:
+        return Y_TYPE_BOTTOM_TO_TOP
+    if head_in_top:
+        return Y_TYPE_MID_TO_TOP
+    if tail_in_bot:
         return Y_TYPE_BOTTOM_TO_MID
-
-    # Còn lại là line ở cao hơn
-    return Y_TYPE_MID_TO_TOP
+    return Y_TYPE_MID_TO_MID
 
 
 def calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head):
     """
-    Tính góc của vector từ tail -> head so với trục thẳng đứng hướng lên.
+    Angle (degrees) of the tail->head vector relative to image-up.
 
-    Quy ước:
-    - angle = 0   : line thẳng
-    - angle < 0   : line nghiêng trái
-    - angle > 0   : line nghiêng phải
-
-    Vì hệ trục ảnh có y tăng xuống dưới nên:
-    - dx = x_head - x_tail
-    - dy_up = y_tail - y_head
+    Negative = leaning left, positive = leaning right, zero = vertical.
+    Image y grows downward, so the "up" component is `y_tail - y_head`.
     """
-    dx = int(x_head) - int(x_tail)
+    dx    = int(x_head) - int(x_tail)
     dy_up = int(y_tail) - int(y_head)
 
     if dx == 0 and dy_up == 0:
         return 0.0
 
-    angle_rad = math.atan2(dx, dy_up)
-    angle_deg = angle_rad * 180.0 / math.pi
-    return angle_deg
+    return math.atan2(dx, dy_up) * 180.0 / math.pi
 
 
 def arrow_to_line_data(arrow):
     """
-    Chuyển dữ liệu arrow từ HuskyLens thành dữ liệu gọn cho thuật toán dò line.
+    Convert a raw HuskyLens arrow into the firmware's line-tracking payload.
 
-    Output:
-    - valid
-    - direction
-    - tail_offset_x: độ dời của tail theo trục X so với tâm ảnh (160)
-    - y_type
-    - line_length_y
-    - angle_deg: góc của vector tail -> head
+    Rejection rules (any failure returns `no_line_tracking()`):
+      - arrow is None or missing any of x_tail/y_tail/x_head/y_head
+      - head is not above tail in image coordinates
+      - either endpoint sits fully outside the image bounds
+      - tail deviates from center by more than MAX_ABS_TAIL_OFFSET_X
+
+    Otherwise endpoints are clamped into the cropped X band before deriving
+    the steering features.
     """
     if arrow is None:
         return no_line_tracking()
 
-    # Lấy dữ liệu từ arrow
-    x_tail = getattr(arrow, "x_tail", None)
-    y_tail = getattr(arrow, "y_tail", None)
-    x_head = getattr(arrow, "x_head", None)
-    y_head = getattr(arrow, "y_head", None)
+    x_tail    = getattr(arrow, "x_tail", None)
+    y_tail    = getattr(arrow, "y_tail", None)
+    x_head    = getattr(arrow, "x_head", None)
+    y_head    = getattr(arrow, "y_head", None)
     direction = getattr(arrow, "direction", DEFAULT_DIRECTION)
 
-    # Thiếu dữ liệu thì bỏ
     if x_tail is None or x_head is None or y_tail is None or y_head is None:
         return no_line_tracking()
 
-    # Ép kiểu int
     x_tail = int(x_tail)
     y_tail = int(y_tail)
     x_head = int(x_head)
     y_head = int(y_head)
 
-    # Tính độ dài line theo trục Y
-    line_length_y = abs(y_tail - y_head)
-
-    # Line quá ngắn
-    if line_length_y < MIN_LINE_LENGTH_Y:
-        return no_line_tracking()
-
-    # Head phải nằm trên tail
     if y_head >= y_tail:
         return no_line_tracking()
 
-    # Tail phải nằm đủ gần đáy ảnh
-    if y_tail < MIN_Y_START_FOR_VALID_LINE:
-        return no_line_tracking()
+    line_length_y = y_tail - y_head
 
-    # Giới hạn x_tail trong vùng ảnh hợp lệ
     x_min_limit = X_CROP_LEFT
     x_max_limit = IMAGE_WIDTH - X_CROP_RIGHT
     if x_max_limit <= x_min_limit:
         return no_line_tracking()
 
+    if x_tail < 0 or x_tail > IMAGE_WIDTH or x_head < 0 or x_head > IMAGE_WIDTH:
+        return no_line_tracking()
+
     x_tail = clamp(x_tail, x_min_limit, x_max_limit)
     x_head = clamp(x_head, x_min_limit, x_max_limit)
 
-    # Độ dời của tail theo trục X so với tâm ảnh 160
-    # tail_offset_x < 0: tail lệch trái
-    # tail_offset_x > 0: tail lệch phải
+    # Signed pixel deviation from the optical axis. Negative -> left, positive -> right.
     tail_offset_x = x_tail - IMAGE_CENTER_X
-
-    # Tail lệch quá lớn thì loại
     if abs(tail_offset_x) > MAX_ABS_TAIL_OFFSET_X:
         return no_line_tracking()
 
-    # Phân loại line theo trục Y
-    y_type = classify_line_y(y_head, y_tail)
-    if y_type == Y_TYPE_UNKNOWN:
-        return no_line_tracking()
-
-    # Tính góc line từ tail -> head
+    y_type    = classify_line_y(y_head, y_tail)
     angle_deg = calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head)
 
     return {
-        "valid": 1,
-        "direction": int(direction if direction is not None else DEFAULT_DIRECTION),
+        "valid":         1,
+        "direction":     int(direction or DEFAULT_DIRECTION),
         "tail_offset_x": int(tail_offset_x),
-        "y_type": int(y_type),
+        "y_type":        int(y_type),
         "line_length_y": int(line_length_y),
-        "angle_deg": float(angle_deg)
+        "angle_deg":     float(angle_deg),
+        "y_head":        int(y_head),
+        "y_tail":        int(y_tail),
     }
 
 
-DEV_ID = "hrbot_huskylens"
-FW_NAME = "huskylens"
-FW_VER = 1
-
+# ---------------------------------------------------------------------------
+# Device protocol I/O
+# ---------------------------------------------------------------------------
 
 def emit(event, payload):
-    """Gửi 1 envelope JSON theo schema HospitalRobot Device Protocol v1."""
+    """Serialize one envelope per HospitalRobot Device Protocol v1."""
     print(json.dumps({
         "dev_id":  DEV_ID,
         "event":   event,
@@ -260,6 +289,7 @@ def emit(event, payload):
 
 
 def build_data_payload(line_tracking, connected, algorithm_set):
+    """Assemble a `data` envelope payload from the latest line-tracking sample."""
     return {
         "connected":     1 if connected else 0,
         "algorithm_set": 1 if algorithm_set else 0,
@@ -269,85 +299,168 @@ def build_data_payload(line_tracking, connected, algorithm_set):
         "line_length_y": int(line_tracking["line_length_y"]),
         "direction":     int(line_tracking["direction"]),
         "angle_deg":     float(line_tracking["angle_deg"]),
+        "y_head":        int(line_tracking["y_head"]),
+        "y_tail":        int(line_tracking["y_tail"]),
     }
 
 
-def make_uart_and_hl():
+def make_uart_and_hl(prev_uart=None):
     """
-    Tạo UART và khởi tạo HuskyLens.
+    Allocate the UART peripheral and a HuskyLens client.
+
+    Any prior UART handle is deinitialized first so re-allocating the same
+    UART_ID on retry does not leak the driver instance.
     """
+    if prev_uart is not None:
+        try:
+            prev_uart.deinit()
+        except Exception:
+            pass
+
     uart = UART(
         UART_ID,
         baudrate=UART_BAUDRATE,
-        tx=Pin(UART_TX_PIN),
-        rx=Pin(UART_RX_PIN)
+        tx=UART_TX_PIN,
+        rx=UART_RX_PIN,
+        timeout=100,        # ms — _transport_read polls in chunks; cap each read so
+                            # a missing HuskyLens cannot hang the loop > 1 frame.
+        timeout_char=20,
     )
-    time.sleep(0.2)
-    hl = HuskyLens(uart, debug=False)
+    time.sleep_ms(200)   # let the line settle before issuing the first request
+    hl = HuskyLens(uart)
+    try:
+        hl.debug = False
+    except Exception:
+        pass
     return uart, hl
 
 
-# ================== INIT ==================
-uart = None
-hl = None
-connected = False
-algorithm_set = False
-last_retry_ms = 0
-# ==========================================
+# ---------------------------------------------------------------------------
+# Runtime state
+# ---------------------------------------------------------------------------
 
-# Boot banner — 10 lần để probe (3s window) match.
+uart                  = None
+hl                    = None
+connected             = False
+algorithm_set         = False
+last_retry_ms         = 0
+get_arrows_takes_alg  = True   # probed lazily, then cached for the session
+
+
+def read_arrows(client):
+    """
+    Call hl.get_arrows with or without the algorithm id depending on the
+    library variant linked into the firmware. The signature is probed once
+    and the result cached in `get_arrows_takes_alg`.
+
+    Before each call we drain any leftover bytes from the UART RX buffer.
+    The V1 _read_v1 protocol scans up to 50 * 150ms = 7.5s looking for the
+    header sequence, which hangs the main loop if stray bytes from a partial
+    or noisy previous response shift the scan out of sync.
+    """
+    global get_arrows_takes_alg
+    try:
+        u = getattr(client, "uart", None)
+        if u is not None:
+            pending = u.any() if hasattr(u, "any") else 0
+            if pending:
+                u.read(pending)
+    except Exception:
+        pass
+
+    if get_arrows_takes_alg:
+        try:
+            return client.get_arrows(ALGORITHM_LINE_TRACKING)
+        except TypeError:
+            get_arrows_takes_alg = False
+    return client.get_arrows()
+
+
+# ---------------------------------------------------------------------------
+# Boot banner
+#
+# Emitted ten times at 150 ms spacing (1.5 s total) so the upstream probe
+# (which scans for device identity for ~3 s after power-on) is guaranteed
+# to see at least one. The watchdog is fed during this phase so the boot
+# delay does not trip it.
+# ---------------------------------------------------------------------------
+
+wdt = WDT(timeout=WDT_TIMEOUT_MS)
+
 for _ in range(10):
     emit("boot", {"fw": FW_NAME, "ver": FW_VER})
+    wdt.feed()
+    time.sleep_ms(150)
+
+
+# ---------------------------------------------------------------------------
+# Main loop -- 10 Hz, deadline-driven so processing jitter does not slow the
+# emitted sample rate.
+# ---------------------------------------------------------------------------
 
 while True:
-    now = time.ticks_ms()
+    now           = time.ticks_ms()
+    next_deadline = time.ticks_add(now, LOOP_DELAY_MS)
+    wdt.feed()
 
-    # Nếu chưa kết nối, thử kết nối lại theo chu kỳ
+    # Stage A: (re)open the UART link to the HuskyLens.
     if (not connected) and time.ticks_diff(now, last_retry_ms) >= RETRY_INTERVAL_MS:
         last_retry_ms = now
         try:
-            uart, hl = make_uart_and_hl()
-            connected = bool(hl.knock())
+            uart, hl      = make_uart_and_hl(uart)
+            connected     = bool(hl.knock())
             algorithm_set = False
         except Exception:
-            connected = False
+            connected     = False
             algorithm_set = False
             emit("error", {"code": "uart_init_failed"})
+        wdt.feed()   # Stage A may take ~2 s on cold detect_version probe.
 
-    # Nếu đã kết nối nhưng chưa set thuật toán line tracking
+    # Stage B: ensure the device is in line-tracking mode.
     if connected and (not algorithm_set):
         try:
-            connected = bool(hl.set_alg(ALGORITHM_LINE_TRACKING))
+            connected     = bool(hl.set_alg(ALGORITHM_LINE_TRACKING))
             algorithm_set = connected
+            if not algorithm_set:
+                emit("error", {"code": "set_alg_failed"})
         except Exception:
-            connected = False
+            connected     = False
             algorithm_set = False
+            emit("error", {"code": "set_alg_failed"})
+        wdt.feed()   # set_alg + internal knock can take ~1 s.
 
-    # Mặc định là chưa có line
+    # Stage C: sample one arrow and reduce it to the line-tracking payload.
+    # Bounded by a 500 ms ceiling so a hung _read_v1 header scan (worst case
+    # ~7.5 s in huskylens.py V2.2.0 V1 path) cannot stall the 10 Hz loop.
     line_tracking = no_line_tracking()
-
-    # Chỉ đọc line khi đã kết nối và set thuật toán thành công
     if connected and algorithm_set:
+        stage_c_start = time.ticks_ms()
         try:
-            try:
-                # Một số thư viện yêu cầu truyền algorithm
-                arrows = hl.get_arrows(ALGORITHM_LINE_TRACKING)
-            except TypeError:
-                # Một số thư viện không cần truyền tham số
-                arrows = hl.get_arrows()
-
-            # Nếu có line thì lấy arrow đầu tiên
-            if arrows and len(arrows) > 0:
-                candidate_arrow = arrows[0]
-                line_tracking = arrow_to_line_data(candidate_arrow)
-
+            arrows = read_arrows(hl)
+            if time.ticks_diff(time.ticks_ms(), stage_c_start) > 500:
+                # Protocol scanner is hunting a header that will never arrive
+                # — drop the connection so Stage A retries on the next tick.
+                raise RuntimeError("read_arrows_timeout")
+            if arrows:
+                # Prefer arrow whose tail is closest to the robot (largest y_tail).
+                best = arrows[0]
+                best_y = int(getattr(best, "y_tail", 0) or 0)
+                for arrow in arrows[1:]:
+                    y = int(getattr(arrow, "y_tail", 0) or 0)
+                    if y > best_y:
+                        best = arrow
+                        best_y = y
+                line_tracking = arrow_to_line_data(best)
         except Exception:
-            connected = False
+            connected     = False
             algorithm_set = False
             line_tracking = no_line_tracking()
+            emit("error", {"code": "get_arrows_failed"})
 
-    # Xuất dữ liệu ra ngoài
+    # Stage D: publish the sample, update LED, and sleep until the next deadline.
     emit("data", build_data_payload(line_tracking, connected, algorithm_set))
+    set_led(led_for_state(connected, algorithm_set, int(line_tracking["y_type"])))
 
-    # Lặp mỗi 50ms
-    time.sleep_ms(LOOP_DELAY_MS)
+    remaining = time.ticks_diff(next_deadline, time.ticks_ms())
+    if remaining > 0:
+        time.sleep_ms(remaining)

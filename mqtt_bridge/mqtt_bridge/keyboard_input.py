@@ -9,22 +9,52 @@ from threading import Event
 if os.name == "nt":
     import msvcrt
 else:
+    import select
     import termios
     import tty
 
 
-def get_key():
+def get_key(timeout=None):
+    """Read one keystroke. ``timeout`` (seconds) returns ``""`` on POSIX timeout.
+
+    On Windows the timeout is implemented via a short poll loop on ``msvcrt.kbhit``.
+    """
     if os.name == "nt":
-        key = msvcrt.getch()
+        # Windows path: msvcrt.getch is blocking, so we implement timeout via
+        # kbhit polling. 50 ms poll keeps CPU usage negligible while staying
+        # responsive enough for keyboard teleop.
+        if timeout is None:
+            key = msvcrt.getch()
+        else:
+            import time as _time
+            deadline = _time.monotonic() + timeout
+            while _time.monotonic() < deadline:
+                if msvcrt.kbhit():
+                    key = msvcrt.getch()
+                    break
+                _time.sleep(0.05)
+            else:
+                return ""
         try:
             return key.decode("utf-8", errors="ignore").lower()
         except Exception:
             return ""
 
+    # POSIX path: switch terminal to raw mode so each keypress arrives as a
+    # single byte without waiting for Enter. tcsetattr restores cooked mode
+    # in the finally block — must run even on exceptions, otherwise the user's
+    # shell is left in an unusable raw state after the node exits.
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
+        if timeout is not None:
+            # select() is the only way to read stdin with a timeout on POSIX.
+            # Without this, sys.stdin.read(1) blocks forever and the keyboard
+            # thread cannot honor _stop_event between keystrokes.
+            ready, _, _ = select.select([sys.stdin], [], [], timeout)
+            if not ready:
+                return ""
         ch = sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
@@ -60,13 +90,15 @@ class KeyboardInput:
         self._thread.start()
 
     def stop(self):
-        pass
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=0.5)
 
     def _loop(self):
         self._log.info("Dieu khien WASD | q de thoat", event="KEYBOARD")
         auto_mode = False
         while not self._stop_event.is_set():
-            key = get_key()
+            key = get_key(timeout=0.2)
             if not key:
                 continue
 

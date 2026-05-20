@@ -1,5 +1,5 @@
 # HospitalRobot Device Protocol v1 — role: line
-# Xem docs/DEVICE_PROTOCOL.md cho spec đầy đủ.
+# Xem docs/20-device-protocol.md cho spec đầy đủ.
 
 from machine import I2C
 import time

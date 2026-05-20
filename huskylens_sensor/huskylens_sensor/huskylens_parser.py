@@ -79,9 +79,6 @@ def _build_frame(sensor):
     if ("tail_offset_x" not in frame or "angle_deg" not in frame) and ("error" not in frame):
         return None, "missing_fields: tail_offset_x_angle_deg_or_error"
 
-    if "error" not in frame and "tail_offset_x" in frame and "angle_deg" in frame:
-        frame["error"] = round(0.8 * frame["tail_offset_x"] + 0.2 * frame["angle_deg"])
-
     return frame, None
 
 

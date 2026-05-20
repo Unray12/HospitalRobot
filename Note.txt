@@ -91,7 +91,7 @@
     error  — lỗi từ firmware
     ack    — xác nhận lệnh đã nhận
 
-  Spec đầy đủ:  docs/DEVICE_PROTOCOL.md
+  Spec đầy đủ:  docs/20-device-protocol.md
   Parser:       robot_common/robot_common/device_protocol.py
 
   3.3  Quản lý serial service
@@ -225,26 +225,33 @@
  7. PLAN SYSTEM (LINE FOLLOWER FSM)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Plans nằm tại: robot_common/robot_common/plans/*.json
+  Plans nằm tại: robot_common/robot_common/plans/*.yaml
   Hiện có: a15, a16, a17, a18, a19
 
   Plan mapping (keyboard/MQTT → plan name):
     0 → clear    1 → a19    2 → a18    3 → a17    4 → a16    5 → a15
 
-  Cấu trúc plan JSON:
+  Cấu trúc plan YAML:
   ─────────────────────────────────────────────────────────────────────
-  {
-    "name": "a19",
-    "start_without_cross": true,
-    "steps": [
-      {"label": "S1", "action": "RotateRight", "until": "line", "speed": 5,
-       "messages": [{"topic": "/plan_message", "message": "say: ..."}]},
-      {"action": "AutoLine", "enabled": true},
-      {"action": "Forward", "duration": 2.0, "speed": 8},
-      {"action": "Stop"}
-    ],
-    "end_state": "stop"
-  }
+  Cấu trúc plan YAML:
+  ─────────────────────────────────────────────────────────────────────
+  name: a19
+  start_without_cross: true
+  steps:
+    - label: S1
+      action: RotateRight
+      until: line
+      speed: 5
+      messages:
+        - topic: /plan_message
+          message: "say: ..."
+    - action: AutoLine
+      enabled: true
+    - action: Forward
+      duration: 2.0
+      speed: 8
+    - action: Stop
+  end_state: stop
 
   Các action hỗ trợ:
     Forward / Backward / Left / Right   — di chuyển có duration
@@ -266,7 +273,7 @@
     messages              danh sách message gửi khi bắt đầu step
     end_state             kết thúc plan sau step này
 
-  Spec đầy đủ: docs/PLAN_GUIDE.md
+  Spec đầy đủ: docs/10-plan-authoring.md
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -294,7 +301,7 @@
   sudo systemctl start hospitalrobot-serial
 
   ┌─ LƯU Ý BAUDRATE ────────────────────────────────────────────────────┐
-  │ USB CDC (ESP32 ↔ Pi):     115200 baud (config trong config.json)    │
+  │ USB CDC (ESP32 ↔ Pi):     115200 baud (config trong config.yaml)    │
   │ UART HuskyLens (IC ↔ IC): 9600 baud  (hằng số trong firmware)      │
   │ Hai baudrate KHÁC NHAU — không nhầm lẫn khi cấu hình.              │
   └─────────────────────────────────────────────────────────────────────┘
@@ -304,7 +311,7 @@
  9. CẤU HÌNH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  File config chính: robot_common/robot_common/config.json
+  File config chính: robot_common/robot_common/config.yaml
 
   Cấu trúc: mỗi package 1 section top-level
   ─────────────────────────────────────────────────────────────────────
@@ -419,14 +426,14 @@
 
   File                                         Nội dung
   ─────────────────────────────────────────────────────────────────────
-  docs/DEVICE_PROTOCOL.md                      Spec serial JSON envelope v1
-  docs/MQTT_MESSAGE_GUIDE.md                   Contract MQTT đầy đủ
-  docs/PLAN_GUIDE.md                           Hướng dẫn viết plan JSON
-  docs/LINE_TRACKING_STRATEGY.md               Chiến lược tracking line
-  docs/HUSKYLENS_INTEGRATION.md                Tích hợp HuskyLens
-  docs/LOGGING_GUIDE.md                        Hệ thống logging
-  docs/PROJECT_FLOW.md                         Luồng hoạt động tổng thể
-  robot_common/robot_common/config.json        Config tất cả node
+  docs/20-device-protocol.md                      Spec serial JSON envelope v1
+  docs/11-mqtt-messaging.md                   Contract MQTT đầy đủ
+  docs/10-plan-authoring.md                           Hướng dẫn viết plan JSON
+  docs/21-line-tracking-strategy.md               Chiến lược tracking line
+  docs/22-huskylens-integration.md                Tích hợp HuskyLens
+  docs/12-logging.md                        Hệ thống logging
+  docs/02-project-flow.md                         Luồng hoạt động tổng thể
+  robot_common/robot_common/config.yaml        Config tất cả node
   robot_common/robot_common/plans/             Plan files (a15-a19)
   scripts/bootstrap_all.sh                     Entry point setup all-in-one
   scripts/setup_raspberry_ros.sh               Build workspace + apt deps

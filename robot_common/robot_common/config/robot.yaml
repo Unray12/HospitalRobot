@@ -1,0 +1,21 @@
+# =============================================================================
+# robot — bringup launcher
+# =============================================================================
+# Đọc bởi: robot/robot/main.py:_load_config
+#
+# Liệt kê các ROS2 node mà bringup launcher (`ros2 run robot robot`) sẽ spawn.
+# Tên trong list phải khớp với key trong _node_map() (xem robot/main.py:18).
+# Tên không hợp lệ sẽ bị skip với warning.
+#
+# Để chạy subset (vd debug 1 node), comment out các node khác hoặc chạy
+# trực tiếp `ros2 run <pkg> <exe>` từ terminal riêng.
+# =============================================================================
+
+bringup:
+  nodes:
+    - line_sensor_driver   # Đọc cảm biến line I2C (3 zone)
+    - line_follower        # FSM auto-tracking + plan execution
+    - motor_driver         # Gửi lệnh motor qua serial xuống MCU
+    - manual_control       # Xử lý lệnh tay (VR/keyboard) + auto sync
+    - camera_sensor        # Đọc face detection từ ESP32 camera
+    - huskylens_sensor     # Đọc HuskyLens line tracking

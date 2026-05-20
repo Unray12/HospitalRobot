@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ROS2 node parse envelope camera (Device Protocol v1) -> <DEV1,FACE,...> string.
 
-Firmware schema (xem `docs/DEVICE_PROTOCOL.md`):
+Firmware schema (xem `docs/20-device-protocol.md`):
   {"dev_id":"hrbot_camera","event":"boot","payload":{"fw":"camera","ver":1}}
   {"dev_id":"hrbot_camera","event":"data","payload":{"kind":"face","ids":[1,2]}}
   {"dev_id":"hrbot_camera","event":"data","payload":{"kind":"no_object"}}
@@ -36,10 +36,14 @@ class CameraSensorNode(Node):
         pub_cfg = config.get("publish", {})
 
         port = str(serial_cfg.get("port", "/dev/ttyACM0"))
-        baudrate = int(serial_cfg.get("baudrate", 9600))
+        baudrate = int(serial_cfg.get("baudrate", 115200))
         read_timeout = float(serial_cfg.get("timeout", 0.2))
         topic = str(pub_cfg.get("topic", "/face/camera"))
-        rate_hz = float(pub_cfg.get("rate_hz", 30.0))
+        # Firmware emits at 10Hz (LOOP_DELAY_MS=100 in device_code/main.py).
+        # Polling much faster just wastes CPU on empty ticks. Default to 15Hz
+        # so we still catch each frame with a little jitter headroom; override
+        # via `publish.rate_hz` if firmware loop rate changes.
+        rate_hz = float(pub_cfg.get("rate_hz", 15.0))
 
         self.reconnect_period_sec = float(
             config.get("reconnect_period_sec", serial_cfg.get("reconnect_period_sec", 2.0))

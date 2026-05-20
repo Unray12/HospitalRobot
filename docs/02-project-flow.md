@@ -72,7 +72,7 @@ camera_sensor/camera_sensor/main.py
 Config:
 
 ```text
-robot_common/robot_common/config.json -> camera_sensor
+robot_common/robot_common/config.yaml -> camera_sensor
 baudrate = 9600
 publish topic = /face/camera
 ```
@@ -143,7 +143,7 @@ Bridge sẽ lấy IDs:
 Sau đó tra mapping:
 
 ```text
-robot_common/robot_common/config.json -> mqtt_bridge.camera_face_plan_message.id_messages
+robot_common/robot_common/config.yaml -> mqtt_bridge.camera_face_plan_message.id_messages
 ```
 
 Nếu ID có message tương ứng, bridge publish ra MQTT topic:
@@ -181,9 +181,9 @@ Output raw:
 ```json
 {
   "LineSensor": {
-    "0x23": {"s1": 0, "s2": 1, "s3": 0, "s4": 1},
-    "0x24": {"s1": 1, "s2": 1, "s3": 0, "s4": 0},
-    "0x25": {"s1": 1, "s2": 1, "s3": 1, "s4": 1}
+    "0x23": { "s1": 0, "s2": 1, "s3": 0, "s4": 1 },
+    "0x24": { "s1": 1, "s2": 1, "s3": 0, "s4": 0 },
+    "0x25": { "s1": 1, "s2": 1, "s3": 1, "s4": 1 }
   }
 }
 ```
@@ -209,7 +209,7 @@ line_sensors/line_sensors/line_sensor_driver_node.py
 Config:
 
 ```text
-robot_common/robot_common/config.json -> line_sensors
+robot_common/robot_common/config.yaml -> line_sensors
 port = /dev/ttyACM0
 baudrate = 115200
 publish topic = /line_sensors/frame
@@ -288,8 +288,9 @@ Thiết bị:
 1. Mở UART tới HuskyLens.
 2. Set algorithm `ALGORITHM_LINE_TRACKING`.
 3. Đọc `hl.get_arrows()`.
-4. Lấy arrow đầu tiên.
-5. Validate line.
+4. **Sort arrows theo `y_tail` desc**, chọn arrow gần robot nhất (Medium-4 fix
+   2026-05-19; trước đây lấy `arrows[0]` ngẫu nhiên).
+5. Validate line endpoints + offset bounds.
 6. Tính thông số tracking.
 7. In JSON qua serial.
 
@@ -334,7 +335,7 @@ huskylens_sensor/huskylens_sensor/huskylens_sensor_node.py
 Config:
 
 ```text
-robot_common/robot_common/config.json -> huskylens_sensor
+robot_common/robot_common/config.yaml -> huskylens_sensor
 baudrate = 9600
 publish topics = /huskylens/frame, /huskylens/valid
 ```
@@ -367,11 +368,9 @@ algorithm_set
 valid
 ```
 
-Nếu có `tail_offset_x` + `angle_deg`, parser tự tính thêm:
-
-```text
-error = round(0.8 * tail_offset_x + 0.2 * angle_deg)
-```
+Nếu có `tail_offset_x` + `angle_deg`, parser **không** synthesize `error`
+(đã loại bỏ heuristic 2026-05-19 — xem [`CHANGELOG.md`](CHANGELOG.md)).
+Field `error` chỉ xuất hiện trong frame khi firmware gửi explicit.
 
 Output ROS `/huskylens/frame`:
 
@@ -383,7 +382,6 @@ Output ROS `/huskylens/frame`:
     "valid": 1,
     "tail_offset_x": -16.0,
     "angle_deg": 3.7,
-    "error": -12,
     "y_type": 1,
     "line_length_y": 84,
     "direction": 0
@@ -554,7 +552,7 @@ Nếu có manual input và config cho phép override, `manual_control` có thể
 Plan nằm trong:
 
 ```text
-robot_common/robot_common/plans/*.json
+robot_common/robot_common/plans/*.yaml
 ```
 
 Chọn plan qua:
@@ -689,10 +687,10 @@ motor_driver/motor_driver/motor_controller.py
 Input:
 
 ```text
-/motor_cmd
+/motor_cmd  (std_msgs/String)
 ```
 
-Command format:
+ROS topic format (publisher → motor_driver):
 
 ```text
 Direction:Speed
@@ -709,21 +707,45 @@ RotateRight:5
 Stop:0
 ```
 
+Serial wire format (motor_driver → MCU, **fixed 2026-05-19**):
+
+```text
+(fl,fr,rl,rr)\n
+```
+
+Trong đó `fl/fr/rl/rr` là tốc độ 4 bánh integer (positive/negative). Ví dụ:
+
+```text
+(-8,-8,-8,-8)\n      # Forward:8
+(0,0,0,0)\n          # Stop:0
+(-5,-5,5,5)\n        # RotateRight:5
+```
+
+> **Bug history:** Trước fix, frame là `(-8,-8,-8,-8\n)` với `\n` đứng **trước**
+> dấu `)`. Xem [`CHANGELOG.md`](CHANGELOG.md) Critical-1.
+
 Flow:
 
 ```text
-/motor_cmd
+/motor_cmd (Direction:Speed)
     ↓
-motor_driver
+motor_driver_node._cmd_cb
     ↓
-format/check command protocol
+parse_command → (direction, speed)
     ↓
-serial to motor controller
+MotorController.move(direction, speed)
+    ↓ wheel_speeds = [int(round(s * speed)) for s in DIR[direction]]
+serial.write(b"(...)\n")
+    ↓
+Motor MCU parser
     ↓
 motor chạy
 ```
 
 `motor_driver` là điểm cuối duy nhất gửi lệnh xuống actuator.
+
+Khi `serial.write` raise, `move()` trả `None` (không phải `wheel_speeds`); caller
+biết command bị drop để log warning thay vì bị nuốt im lặng (Critical-2 fix).
 
 ## 10. Flow tổng hợp end-to-end
 
@@ -869,10 +891,10 @@ Topic: /line_sensors/frame
 ### HuskyLens line-tracking
 
 ```text
-Device baudrate: 9600
-Raw key: HuskylenSensor
+Device baudrate: 115200 (USB-CDC) / 9600 (UART HuskyLens IC)
+Raw key: HuskylenSensor (trong envelope.payload)
 Fields: tail_offset_x, angle_deg, valid, connected, algorithm_set
-ROS adds: error
+Optional: error (firmware emit explicit, không synthesize)
 Topics: /huskylens/frame, /huskylens/valid
 ```
 
@@ -953,7 +975,6 @@ HuskylenSensor.algorithm_set = 1
 HuskylenSensor.valid = 1
 HuskylenSensor.tail_offset_x exists
 HuskylenSensor.angle_deg exists
-HuskylenSensor.error exists
 ```
 
 ### Motor command

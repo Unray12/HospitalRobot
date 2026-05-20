@@ -13,6 +13,7 @@ setup(
     ],
     install_requires=[
         'setuptools',
+        'rclpy',
         'paho-mqtt',
     ],
     zip_safe=True,

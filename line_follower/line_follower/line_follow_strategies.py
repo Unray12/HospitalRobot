@@ -1,7 +1,18 @@
+"""Tracking strategy abstractions used by ``LineFollowerFSM``.
+
+The strategies stay as thin adapters over FSM compute methods because the
+underlying line-sensor and HuskyLens computations have side effects on FSM
+state (``self.state`` transitions, plan-lost-line bookkeeping). Extracting
+them fully would require also extracting the FSM lifecycle, which is out of
+scope for this layer. The adapters exist so ``LineFollowerFSM`` can swap the
+active strategy via configuration without branching everywhere.
+"""
+
+
 class BaseLineFollowStrategy:
     name = "base"
 
-    def compute(self, frame_context):
+    def compute(self, frame_context):  # pragma: no cover - interface only
         raise NotImplementedError
 
 
@@ -26,6 +37,8 @@ class HuskyLensStrategy(BaseLineFollowStrategy):
 
 
 class HybridStrategy(BaseLineFollowStrategy):
+    """Prefer HuskyLens; fall back to line sensor when HuskyLens is unusable."""
+
     name = "hybrid"
 
     def __init__(self, huskylens_strategy, line_sensor_strategy):

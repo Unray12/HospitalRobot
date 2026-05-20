@@ -1,6 +1,6 @@
 # Plan Guide - HospitalRobot
 
-Tài liệu này là đặc tả chi tiết cho file plan JSON dùng bởi `line_follower`.
+Tài liệu này là đặc tả chi tiết cho file plan YAML dùng bởi `line_follower`.
 
 ## 1. Mục tiêu
 
@@ -13,7 +13,7 @@ Tài liệu này là đặc tả chi tiết cho file plan JSON dùng bởi `line
 - Thư mục plan: `robot_common/robot_common/plans/`
 - Nạp plan qua:
   - topic `/plan_select` (`std_msgs/String`)
-  - hoặc `line_follower.cross_plan_name` trong `config.json`
+  - hoặc `line_follower.cross_plan_name` trong `config.yaml`
 - Cơ chế load:
   - `ConfigManager.load_plan(plan_name)`
   - cache theo tên plan trong process
@@ -35,6 +35,7 @@ Tài liệu này là đặc tả chi tiết cho file plan JSON dùng bởi `line
 ```
 
 Trường cấp plan:
+
 - `name` (khuyến nghị): tên plan
 - `steps` (bắt buộc): mảng step
 - `end_state` (optional): `follow` hoặc `stop`
@@ -47,6 +48,7 @@ Trường cấp plan:
 Mỗi phần tử trong `steps` là object.
 
 Trường chung thường dùng:
+
 - `label`: nhãn step để `Goto` nhảy đến
 - `action`: tên hành động
 - `speed`: tốc độ int
@@ -60,6 +62,7 @@ Trường chung thường dùng:
 - `messages`: mảng message cần publish tại step
 
 Ví dụ `messages`:
+
 ```json
 {
   "action": "RotateRight",
@@ -80,6 +83,7 @@ Ví dụ `messages`:
 - `Right`
 
 Rule:
+
 - Nếu thiếu `duration` hoặc `duration <= 0`: fallback `0.5s`
 - `speed` sai kiểu: fallback về `base_speed`
 
@@ -89,10 +93,12 @@ Rule:
 - `RotateRight`
 
 Hai mode:
+
 - Time mode: có `duration > 0`
 - Until-line mode: không có duration hoặc đặt `until: "line"`
 
 Khuyến nghị an toàn:
+
 - Luôn thêm `timeout` cho until-line mode
 - Có thể thêm `min_duration` để tránh stop sớm do nhiễu line
 - Dùng `strict_line=true` khi cần bám đúng line giữa
@@ -122,6 +128,7 @@ Khuyến nghị an toàn:
 ## 6. Action alias (normalize)
 
 Alias hợp lệ:
+
 - `TurnLeft` -> `RotateLeft`
 - `TurnRight` -> `RotateRight`
 - `Rotate_Left` -> `RotateLeft`
@@ -144,17 +151,36 @@ Alias hợp lệ:
 
 ## 8. Mapping plan mặc định runtime
 
-Theo `config.json` hiện tại:
-- `1 -> a20`
-- `2 -> a19`
-- `3 -> a18`
-- `4 -> a17`
-- `5 -> a16`
-- `6 -> a15`
-- `0/clear -> clear plan`
+Theo `config.yaml` hiện tại (`line_follower.plan_alias` + `mqtt_bridge.plan_keys`):
 
-MQTT room map mặc định:
-- `room:a20..a15` hoặc `room:1..6`
+- `1 → a19`
+- `2 → a18`
+- `3 → a17`
+- `4 → a16`
+- `5 → a15`
+- `0` hoặc `clear` → clear plan
+
+MQTT room map (`mqtt_bridge.room_plans`):
+
+- `room:1..5` hoặc `room:a19..a15`
+- `phong:1..5` hoặc `phong:a19..a15`
+- `plan:<plan_name>` cho plan custom
+
+> **Note:** Mapping được duplicate ở 3 chỗ trong `config.yaml`. Khi đổi, sửa
+> đồng bộ cả 3. Xem [`30-code-review.md`](30-code-review.md) §Low-1.
+
+## 8.1 Plan name validation (security)
+
+Từ 2026-05-19, `ConfigManager.load_plan(name)` **reject** tên plan không
+khớp regex `^[A-Za-z0-9_-]+$`. Block các input nguy hiểm:
+
+- `../config` (path traversal)
+- `plans/../config`
+- Empty string, None, non-string
+
+Khi reject, function trả `None` và log warning. App publish `plan_select`
+qua MQTT cần sanitize input phía client; bridge sẽ pass-through nhưng
+`ConfigManager` là gate cuối cùng.
 
 ## 9. Ví dụ plan nâng cao
 
@@ -201,7 +227,7 @@ MQTT room map mặc định:
 ## 11. Lỗi thường gặp
 
 - `Plan not found`:
-  - tên plan không trùng tên file `.json`.
+  - tên plan không trùng tên file `.yaml` (hoặc `.json` nếu vẫn dùng legacy).
 - Robot quay mãi:
   - rotate-until-line thiếu `timeout`.
 - Plan kết thúc nhưng robot dừng ngoài ý muốn:

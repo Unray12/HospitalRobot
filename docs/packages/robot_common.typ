@@ -52,7 +52,6 @@
 
   #inline("Plan repository hiện có")
   - `a15`, `a16`, `a17`, `a18`, `a19`
-  - `plan_master_reference_non_a`
 
   #inline("Validation commands")
   ```bash
