@@ -76,6 +76,9 @@ class LineFollowerFSM:
         huskylens_heading_deadband=3.0,
         huskylens_y_type_rotate_timeout=5.0,
         huskylens_short_line_speed_factor=0.5,
+        huskylens_lateral_hysteresis=6.0,
+        huskylens_heading_hysteresis=3.0,
+        huskylens_command_hold_sec=0.20,
         logger=None,
     ):
         self._logger = logger
@@ -108,6 +111,16 @@ class LineFollowerFSM:
         self.huskylens_short_line_speed_factor = float(
             min(1.0, max(0.0, huskylens_short_line_speed_factor))
         )
+        # Hysteresis added to deadband to break free of a turn: once turning,
+        # the value must drop *inside* deadband by at least the hysteresis
+        # amount before Forward kicks back in. Prevents flicker on noisy frames.
+        self.huskylens_lateral_hysteresis = float(max(0.0, huskylens_lateral_hysteresis))
+        self.huskylens_heading_hysteresis = float(max(0.0, huskylens_heading_hysteresis))
+        # Minimum time to hold a non-Forward command before switching to another
+        # non-Forward command. Smoothes high-rate command flicker at 100 Hz.
+        self.huskylens_command_hold_sec = float(max(0.0, huskylens_command_hold_sec))
+        self._last_huskylens_action = None
+        self._last_huskylens_action_ts = 0.0
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
@@ -743,6 +756,13 @@ class LineFollowerFSM:
         Lateral correction comes from ``tail_offset_x`` (sign of the tail offset),
         heading correction from ``angle_deg``. Lateral takes priority over heading;
         within each axis the deadband from config decides when to start steering.
+
+        Three smoothing layers stack to fight noisy-frame oscillation:
+          1. Deadband on each axis (lateral/heading)
+          2. Hysteresis — once turning, the value must fall *inside* deadband by
+             ``hysteresis`` extra before Forward releases.
+          3. Command hold — once a non-Forward command is issued, do not switch
+             to a *different* non-Forward command for ``command_hold_sec`` seconds.
         """
         huskylens = (frame_context or {}).get("huskylens_frame")
         if not isinstance(huskylens, dict):
@@ -772,26 +792,73 @@ class LineFollowerFSM:
         def _scaled(speed):
             return max(0, int(round(int(speed) * scale)))
 
-        lateral_deadband = self.huskylens_lateral_deadband
-        heading_deadband = self.huskylens_heading_deadband
+        lat_db = self.huskylens_lateral_deadband
+        hd_db = self.huskylens_heading_deadband
+        lat_hyst = self.huskylens_lateral_hysteresis
+        hd_hyst = self.huskylens_heading_hysteresis
 
-        # Lateral correction first (mecanum strafe). Strafing preserves heading
-        # so the robot can recenter on the line without losing forward bearing.
-        # Only after we are within the lateral deadband do we apply heading
-        # correction (rotate). Doing rotate first would oscillate when the
-        # robot is both offset AND tilted.
-        if tail_offset_x < -lateral_deadband:
-            self.state = self.STATE_TURN_RIGHT
-            return "Right", _scaled(self.turn_speed_right)
-        if tail_offset_x > lateral_deadband:
+        prev = self._last_huskylens_action
+        # When already turning a given direction, require the offset/angle to
+        # drop INSIDE deadband by `hysteresis` extra before releasing. This
+        # widens the "stay turning" band on the active side without widening
+        # the entry threshold.
+        lat_release_left  = lat_db - lat_hyst   # tail_offset_x must drop below this to stop strafing Left
+        lat_release_right = -(lat_db - lat_hyst)  # tail_offset_x must rise above this to stop strafing Right
+        hd_release_left   = hd_db - hd_hyst
+        hd_release_right  = -(hd_db - hd_hyst)
+
+        # Decide raw command (lateral first, then heading, else forward).
+        if prev == "Left" and tail_offset_x > lat_release_left:
+            raw = "Left"
+        elif prev == "Right" and tail_offset_x < lat_release_right:
+            raw = "Right"
+        elif tail_offset_x > lat_db:
+            raw = "Left"
+        elif tail_offset_x < -lat_db:
+            raw = "Right"
+        elif prev == "RotateLeft" and angle_deg > hd_release_left:
+            raw = "RotateLeft"
+        elif prev == "RotateRight" and angle_deg < hd_release_right:
+            raw = "RotateRight"
+        elif angle_deg > hd_db:
+            raw = "RotateLeft"
+        elif angle_deg < -hd_db:
+            raw = "RotateRight"
+        else:
+            raw = "Forward"
+
+        # Command hold: once a non-Forward command is active, block switches to
+        # a *different* non-Forward command for command_hold_sec. Switching to
+        # Forward is always allowed (we want to settle on the line, not flick
+        # between turn directions).
+        now = time.time()
+        hold = self.huskylens_command_hold_sec
+        if (
+            prev is not None
+            and prev != "Forward"
+            and raw != "Forward"
+            and raw != prev
+            and (now - self._last_huskylens_action_ts) < hold
+        ):
+            raw = prev
+
+        # Latch + state mapping.
+        if raw != prev:
+            self._last_huskylens_action_ts = now
+        self._last_huskylens_action = raw
+
+        if raw == "Left":
             self.state = self.STATE_TURN_LEFT
             return "Left", _scaled(self.turn_speed_left)
-        if angle_deg < -heading_deadband:
+        if raw == "Right":
             self.state = self.STATE_TURN_RIGHT
-            return "RotateRight", _scaled(self.turn_speed_right)
-        if angle_deg > heading_deadband:
+            return "Right", _scaled(self.turn_speed_right)
+        if raw == "RotateLeft":
             self.state = self.STATE_TURN_LEFT
             return "RotateLeft", _scaled(self.turn_speed_left)
+        if raw == "RotateRight":
+            self.state = self.STATE_TURN_RIGHT
+            return "RotateRight", _scaled(self.turn_speed_right)
         self.state = self.STATE_FOLLOWING
         return "Forward", _scaled(self.base_speed)
 

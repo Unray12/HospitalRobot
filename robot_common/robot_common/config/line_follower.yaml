@@ -126,11 +126,22 @@ huskylens:
   # Deadband cho tail_offset_x (pixel). Trong band → Forward.
   # Ngoài band → Left/Right strafe (mecanum).
   # Tăng nếu robot rung quá nhiều; giảm nếu muốn bám line chặt hơn.
-  lateral_deadband: 10.0
+  lateral_deadband: 25.0
 
   # Deadband cho angle_deg. Trong band → Forward.
   # Ngoài band → RotateLeft/RotateRight.
-  heading_deadband: 3.0
+  heading_deadband: 12.0
+
+  # Hysteresis: khi đã bắt đầu strafe/rotate, giá trị phải tụt vào trong
+  # deadband thêm `hysteresis` mới release về Forward. Ngăn flicker quanh mép.
+  # Quy tắc: deadband > hysteresis (nếu hysteresis >= deadband sẽ luôn turning).
+  lateral_hysteresis: 10.0
+  heading_hysteresis: 5.0
+
+  # Khi đang ở một lệnh non-Forward, chặn switch sang lệnh non-Forward khác
+  # trong `command_hold_sec` giây. Switch về Forward luôn được phép.
+  # Tăng để mượt hơn (đỡ rung), giảm để phản ứng nhanh hơn.
+  command_hold_sec: 0.20
 
   # Safety timeout cho rotate-until-y_type (giây).
   # Nếu y_type không đạt MID_TO_TOP sau thời gian này, rotate kết thúc.
