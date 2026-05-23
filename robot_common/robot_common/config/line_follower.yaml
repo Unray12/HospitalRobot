@@ -136,6 +136,12 @@ huskylens:
   # Nếu y_type không đạt MID_TO_TOP sau thời gian này, rotate kết thúc.
   y_type_rotate_timeout: 5.0
 
+  # Hệ số giảm tốc khi y_type là *_SHORT (line ngắn → gần cross/cuối line).
+  # 1.0 = giữ nguyên tốc độ, 0.5 = đi nửa tốc, 0.0 = dừng hẳn ở SHORT.
+  # Ngưỡng "short" được cấu hình ở firmware: SHORT_LINE_PCT
+  # trong huskylens_sensor/device_code/main.py (mặc định 30% chiều cao ảnh).
+  short_line_speed_factor: 0.5
+
 # ── Plan alias (keyboard/MQTT digit → plan name) ─────────────────────────────
 # Source of truth: robot_common/config/plan_mapping.yaml (plan_keys section).
 # The block below is kept as a backwards-compat fallback for installs that

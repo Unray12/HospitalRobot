@@ -13,6 +13,8 @@ plan_keys:
   '3': a17
   '4': a16
   '5': a15
+  # Test plan: bám line tới cross, sau đó quay trái cho tới khi tìm lại được line.
+  'm': test_m
 
 # Room id / digit → plan name (MQTT "room:X" payload)
 room_plans:

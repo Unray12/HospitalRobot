@@ -7,11 +7,19 @@ from .line_follow_strategies import HybridStrategy, HuskyLensStrategy, LineSenso
 
 # HuskyLens y_type classification codes -- must stay in sync with the firmware
 # `huskylens_sensor/device_code/main.py` (Y_TYPE_* constants).
-Y_TYPE_NO_LINE       = 0
-Y_TYPE_BOTTOM_TO_MID = 1
-Y_TYPE_MID_TO_TOP    = 2
-Y_TYPE_BOTTOM_TO_TOP = 3
-Y_TYPE_MID_TO_MID    = 4
+Y_TYPE_NO_LINE             = 0
+Y_TYPE_BOTTOM_TO_MID       = 1
+Y_TYPE_MID_TO_TOP          = 2
+Y_TYPE_BOTTOM_TO_TOP       = 3
+Y_TYPE_MID_TO_MID          = 4
+Y_TYPE_BOTTOM_TO_MID_SHORT = 5
+Y_TYPE_MID_TO_TOP_SHORT    = 6
+
+# Any of these is treated as "robot is near a cross / line ends just under the
+# camera" and arms the cross_pre trigger. Adding a code here also makes the
+# rotate-until-y_type plan step exit correctly when the new code reappears.
+_Y_TYPE_CROSS_TRIGGER  = (Y_TYPE_BOTTOM_TO_MID, Y_TYPE_BOTTOM_TO_MID_SHORT)
+_Y_TYPE_LINE_ACQUIRED  = (Y_TYPE_MID_TO_TOP, Y_TYPE_MID_TO_TOP_SHORT, Y_TYPE_BOTTOM_TO_TOP)
 
 
 class LineFollowerFSM:
@@ -67,6 +75,7 @@ class LineFollowerFSM:
         huskylens_lateral_deadband=10.0,
         huskylens_heading_deadband=3.0,
         huskylens_y_type_rotate_timeout=5.0,
+        huskylens_short_line_speed_factor=0.5,
         logger=None,
     ):
         self._logger = logger
@@ -93,6 +102,12 @@ class LineFollowerFSM:
         self.huskylens_lateral_deadband = float(max(0.0, huskylens_lateral_deadband))
         self.huskylens_heading_deadband = float(max(0.0, huskylens_heading_deadband))
         self.huskylens_y_type_rotate_timeout = float(max(0.0, huskylens_y_type_rotate_timeout))
+        # Multiplier applied to base/turn speed when y_type is a *_SHORT variant
+        # (line is short -> robot is close to a cross or to the end of the line).
+        # 1.0 = no slow-down, 0.0 = stop. Default 0.5 = half speed.
+        self.huskylens_short_line_speed_factor = float(
+            min(1.0, max(0.0, huskylens_short_line_speed_factor))
+        )
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
@@ -202,17 +217,19 @@ class LineFollowerFSM:
         ):
             y_type = self._huskylens_y_type()
             if y_type is not None:
-                # Edge-triggered: only fire on the BOTTOM_TO_MID transition,
-                # not on every frame that stays BOTTOM_TO_MID. _y_type_cross_active
-                # latches True until y_type leaves the BOTTOM_TO_MID band.
-                if y_type == Y_TYPE_BOTTOM_TO_MID and not self._y_type_cross_active:
+                # Edge-triggered: only fire on the BOTTOM_TO_MID(_SHORT) transition,
+                # not on every frame that stays in that band. _y_type_cross_active
+                # latches True until y_type leaves the trigger band.
+                if y_type in _Y_TYPE_CROSS_TRIGGER and not self._y_type_cross_active:
                     self._y_type_cross_active = True
                     self.state = self.STATE_CROSS_PRE
                     self._cross_pre_phase = 0
                     self._cross_pre_until = now + self.cross_pre_forward_duration
-                    self._log_info("===> PLAN trigger (y_type): enter cross_pre")
+                    self._log_info(
+                        f"===> PLAN trigger (y_type={y_type}): enter cross_pre"
+                    )
                     return "Forward", self.cross_pre_forward_speed
-                if y_type != Y_TYPE_BOTTOM_TO_MID:
+                if y_type not in _Y_TYPE_CROSS_TRIGGER:
                     self._y_type_cross_active = False
 
         if frame is None:
@@ -551,7 +568,7 @@ class LineFollowerFSM:
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
-            if self._huskylens_y_type() == Y_TYPE_MID_TO_TOP:
+            if self._huskylens_y_type() in _Y_TYPE_LINE_ACQUIRED:
                 self._clear_plan_action_state()
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
@@ -734,6 +751,16 @@ class LineFollowerFSM:
         except Exception:
             return None
 
+        try:
+            y_type = int(huskylens.get("y_type", 0))
+        except Exception:
+            y_type = 0
+        is_short = y_type in (Y_TYPE_BOTTOM_TO_MID_SHORT, Y_TYPE_MID_TO_TOP_SHORT)
+        scale = self.huskylens_short_line_speed_factor if is_short else 1.0
+
+        def _scaled(speed):
+            return max(0, int(round(int(speed) * scale)))
+
         lateral_deadband = self.huskylens_lateral_deadband
         heading_deadband = self.huskylens_heading_deadband
 
@@ -744,18 +771,18 @@ class LineFollowerFSM:
         # robot is both offset AND tilted.
         if tail_offset_x < -lateral_deadband:
             self.state = self.STATE_TURN_RIGHT
-            return "Right", self.turn_speed_right
+            return "Right", _scaled(self.turn_speed_right)
         if tail_offset_x > lateral_deadband:
             self.state = self.STATE_TURN_LEFT
-            return "Left", self.turn_speed_left
+            return "Left", _scaled(self.turn_speed_left)
         if angle_deg < -heading_deadband:
             self.state = self.STATE_TURN_RIGHT
-            return "RotateRight", self.turn_speed_right
+            return "RotateRight", _scaled(self.turn_speed_right)
         if angle_deg > heading_deadband:
             self.state = self.STATE_TURN_LEFT
-            return "RotateLeft", self.turn_speed_left
+            return "RotateLeft", _scaled(self.turn_speed_left)
         self.state = self.STATE_FOLLOWING
-        return "Forward", self.base_speed
+        return "Forward", _scaled(self.base_speed)
 
     def _log_info(self, msg, event="INFO"):
         if self._logger:

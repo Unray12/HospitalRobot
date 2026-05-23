@@ -1,0 +1,23 @@
+name: test_m
+# Plan test: bám line → tới ngã rẽ (cross) → quay trái đến khi nhận lại được line.
+# Trigger: nhấn 'm' trên keyboard (hoặc MQTT plan_select payload "test_m"/"m").
+start_without_cross: true
+steps:
+- label: S1_FOLLOW_LINE
+  action: AutoLine
+  enabled: true
+  messages:
+  - topic: /plan_message
+    message: 'say: Bắt đầu bám line, chờ ngã rẽ.'
+
+- label: S2_ROTATE_LEFT_TO_LINE
+  action: RotateLeft
+  until: line
+  speed: 5
+  end_state: true
+  continue_immediately: true
+  messages:
+  - topic: /plan_message
+    message: 'say: Phát hiện ngã rẽ, đang quay trái.'
+
+end_state: stop

@@ -105,6 +105,7 @@ class LineFollowerNode(Node):
             huskylens_lateral_deadband=huskylens_cfg.get("lateral_deadband", 10.0),
             huskylens_heading_deadband=huskylens_cfg.get("heading_deadband", 3.0),
             huskylens_y_type_rotate_timeout=huskylens_cfg.get("y_type_rotate_timeout", 5.0),
+            huskylens_short_line_speed_factor=huskylens_cfg.get("short_line_speed_factor", 0.5),
             logger=self.log,
         )
         if plan_name:
