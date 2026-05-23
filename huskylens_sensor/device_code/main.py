@@ -105,12 +105,13 @@ WDT_TIMEOUT_MS = 8000
 # arrow always points from tail (bottom) to head (top) in image space.
 # ---------------------------------------------------------------------------
 
-Y_TYPE_NO_LINE             = 0   # no arrow / rejected / horizontal line (|angle_deg|>HORIZONTAL_ANGLE_DEG)
+Y_TYPE_NO_LINE             = 0   # no arrow / rejected as invalid
 Y_TYPE_BOTTOM_TO_MID       = 1   # tail BOT, head MID -- short line near robot (cross)
 Y_TYPE_MID_TO_TOP          = 2   # tail MID, head TOP -- long line ahead (follow)
 Y_TYPE_BOTTOM_TO_TOP       = 3   # tail BOT, head TOP -- full-frame line
 Y_TYPE_BOTTOM_TO_MID_SHORT = 5   # BOTTOM_TO_MID whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
 Y_TYPE_MID_TO_TOP_SHORT    = 6   # MID_TO_TOP    whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
+Y_TYPE_HORIZONTAL          = 7   # |angle_deg| > HORIZONTAL_ANGLE_DEG -- perpendicular cross bar
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +128,7 @@ LED_FOLLOW         = (0,   255, 0  )   # green  -- MID_TO_TOP     (good follow)
 LED_FULL_LINE      = (0,   180, 255)   # cyan   -- BOTTOM_TO_TOP  (full frame)
 LED_CROSS_SHORT    = (255, 120, 0  )   # amber  -- BOTTOM_TO_MID_SHORT
 LED_FOLLOW_SHORT   = (120, 255, 0  )   # lime   -- MID_TO_TOP_SHORT
+LED_HORIZONTAL     = (255, 0,   180)   # pink   -- HORIZONTAL (perpendicular bar)
 
 _current_led = (0, 0, 0)
 
@@ -157,6 +159,8 @@ def led_for_state(connected, algorithm_set, y_type):
         return LED_CROSS_SHORT
     if y_type == Y_TYPE_MID_TO_TOP_SHORT:
         return LED_FOLLOW_SHORT
+    if y_type == Y_TYPE_HORIZONTAL:
+        return LED_HORIZONTAL
     return LED_NO_LINE
 
 
@@ -294,13 +298,23 @@ def arrow_to_line_data(arrow):
     y_type    = classify_line_y(y_head, y_tail, line_length_y)
     angle_deg = calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head)
 
-    # Reject horizontal lines: |angle_deg| > HORIZONTAL_ANGLE_DEG means the
-    # detected arrow is essentially perpendicular to the forward direction
-    # (cross bar / wall / T-junction perpendicular line). tail_offset_x and
-    # angle_deg are not meaningful steering signals in that case, so we drop
-    # the whole frame to NO_LINE rather than feed bad data to the follower.
+    # Horizontal line: |angle_deg| > HORIZONTAL_ANGLE_DEG means the detected
+    # arrow is essentially perpendicular to the forward direction (cross bar
+    # / wall / T-junction perpendicular line). tail_offset_x / angle_deg are
+    # NOT meaningful steering signals, but the bar itself IS a strong cross
+    # detection signal -- so emit a positive Y_TYPE_HORIZONTAL with zeroed
+    # steering fields. The follower treats this as a cross trigger.
     if abs(angle_deg) > HORIZONTAL_ANGLE_DEG:
-        return no_line_tracking()
+        return {
+            "valid":         1,
+            "direction":     int(direction or DEFAULT_DIRECTION),
+            "tail_offset_x": 0,
+            "y_type":        Y_TYPE_HORIZONTAL,
+            "line_length_y": int(line_length_y),
+            "angle_deg":     0.0,
+            "y_head":        int(y_head),
+            "y_tail":        int(y_tail),
+        }
 
     return {
         "valid":         1,

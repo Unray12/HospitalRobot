@@ -13,11 +13,12 @@ Y_TYPE_MID_TO_TOP          = 2
 Y_TYPE_BOTTOM_TO_TOP       = 3
 Y_TYPE_BOTTOM_TO_MID_SHORT = 5
 Y_TYPE_MID_TO_TOP_SHORT    = 6
+Y_TYPE_HORIZONTAL          = 7
 
 # Any of these is treated as "robot is near a cross / line ends just under the
 # camera" and arms the cross_pre trigger. Adding a code here also makes the
 # rotate-until-y_type plan step exit correctly when the new code reappears.
-_Y_TYPE_CROSS_TRIGGER  = (Y_TYPE_BOTTOM_TO_MID, Y_TYPE_BOTTOM_TO_MID_SHORT)
+_Y_TYPE_CROSS_TRIGGER  = (Y_TYPE_BOTTOM_TO_MID, Y_TYPE_BOTTOM_TO_MID_SHORT, Y_TYPE_HORIZONTAL)
 _Y_TYPE_LINE_ACQUIRED  = (Y_TYPE_MID_TO_TOP, Y_TYPE_MID_TO_TOP_SHORT, Y_TYPE_BOTTOM_TO_TOP)
 
 
@@ -235,11 +236,19 @@ class LineFollowerFSM:
         ):
             y_type = self._huskylens_y_type()
             if y_type is not None:
-                # Edge-triggered: only fire on the BOTTOM_TO_MID(_SHORT) transition,
-                # not on every frame that stays in that band. _y_type_cross_active
-                # latches True until y_type leaves the trigger band.
+                # Edge-triggered: only fire on the BOTTOM_TO_MID(_SHORT) / HORIZONTAL
+                # transition, not on every frame that stays in that band.
+                # _y_type_cross_active latches True until y_type leaves the trigger band.
                 if y_type in _Y_TYPE_CROSS_TRIGGER and not self._y_type_cross_active:
                     self._y_type_cross_active = True
+                    # Honor cross_pre_skip_in_autoline: when configured to skip,
+                    # jump straight into the plan's rotate action instead of the
+                    # cross_pre forward+stop phase.
+                    if self._should_skip_cross_pre():
+                        self._log_info(
+                            f"===> PLAN trigger (y_type={y_type}): skip cross_pre"
+                        )
+                        return self._start_plan_action(now)
                     self.state = self.STATE_CROSS_PRE
                     self._cross_pre_phase = 0
                     self._cross_pre_until = now + self.cross_pre_forward_duration
