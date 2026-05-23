@@ -62,12 +62,15 @@ class LineFollowerNode(Node):
         self._last_frame_ts = 0.0
         self._last_huskylens_frame = None
         self._last_huskylens_ts = 0.0
+        self._last_huskylens_log_key = None   # (valid, y_type, line_length_bucket) for change detection
         self._last_plan_name = None
         self._last_plan_ts = 0.0
         self._active_plan_name = None
         self._last_plan_status_text = None
         self._last_plan_status_log_ts = 0.0
-        self.plan_status_log_period = float(config.get("plan_status_log_period", 0.8))
+        # Reduced from 0.8 -> 5.0 to cut noise: PLAN_STATUS still logs on change,
+        # this period only governs the periodic heartbeat when nothing changes.
+        self.plan_status_log_period = float(config.get("plan_status_log_period", 5.0))
         self._active_plan_autoline = None
         self._plan_completion_reported = False
 
@@ -228,6 +231,19 @@ class LineFollowerNode(Node):
                 "y_tail":        int(sensor.get("y_tail", 0)),
             }
             self._last_huskylens_ts = time.time()
+            # Log only when (valid, y_type) changes -- much less spammy than the
+            # 2-second STATUS heartbeat in the firmware-side node, and surfaces
+            # every cross-related transition immediately.
+            f = self._last_huskylens_frame
+            key = (f["valid"], f["y_type"])
+            if key != self._last_huskylens_log_key:
+                self.log.info(
+                    f"HuskyLens change | valid={f['valid']} y_type={f['y_type']} "
+                    f"line_length_y={f['line_length_y']} tail_offset_x={f['tail_offset_x']:.0f} "
+                    f"angle_deg={f['angle_deg']:.1f}",
+                    event="HUSKYLENS_CHANGE",
+                )
+                self._last_huskylens_log_key = key
         except Exception:
             self._last_huskylens_frame = None
             self._last_huskylens_ts = time.time()
