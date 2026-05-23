@@ -19,10 +19,15 @@ steps:
   action: RotateLeft
   speed: 5
   until: line
+  min_duration: 3.0
   messages:
   - topic: /plan_message
     message: 'say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo
       con. Nếu cần đi chậm lại hoặc có vấn đề gì, cô chú cứ báo để con hỗ trợ kịp thời.'
+- label: S3B_FORWARD_AFTER_CHECK
+  action: Forward
+  speed: 8
+  duration: 3.0
 - label: S4_WAIT_TIMEOUT
   action: RotateRight
   speed: 5
