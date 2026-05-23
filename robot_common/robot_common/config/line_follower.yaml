@@ -152,6 +152,14 @@ huskylens:
   # Nếu y_type không đạt MID_TO_TOP sau thời gian này, rotate kết thúc.
   y_type_rotate_timeout: 5.0
 
+  # 4-way cross sequence detector. Robot phải quan sát đủ chuỗi y_type:
+  #   BOT_TO_TOP  →  BOT_TO_MID  →  MID_TO_TOP (line_length_y > min_length)
+  # mới fire cross trigger. Nếu giữa 2 phase hơn `timeout` giây thì reset.
+  # Tăng min_length để chỉ trigger khi đã qua hẳn cross (line phía sau dài rõ).
+  # Giảm để trigger sớm hơn.
+  cross_seq_min_length: 75
+  cross_seq_timeout: 8.0
+
 # ── Plan alias (keyboard/MQTT digit → plan name) ─────────────────────────────
 # Source of truth: robot_common/config/plan_mapping.yaml (plan_keys section).
 # The block below is kept as a backwards-compat fallback for installs that
