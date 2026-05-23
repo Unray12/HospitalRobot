@@ -63,23 +63,6 @@ Y_BOTTOM_THRESHOLD = IMAGE_HEIGHT - 20   # 220
 # steer on. Beyond this the arrow is treated as spurious.
 MAX_ABS_TAIL_OFFSET_X = 110
 
-# Short-line thresholds. Two separate cutoffs because the two cases mean
-# different things physically:
-#   - BOTTOM_TO_MID: tail at bottom, head in MID -- line từ dưới đứt phía trên
-#     (đang vào cross). Trigger SHORT khi line ngắn dần đến ngưỡng này (sắp tới
-#     cross thật sự).
-#   - MID_TO_TOP:    tail in MID, head at top -- line dài phía trước (follow
-#     mode). Trigger SHORT chỉ khi line gần như mất hẳn ở phía trước.
-# Tuning: tăng để SHORT trigger sớm hơn; giảm để SHORT trigger muộn hơn.
-BOTTOM_TO_MID_SHORT_PCT = 35   # percent of IMAGE_HEIGHT (35% of 240 = 84 px)
-MID_TO_TOP_SHORT_PCT    = 25   # percent of IMAGE_HEIGHT (25% of 240 = 60 px)
-
-# Horizontal-line cutoff. Khi |angle_deg| vượt ngưỡng này, arrow được coi là
-# line ngang (thanh chắn vuông góc với hướng đi -- T/+ junction, hoặc tường).
-# Trong trường hợp đó tail_offset_x / angle_deg không có ý nghĩa steering, robot
-# nên xử lý như "thấy cross" thay vì strafe theo offset.
-HORIZONTAL_ANGLE_DEG = 60.0
-
 
 # ---------------------------------------------------------------------------
 # Runtime configuration
@@ -105,13 +88,10 @@ WDT_TIMEOUT_MS = 8000
 # arrow always points from tail (bottom) to head (top) in image space.
 # ---------------------------------------------------------------------------
 
-Y_TYPE_NO_LINE             = 0   # no arrow / rejected as invalid
-Y_TYPE_BOTTOM_TO_MID       = 1   # tail BOT, head MID -- short line near robot (cross)
-Y_TYPE_MID_TO_TOP          = 2   # tail MID, head TOP -- long line ahead (follow)
-Y_TYPE_BOTTOM_TO_TOP       = 3   # tail BOT, head TOP -- full-frame line
-Y_TYPE_BOTTOM_TO_MID_SHORT = 5   # BOTTOM_TO_MID whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
-Y_TYPE_MID_TO_TOP_SHORT    = 6   # MID_TO_TOP    whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
-Y_TYPE_HORIZONTAL          = 7   # |angle_deg| > HORIZONTAL_ANGLE_DEG -- perpendicular cross bar
+Y_TYPE_NO_LINE       = 0   # no arrow / rejected as invalid
+Y_TYPE_BOTTOM_TO_MID = 1   # tail BOT, head MID -- short line near robot (cross)
+Y_TYPE_MID_TO_TOP    = 2   # tail MID, head TOP -- long line ahead (follow)
+Y_TYPE_BOTTOM_TO_TOP = 3   # tail BOT, head TOP -- full-frame line
 
 
 # ---------------------------------------------------------------------------
@@ -126,9 +106,6 @@ LED_NO_LINE        = (255, 80,  0  )   # orange -- connected but no valid arrow
 LED_CROSS          = (255, 255, 0  )   # yellow -- BOTTOM_TO_MID  (short, cross)
 LED_FOLLOW         = (0,   255, 0  )   # green  -- MID_TO_TOP     (good follow)
 LED_FULL_LINE      = (0,   180, 255)   # cyan   -- BOTTOM_TO_TOP  (full frame)
-LED_CROSS_SHORT    = (255, 120, 0  )   # amber  -- BOTTOM_TO_MID_SHORT
-LED_FOLLOW_SHORT   = (120, 255, 0  )   # lime   -- MID_TO_TOP_SHORT
-LED_HORIZONTAL     = (255, 0,   180)   # pink   -- HORIZONTAL (perpendicular bar)
 
 _current_led = (0, 0, 0)
 
@@ -155,12 +132,6 @@ def led_for_state(connected, algorithm_set, y_type):
         return LED_FOLLOW
     if y_type == Y_TYPE_BOTTOM_TO_TOP:
         return LED_FULL_LINE
-    if y_type == Y_TYPE_BOTTOM_TO_MID_SHORT:
-        return LED_CROSS_SHORT
-    if y_type == Y_TYPE_MID_TO_TOP_SHORT:
-        return LED_FOLLOW_SHORT
-    if y_type == Y_TYPE_HORIZONTAL:
-        return LED_HORIZONTAL
     return LED_NO_LINE
 
 
@@ -200,32 +171,23 @@ def no_line_tracking():
     }
 
 
-def classify_line_y(y_head, y_tail, line_length_y):
+def classify_line_y(y_head, y_tail):
     """
     Map a (head, tail) pair to one of the Y_TYPE_* classes.
 
-    BOTTOM_TO_MID is downgraded to BOTTOM_TO_MID_SHORT when
-    `line_length_y < BOTTOM_TO_MID_SHORT_PCT% of IMAGE_HEIGHT`.
-    MID_TO_TOP is downgraded to MID_TO_TOP_SHORT when
-    `line_length_y < MID_TO_TOP_SHORT_PCT% of IMAGE_HEIGHT`.
-    BOTTOM_TO_TOP (full-frame) is never downgraded.
-
-    Lines with both endpoints inside the MID band are folded into MID_TO_TOP
-    family (line still points upward).
+    Lines with both endpoints inside the MID band fold into MID_TO_TOP
+    (line still points upward).
 
     Precondition: `y_head < y_tail` (enforced by the caller).
     """
     head_in_top = (int(y_head) < MID_Y_THRESHOLD)
     tail_in_bot = (int(y_tail) >= Y_BOTTOM_THRESHOLD)
-    length = int(line_length_y)
 
     if head_in_top and tail_in_bot:
         return Y_TYPE_BOTTOM_TO_TOP
     if tail_in_bot:
-        short_px = (IMAGE_HEIGHT * BOTTOM_TO_MID_SHORT_PCT) // 100
-        return Y_TYPE_BOTTOM_TO_MID_SHORT if length < short_px else Y_TYPE_BOTTOM_TO_MID
-    short_px = (IMAGE_HEIGHT * MID_TO_TOP_SHORT_PCT) // 100
-    return Y_TYPE_MID_TO_TOP_SHORT if length < short_px else Y_TYPE_MID_TO_TOP
+        return Y_TYPE_BOTTOM_TO_MID
+    return Y_TYPE_MID_TO_TOP
 
 
 def calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head):
@@ -295,26 +257,8 @@ def arrow_to_line_data(arrow):
     if abs(tail_offset_x) > MAX_ABS_TAIL_OFFSET_X:
         return no_line_tracking()
 
-    y_type    = classify_line_y(y_head, y_tail, line_length_y)
+    y_type    = classify_line_y(y_head, y_tail)
     angle_deg = calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head)
-
-    # Horizontal line: |angle_deg| > HORIZONTAL_ANGLE_DEG means the detected
-    # arrow is essentially perpendicular to the forward direction (cross bar
-    # / wall / T-junction perpendicular line). tail_offset_x / angle_deg are
-    # NOT meaningful steering signals, but the bar itself IS a strong cross
-    # detection signal -- so emit a positive Y_TYPE_HORIZONTAL with zeroed
-    # steering fields. The follower treats this as a cross trigger.
-    if abs(angle_deg) > HORIZONTAL_ANGLE_DEG:
-        return {
-            "valid":         1,
-            "direction":     int(direction or DEFAULT_DIRECTION),
-            "tail_offset_x": 0,
-            "y_type":        Y_TYPE_HORIZONTAL,
-            "line_length_y": int(line_length_y),
-            "angle_deg":     0.0,
-            "y_head":        int(y_head),
-            "y_tail":        int(y_tail),
-        }
 
     return {
         "valid":         1,

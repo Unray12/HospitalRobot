@@ -95,8 +95,6 @@ Firmware (`huskylens_sensor/device_code/main.py`) phân loại vị trí line:
 |    1 | `Y_TYPE_BOTTOM_TO_MID`       | Tail BOT, head MID — line đứt phía trên (đang vào cross) |
 |    2 | `Y_TYPE_MID_TO_TOP`          | Tail MID, head TOP — line dài phía trước (follow)      |
 |    3 | `Y_TYPE_BOTTOM_TO_TOP`       | Tail BOT, head TOP — line full-frame                   |
-|    5 | `Y_TYPE_BOTTOM_TO_MID_SHORT` | Như (1) nhưng `line_length_y < SHORT_LINE_PCT%`        |
-|    6 | `Y_TYPE_MID_TO_TOP_SHORT`    | Như (2) nhưng `line_length_y < SHORT_LINE_PCT%`        |
 
 Code đồng bộ với `line_follower/line_follower.py:Y_TYPE_*` constants.
 
