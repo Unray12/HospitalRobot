@@ -74,6 +74,12 @@ MAX_ABS_TAIL_OFFSET_X = 110
 BOTTOM_TO_MID_SHORT_PCT = 35   # percent of IMAGE_HEIGHT (35% of 240 = 84 px)
 MID_TO_TOP_SHORT_PCT    = 25   # percent of IMAGE_HEIGHT (25% of 240 = 60 px)
 
+# Horizontal-line cutoff. Khi |angle_deg| vượt ngưỡng này, arrow được coi là
+# line ngang (thanh chắn vuông góc với hướng đi -- T/+ junction, hoặc tường).
+# Trong trường hợp đó tail_offset_x / angle_deg không có ý nghĩa steering, robot
+# nên xử lý như "thấy cross" thay vì strafe theo offset.
+HORIZONTAL_ANGLE_DEG = 60.0
+
 
 # ---------------------------------------------------------------------------
 # Runtime configuration
@@ -99,7 +105,7 @@ WDT_TIMEOUT_MS = 8000
 # arrow always points from tail (bottom) to head (top) in image space.
 # ---------------------------------------------------------------------------
 
-Y_TYPE_NO_LINE             = 0   # no arrow available or rejected as invalid
+Y_TYPE_NO_LINE             = 0   # no arrow / rejected / horizontal line (|angle_deg|>HORIZONTAL_ANGLE_DEG)
 Y_TYPE_BOTTOM_TO_MID       = 1   # tail BOT, head MID -- short line near robot (cross)
 Y_TYPE_MID_TO_TOP          = 2   # tail MID, head TOP -- long line ahead (follow)
 Y_TYPE_BOTTOM_TO_TOP       = 3   # tail BOT, head TOP -- full-frame line
@@ -287,6 +293,14 @@ def arrow_to_line_data(arrow):
 
     y_type    = classify_line_y(y_head, y_tail, line_length_y)
     angle_deg = calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head)
+
+    # Reject horizontal lines: |angle_deg| > HORIZONTAL_ANGLE_DEG means the
+    # detected arrow is essentially perpendicular to the forward direction
+    # (cross bar / wall / T-junction perpendicular line). tail_offset_x and
+    # angle_deg are not meaningful steering signals in that case, so we drop
+    # the whole frame to NO_LINE rather than feed bad data to the follower.
+    if abs(angle_deg) > HORIZONTAL_ANGLE_DEG:
+        return no_line_tracking()
 
     return {
         "valid":         1,
