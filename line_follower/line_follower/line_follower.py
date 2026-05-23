@@ -79,6 +79,10 @@ class LineFollowerFSM:
         huskylens_heading_hysteresis=3.0,
         huskylens_command_hold_sec=0.20,
         huskylens_smoothing_alpha=0.4,
+        huskylens_adaptive_speed=True,
+        huskylens_min_speed_factor=0.45,
+        huskylens_lateral_full_speed_offset=80.0,
+        huskylens_heading_full_speed_angle=40.0,
         cross_pre_skip_in_autoline=False,
         cross_seq_long_length=150,
         cross_seq_short_length=75,
@@ -128,6 +132,21 @@ class LineFollowerFSM:
         )
         self._smoothed_tail_offset_x = None
         self._smoothed_angle_deg = None
+        # Adaptive (proportional) correction speed. When value is just past
+        # deadband -> use slow speed (min_speed_factor * turn_speed) to fine-
+        # adjust without overshoot. When value is far past deadband -> ramp
+        # up to full turn_speed for fast catch-up. Linear interpolation over
+        # the "full_speed" offset/angle range.
+        self.huskylens_adaptive_speed = bool(huskylens_adaptive_speed)
+        self.huskylens_min_speed_factor = float(
+            min(1.0, max(0.0, huskylens_min_speed_factor))
+        )
+        self.huskylens_lateral_full_speed_offset = float(
+            max(1.0, huskylens_lateral_full_speed_offset)
+        )
+        self.huskylens_heading_full_speed_angle = float(
+            max(1.0, huskylens_heading_full_speed_angle)
+        )
         # When True, skip the cross_pre forward+stop phase entirely and jump
         # directly to the plan's next rotate action as soon as a cross is
         # detected. Useful when the operator wants the robot to start turning
@@ -837,6 +856,22 @@ class LineFollowerFSM:
         def _scaled(speed):
             return max(0, int(speed))
 
+        def _adaptive(base_turn_speed, value, deadband, full_speed_value):
+            """Linear ramp from min_speed_factor*base (just past deadband) to
+            base (when |value| >= full_speed_value). Falls back to min speed
+            when called before deadband is exceeded (shouldn't happen but
+            kept defensive)."""
+            if not self.huskylens_adaptive_speed:
+                return _scaled(base_turn_speed)
+            slow = max(1, int(round(base_turn_speed * self.huskylens_min_speed_factor)))
+            abs_val = abs(value)
+            if abs_val <= deadband:
+                return slow
+            span = max(1.0, float(full_speed_value) - float(deadband))
+            fraction = min(1.0, (abs_val - deadband) / span)
+            return max(slow, min(int(base_turn_speed),
+                                  int(round(slow + (base_turn_speed - slow) * fraction))))
+
         lat_db = self.huskylens_lateral_deadband
         hd_db = self.huskylens_heading_deadband
         lat_hyst = self.huskylens_lateral_hysteresis
@@ -894,16 +929,28 @@ class LineFollowerFSM:
 
         if raw == "Left":
             self.state = self.STATE_TURN_LEFT
-            return "Left", _scaled(self.turn_speed_left)
+            return "Left", _adaptive(
+                self.turn_speed_left, tail_offset_x, lat_db,
+                self.huskylens_lateral_full_speed_offset,
+            )
         if raw == "Right":
             self.state = self.STATE_TURN_RIGHT
-            return "Right", _scaled(self.turn_speed_right)
+            return "Right", _adaptive(
+                self.turn_speed_right, tail_offset_x, lat_db,
+                self.huskylens_lateral_full_speed_offset,
+            )
         if raw == "RotateLeft":
             self.state = self.STATE_TURN_LEFT
-            return "RotateLeft", _scaled(self.turn_speed_left)
+            return "RotateLeft", _adaptive(
+                self.turn_speed_left, angle_deg, hd_db,
+                self.huskylens_heading_full_speed_angle,
+            )
         if raw == "RotateRight":
             self.state = self.STATE_TURN_RIGHT
-            return "RotateRight", _scaled(self.turn_speed_right)
+            return "RotateRight", _adaptive(
+                self.turn_speed_right, angle_deg, hd_db,
+                self.huskylens_heading_full_speed_angle,
+            )
         self.state = self.STATE_FOLLOWING
         return "Forward", _scaled(self.base_speed)
 
