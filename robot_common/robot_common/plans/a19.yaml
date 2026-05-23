@@ -37,6 +37,14 @@ steps:
   messages:
   - topic: /plan_message
     message: 'say: Con xin phép quay về vị trí ban đầu để tiếp tục hỗ trợ những người bệnh khác. Chúc cô chú, anh chị nhiều sức khỏe.'
+- label: S7_FORWARD
+  action: Forward
+  speed: 8
+  duration: 5.0
+- label: S8_ROTATE_RIGHT
+  action: RotateRight
+  speed: 5
+  duration: 12.0
 - label: S6_RETURN_DONE
   action: RotateRight
   speed: 5
