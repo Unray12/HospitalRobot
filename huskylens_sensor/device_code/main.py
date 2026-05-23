@@ -63,11 +63,16 @@ Y_BOTTOM_THRESHOLD = IMAGE_HEIGHT - 20   # 220
 # steer on. Beyond this the arrow is treated as spurious.
 MAX_ABS_TAIL_OFFSET_X = 110
 
-# Short-line threshold. If the detected line_length_y (in pixels) is less than
-# SHORT_LINE_PCT percent of IMAGE_HEIGHT, the BOTTOM_TO_MID / MID_TO_TOP cases
-# are reclassified to the *_SHORT variants below. Tune this single percentage
-# to change the cut-off for "short" lines.
-SHORT_LINE_PCT = 30   # percent of IMAGE_HEIGHT (e.g. 30 -> 72 px at 240 px tall)
+# Short-line thresholds. Two separate cutoffs because the two cases mean
+# different things physically:
+#   - BOTTOM_TO_MID: tail at bottom, head in MID -- line từ dưới đứt phía trên
+#     (đang vào cross). Trigger SHORT khi line ngắn dần đến ngưỡng này (sắp tới
+#     cross thật sự).
+#   - MID_TO_TOP:    tail in MID, head at top -- line dài phía trước (follow
+#     mode). Trigger SHORT chỉ khi line gần như mất hẳn ở phía trước.
+# Tuning: tăng để SHORT trigger sớm hơn; giảm để SHORT trigger muộn hơn.
+BOTTOM_TO_MID_SHORT_PCT = 35   # percent of IMAGE_HEIGHT (35% of 240 = 84 px)
+MID_TO_TOP_SHORT_PCT    = 25   # percent of IMAGE_HEIGHT (25% of 240 = 60 px)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +103,6 @@ Y_TYPE_NO_LINE             = 0   # no arrow available or rejected as invalid
 Y_TYPE_BOTTOM_TO_MID       = 1   # tail BOT, head MID -- short line near robot (cross)
 Y_TYPE_MID_TO_TOP          = 2   # tail MID, head TOP -- long line ahead (follow)
 Y_TYPE_BOTTOM_TO_TOP       = 3   # tail BOT, head TOP -- full-frame line
-Y_TYPE_MID_TO_MID          = 4   # tail and head both in MID -- floating segment
 Y_TYPE_BOTTOM_TO_MID_SHORT = 5   # BOTTOM_TO_MID whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
 Y_TYPE_MID_TO_TOP_SHORT    = 6   # MID_TO_TOP    whose length < SHORT_LINE_PCT% of IMAGE_HEIGHT
 
@@ -115,7 +119,6 @@ LED_NO_LINE        = (255, 80,  0  )   # orange -- connected but no valid arrow
 LED_CROSS          = (255, 255, 0  )   # yellow -- BOTTOM_TO_MID  (short, cross)
 LED_FOLLOW         = (0,   255, 0  )   # green  -- MID_TO_TOP     (good follow)
 LED_FULL_LINE      = (0,   180, 255)   # cyan   -- BOTTOM_TO_TOP  (full frame)
-LED_FLOATING       = (180, 0,   255)   # purple -- MID_TO_MID     (floating)
 LED_CROSS_SHORT    = (255, 120, 0  )   # amber  -- BOTTOM_TO_MID_SHORT
 LED_FOLLOW_SHORT   = (120, 255, 0  )   # lime   -- MID_TO_TOP_SHORT
 
@@ -144,8 +147,6 @@ def led_for_state(connected, algorithm_set, y_type):
         return LED_FOLLOW
     if y_type == Y_TYPE_BOTTOM_TO_TOP:
         return LED_FULL_LINE
-    if y_type == Y_TYPE_MID_TO_MID:
-        return LED_FLOATING
     if y_type == Y_TYPE_BOTTOM_TO_MID_SHORT:
         return LED_CROSS_SHORT
     if y_type == Y_TYPE_MID_TO_TOP_SHORT:
@@ -193,23 +194,28 @@ def classify_line_y(y_head, y_tail, line_length_y):
     """
     Map a (head, tail) pair to one of the Y_TYPE_* classes.
 
-    BOTTOM_TO_MID and MID_TO_TOP are downgraded to the *_SHORT variants when
-    `line_length_y` is below `SHORT_LINE_PCT` percent of IMAGE_HEIGHT.
+    BOTTOM_TO_MID is downgraded to BOTTOM_TO_MID_SHORT when
+    `line_length_y < BOTTOM_TO_MID_SHORT_PCT% of IMAGE_HEIGHT`.
+    MID_TO_TOP is downgraded to MID_TO_TOP_SHORT when
+    `line_length_y < MID_TO_TOP_SHORT_PCT% of IMAGE_HEIGHT`.
+    BOTTOM_TO_TOP (full-frame) is never downgraded.
+
+    Lines with both endpoints inside the MID band are folded into MID_TO_TOP
+    family (line still points upward).
 
     Precondition: `y_head < y_tail` (enforced by the caller).
     """
     head_in_top = (int(y_head) < MID_Y_THRESHOLD)
     tail_in_bot = (int(y_tail) >= Y_BOTTOM_THRESHOLD)
-    short_threshold_px = (IMAGE_HEIGHT * SHORT_LINE_PCT) // 100
-    is_short = int(line_length_y) < short_threshold_px
+    length = int(line_length_y)
 
     if head_in_top and tail_in_bot:
         return Y_TYPE_BOTTOM_TO_TOP
-    if head_in_top:
-        return Y_TYPE_MID_TO_TOP_SHORT if is_short else Y_TYPE_MID_TO_TOP
     if tail_in_bot:
-        return Y_TYPE_BOTTOM_TO_MID_SHORT if is_short else Y_TYPE_BOTTOM_TO_MID
-    return Y_TYPE_MID_TO_MID
+        short_px = (IMAGE_HEIGHT * BOTTOM_TO_MID_SHORT_PCT) // 100
+        return Y_TYPE_BOTTOM_TO_MID_SHORT if length < short_px else Y_TYPE_BOTTOM_TO_MID
+    short_px = (IMAGE_HEIGHT * MID_TO_TOP_SHORT_PCT) // 100
+    return Y_TYPE_MID_TO_TOP_SHORT if length < short_px else Y_TYPE_MID_TO_TOP
 
 
 def calc_line_angle_from_tail_to_head(x_tail, y_tail, x_head, y_head):

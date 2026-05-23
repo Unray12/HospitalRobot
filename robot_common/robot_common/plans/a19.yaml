@@ -5,6 +5,7 @@ steps:
   action: RotateRight
   until: line
   speed: 5
+  min_duration: 3.0
   messages:
   - topic: /plan_message
     message: 'say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú, anh chị đến phòng khám A19 theo lộ trình an

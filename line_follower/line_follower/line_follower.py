@@ -11,7 +11,6 @@ Y_TYPE_NO_LINE             = 0
 Y_TYPE_BOTTOM_TO_MID       = 1
 Y_TYPE_MID_TO_TOP          = 2
 Y_TYPE_BOTTOM_TO_TOP       = 3
-Y_TYPE_MID_TO_MID          = 4
 Y_TYPE_BOTTOM_TO_MID_SHORT = 5
 Y_TYPE_MID_TO_TOP_SHORT    = 6
 
