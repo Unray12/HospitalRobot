@@ -78,6 +78,7 @@ class LineFollowerFSM:
         huskylens_lateral_hysteresis=6.0,
         huskylens_heading_hysteresis=3.0,
         huskylens_command_hold_sec=0.20,
+        huskylens_smoothing_alpha=0.4,
         cross_pre_skip_in_autoline=False,
         cross_seq_long_length=150,
         cross_seq_short_length=75,
@@ -118,6 +119,15 @@ class LineFollowerFSM:
         self.huskylens_command_hold_sec = float(max(0.0, huskylens_command_hold_sec))
         self._last_huskylens_action = None
         self._last_huskylens_action_ts = 0.0
+        # EMA smoothing on raw HuskyLens (tail_offset_x, angle_deg) to damp
+        # frame-to-frame noise. alpha=0 disables, alpha=1 uses raw values.
+        # Default 0.4: each frame contributes 40%, prior smoothed value 60%.
+        # This filters the ±5-10 deg noise on angle_deg seen in field logs.
+        self.huskylens_smoothing_alpha = float(
+            min(1.0, max(0.0, huskylens_smoothing_alpha))
+        )
+        self._smoothed_tail_offset_x = None
+        self._smoothed_angle_deg = None
         # When True, skip the cross_pre forward+stop phase entirely and jump
         # directly to the plan's next rotate action as soon as a cross is
         # detected. Useful when the operator wants the robot to start turning
@@ -173,6 +183,8 @@ class LineFollowerFSM:
         self._y_type_cross_active = False
         self._cross_seq_phase = 0
         self._cross_seq_last_ts = 0.0
+        self._smoothed_tail_offset_x = None
+        self._smoothed_angle_deg = None
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
@@ -796,6 +808,24 @@ class LineFollowerFSM:
             tail_offset_x = float(huskylens.get("tail_offset_x"))
         except Exception:
             return None
+
+        # EMA smoothing to damp HuskyLens frame-to-frame noise on angle_deg
+        # / tail_offset_x. Without this the direction value bouncing ±8 deg
+        # around 0 causes RotateLeft <-> RotateRight flicker every new frame.
+        alpha = self.huskylens_smoothing_alpha
+        if alpha > 0:
+            if self._smoothed_tail_offset_x is None:
+                self._smoothed_tail_offset_x = tail_offset_x
+                self._smoothed_angle_deg = angle_deg
+            else:
+                self._smoothed_tail_offset_x = (
+                    (1.0 - alpha) * self._smoothed_tail_offset_x + alpha * tail_offset_x
+                )
+                self._smoothed_angle_deg = (
+                    (1.0 - alpha) * self._smoothed_angle_deg + alpha * angle_deg
+                )
+            tail_offset_x = self._smoothed_tail_offset_x
+            angle_deg = self._smoothed_angle_deg
 
         def _scaled(speed):
             return max(0, int(speed))

@@ -5,7 +5,7 @@ steps:
   action: RotateRight
   until: line
   speed: 5
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn cô chú, anh chị đến phòng khám A19 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi phía sau
@@ -18,15 +18,13 @@ steps:
   action: RotateLeft
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Con vẫn đang đồng hành cùng cô chú, anh chị. Nếu cô chú đang ở phía sau, xin vui lòng tiếp tục đi theo con. Nếu cần đi chậm lại hoặc có vấn đề gì, cô chú cứ báo để con hỗ trợ kịp thời.'
 - label: S4_WAIT_TIMEOUT
-  action: RotateRight
-  speed: 5
-  until: line
-  min_duration: 3.0
+  action: WAIT
+  duration: 10.0
   messages:
   - topic: /plan_message
     message: 'say: Chúng ta đã đến phòng khám A19. Cô chú, anh chị vui lòng kiểm tra lại thông tin khám bệnh và làm theo hướng dẫn của nhân viên y tế tại đây. Con chúc cô chú, anh chị có buổi khám thuận
@@ -35,7 +33,7 @@ steps:
   action: RotateRight
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Con xin phép quay về vị trí ban đầu để tiếp tục hỗ trợ những người bệnh khác. Chúc cô chú, anh chị nhiều sức khỏe.'
@@ -43,7 +41,7 @@ steps:
   action: RotateRight
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: done

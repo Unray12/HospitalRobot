@@ -5,7 +5,7 @@ steps:
   action: RotateRight
   until: line
   speed: 5
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Xin chào cô chú, anh chị. Con là robot hỗ trợ của bệnh viện. Con sẽ hướng dẫn đến phòng khám A18 theo lộ trình an toàn và thuận tiện nhất. Trong quá trình di chuyển, cô chú vui lòng đi
@@ -24,23 +24,21 @@ steps:
   action: RotateLeft
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Con xin kiểm tra lại ạ. Nếu cô chú, anh chị đang ở phía sau, vui lòng tiếp tục đi theo con để đến phòng khám A18. Nếu cần đi chậm lại, xin hãy báo để con điều chỉnh tốc độ.'
 - label: S5_ARRIVED_A18
-  action: RotateRight
-  speed: 5
-  until: line
-  min_duration: 3.0
+  action: WAIT
   messages:
   - topic: /plan_message
     message: 'say: Chúng ta đã đến phòng khám A18. Cô chú, anh chị vui lòng kiểm tra thông tin khám và làm theo hướng dẫn của nhân viên y tế tại đây. Chúc cô chú, anh chị thăm khám thuận lợi.'
+  duration: 10.0
 - label: S6_RETURNING
   action: RotateRight
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: 'say: Con xin phép quay về vị trí hỗ trợ ban đầu để tiếp tục hướng dẫn những người bệnh khác. Con cảm ơn cô chú, anh chị.'
@@ -55,7 +53,7 @@ steps:
   action: RotateRight
   speed: 5
   until: line
-  min_duration: 3.0
+  min_duration: 14.0
   messages:
   - topic: /plan_message
     message: done
