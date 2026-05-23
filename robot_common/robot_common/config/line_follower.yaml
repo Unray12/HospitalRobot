@@ -152,12 +152,15 @@ huskylens:
   # Nếu y_type không đạt MID_TO_TOP sau thời gian này, rotate kết thúc.
   y_type_rotate_timeout: 5.0
 
-  # 4-way cross sequence detector. Robot phải quan sát đủ chuỗi y_type:
-  #   BOT_TO_TOP  →  BOT_TO_MID  →  MID_TO_TOP (line_length_y > min_length)
-  # mới fire cross trigger. Nếu giữa 2 phase hơn `timeout` giây thì reset.
-  # Tăng min_length để chỉ trigger khi đã qua hẳn cross (line phía sau dài rõ).
-  # Giảm để trigger sớm hơn.
-  cross_seq_min_length: 75
+  # Cross detector dựa trên length-collapse của HuskyLens:
+  #   phase 1: line phía trước DÀI (line_length_y > long_length)
+  #   phase 2: line phía trước NGẮN đột ngột (line_length_y < short_length)
+  #            → CROSS DETECTED
+  # Robust với trường hợp y_type nhảy thẳng BOT_TO_TOP -> MID_TO_TOP (bỏ
+  # qua BOT_TO_MID phase) khi camera không thấy đủ rõ giai đoạn trung gian.
+  # Reset nếu giữa các phase quá `timeout` giây không có update.
+  cross_seq_long_length: 150    # px — line được coi là "dài" (phase 1)
+  cross_seq_short_length: 75    # px — line được coi là "ngắn" (phase 2, fire)
   cross_seq_timeout: 8.0
 
 # ── Plan alias (keyboard/MQTT digit → plan name) ─────────────────────────────

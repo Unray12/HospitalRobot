@@ -79,7 +79,8 @@ class LineFollowerFSM:
         huskylens_heading_hysteresis=3.0,
         huskylens_command_hold_sec=0.20,
         cross_pre_skip_in_autoline=False,
-        cross_seq_min_length=75,
+        cross_seq_long_length=150,
+        cross_seq_short_length=75,
         cross_seq_timeout=8.0,
         logger=None,
     ):
@@ -122,16 +123,21 @@ class LineFollowerFSM:
         # detected. Useful when the operator wants the robot to start turning
         # immediately at a T/+ junction without nudging forward first.
         self.cross_pre_skip_in_autoline = bool(cross_pre_skip_in_autoline)
-        # 4-way cross sequence detector via HuskyLens y_type. The robot is
-        # considered to have crossed a 4-way intersection when it observes
-        # this y_type sequence within `cross_seq_timeout` seconds:
-        #   1) Y_TYPE_BOTTOM_TO_TOP  (line full-frame, robot on the line)
-        #   2) Y_TYPE_BOTTOM_TO_MID  (line truncating from top -- entering cross)
-        #   3) Y_TYPE_MID_TO_TOP     with line_length_y > cross_seq_min_length
-        #      (line reappears ahead after the intersection)
-        # Phase 3 fires the cross trigger. _cross_seq_phase tracks progress
-        # (0=idle, 1=saw BOT_TO_TOP, 2=saw BOT_TO_MID).
-        self.cross_seq_min_length = int(max(0, cross_seq_min_length))
+        # 4-way cross sequence detector via HuskyLens line_length_y.
+        # Trigger when the line ahead transitions from LONG to SHORT, which
+        # is the universal signature of approaching a cross or T-junction:
+        #   Phase 1: y_type in {BOT_TO_TOP, MID_TO_TOP} AND length > long_thr
+        #            (line ahead is long, robot is bám line on a straight)
+        #   Phase 2: y_type in {MID_TO_TOP, BOT_TO_MID} AND length < short_thr
+        #            (line ahead suddenly short -- end-of-line / cross bar in
+        #            front truncating the visible part)
+        #            -> CROSS DETECTED
+        # This handles the real-world case where the y_type can jump
+        # BOT_TO_TOP -> MID_TO_TOP directly within one frame (camera doesn't
+        # see a clean BOT_TO_MID phase), as long as the length collapse is
+        # observed.
+        self.cross_seq_long_length = int(max(0, cross_seq_long_length))
+        self.cross_seq_short_length = int(max(0, cross_seq_short_length))
         self.cross_seq_timeout = float(max(0.0, cross_seq_timeout))
         self._cross_seq_phase = 0
         self._cross_seq_last_ts = 0.0
@@ -1021,20 +1027,24 @@ class LineFollowerFSM:
             return 0
 
     def _update_cross_sequence(self, now):
-        """4-way cross sequence detector.
+        """Cross detector based on the LONG -> SHORT line_length_y collapse.
 
-        Tracks a 3-phase y_type sequence:
-          phase 0 (idle) --(BOT_TO_TOP)--> phase 1 --(BOT_TO_MID)--> phase 2
-            --(MID_TO_TOP, length > min)--> CROSS DETECTED (return True)
+        Phase 0 (idle): waiting.
+        Phase 1: saw y_type in {BOT_TO_TOP, MID_TO_TOP} with line_length_y
+                 > cross_seq_long_length. Robot is on a straight, line ahead
+                 visible far. Stays in phase 1 as long as the line remains long.
+        Phase 2: y_type in {MID_TO_TOP, BOT_TO_MID} with line_length_y
+                 < cross_seq_short_length. Line ahead collapsed -- this is the
+                 cross signature. CROSS DETECTED, return True.
 
-        The sequence resets if cross_seq_timeout seconds elapse between phase
-        transitions. Returns False every other tick.
+        Resets to phase 0 if cross_seq_timeout seconds pass without any update.
         """
         y_type = self._huskylens_y_type()
         if y_type is None:
             return False
+        length = self._huskylens_line_length()
 
-        # Timeout reset: if we sat in an intermediate phase too long, abandon.
+        # Timeout reset.
         if (
             self._cross_seq_phase > 0
             and self.cross_seq_timeout > 0
@@ -1045,38 +1055,32 @@ class LineFollowerFSM:
             )
             self._cross_seq_phase = 0
 
-        if y_type == Y_TYPE_BOTTOM_TO_TOP:
-            if self._cross_seq_phase != 1:
+        is_forward_line = y_type in (Y_TYPE_BOTTOM_TO_TOP, Y_TYPE_MID_TO_TOP)
+        is_approach    = y_type in (Y_TYPE_MID_TO_TOP, Y_TYPE_BOTTOM_TO_MID)
+
+        if self._cross_seq_phase == 0:
+            if is_forward_line and length > self.cross_seq_long_length:
                 self._cross_seq_phase = 1
                 self._cross_seq_last_ts = now
-                self._log_info("===> Cross seq phase 1: BOT_TO_TOP")
-            else:
-                self._cross_seq_last_ts = now   # refresh timestamp while staying in phase
+                self._log_info(
+                    f"===> Cross seq phase 1: long line (y_type={y_type} len={length})"
+                )
             return False
 
-        if y_type == Y_TYPE_BOTTOM_TO_MID:
-            if self._cross_seq_phase == 1:
-                self._cross_seq_phase = 2
-                self._cross_seq_last_ts = now
-                self._log_info("===> Cross seq phase 2: BOT_TO_MID")
-            elif self._cross_seq_phase == 2:
-                self._cross_seq_last_ts = now
+        # phase 1: watching for collapse
+        if is_forward_line and length > self.cross_seq_long_length:
+            self._cross_seq_last_ts = now   # still long, refresh timestamp
             return False
 
-        if y_type == Y_TYPE_MID_TO_TOP:
-            if self._cross_seq_phase == 2:
-                length = self._huskylens_line_length()
-                if length > self.cross_seq_min_length:
-                    self._log_info(
-                        f"===> Cross seq phase 3: MID_TO_TOP len={length} > "
-                        f"{self.cross_seq_min_length} -> CROSS DETECTED"
-                    )
-                    self._cross_seq_phase = 0
-                    return True
-                # length too short -- stay in phase 2, wait for line to grow
-                self._cross_seq_last_ts = now
-            return False
+        if is_approach and length < self.cross_seq_short_length:
+            self._log_info(
+                f"===> Cross seq phase 2: short line (y_type={y_type} len={length}) "
+                f"-> CROSS DETECTED"
+            )
+            self._cross_seq_phase = 0
+            return True
 
+        # In-between: keep phase 1 but don't refresh timestamp aggressively
         return False
 
     def _next_action_is_autoline(self):

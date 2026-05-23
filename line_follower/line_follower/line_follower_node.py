@@ -112,7 +112,8 @@ class LineFollowerNode(Node):
             huskylens_heading_hysteresis=huskylens_cfg.get("heading_hysteresis", 3.0),
             huskylens_command_hold_sec=huskylens_cfg.get("command_hold_sec", 0.20),
             cross_pre_skip_in_autoline=bool(config.get("cross_pre_skip_in_autoline", True)),
-            cross_seq_min_length=int(huskylens_cfg.get("cross_seq_min_length", 75)),
+            cross_seq_long_length=int(huskylens_cfg.get("cross_seq_long_length", 150)),
+            cross_seq_short_length=int(huskylens_cfg.get("cross_seq_short_length", 75)),
             cross_seq_timeout=float(huskylens_cfg.get("cross_seq_timeout", 8.0)),
             logger=self.log,
         )
