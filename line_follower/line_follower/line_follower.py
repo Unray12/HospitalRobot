@@ -559,6 +559,17 @@ class LineFollowerFSM:
             ):
                 self._clear_plan_action_state()
                 return self._after_plan_action(now)
+            # In huskylens/hybrid tracking, the camera can detect a line ahead
+            # before the 3-zone line sensor (robot rotating over no-line floor).
+            # Accept HuskyLens line-acquired y_type as an exit signal too.
+            if self.tracking_strategy_name in ("huskylens", "hybrid"):
+                y_type = self._huskylens_y_type()
+                if y_type is not None and y_type in _Y_TYPE_LINE_ACQUIRED:
+                    self._log_info(
+                        f"===> until:line satisfied by HuskyLens y_type={y_type}"
+                    )
+                    self._clear_plan_action_state()
+                    return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
         if self._plan_action_until_y_type:
