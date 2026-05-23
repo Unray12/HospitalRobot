@@ -78,6 +78,7 @@ class LineFollowerFSM:
         huskylens_lateral_hysteresis=6.0,
         huskylens_heading_hysteresis=3.0,
         huskylens_command_hold_sec=0.20,
+        cross_pre_skip_in_autoline=False,
         logger=None,
     ):
         self._logger = logger
@@ -120,6 +121,11 @@ class LineFollowerFSM:
         self.huskylens_command_hold_sec = float(max(0.0, huskylens_command_hold_sec))
         self._last_huskylens_action = None
         self._last_huskylens_action_ts = 0.0
+        # When True, skip the cross_pre forward+stop phase entirely and jump
+        # directly to the plan's next rotate action as soon as a cross is
+        # detected. Useful when the operator wants the robot to start turning
+        # immediately at a T/+ junction without nudging forward first.
+        self.cross_pre_skip_in_autoline = bool(cross_pre_skip_in_autoline)
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
@@ -940,7 +946,11 @@ class LineFollowerFSM:
 
     def _should_skip_cross_pre(self):
         """Skip pre-forward phase when next actionable step is rotate for immediate turn."""
-        if self._autoline_mode:
+        # Operator override: in autoline mode, when configured to skip, jump
+        # straight from cross_event to the plan's rotate without the forward
+        # nudge / stop phases.
+        force_skip_in_autoline = bool(self.cross_pre_skip_in_autoline) and self._autoline_mode
+        if self._autoline_mode and not force_skip_in_autoline:
             return False
         idx = self._plan_index
         guard = 0

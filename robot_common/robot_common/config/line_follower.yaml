@@ -36,6 +36,11 @@ cross_pre_forward_speed: 8
 cross_pre_forward_duration: 2.7   # giây — đủ để robot vượt qua giao cắt
 cross_pre_stop_duration: 1.0      # giây — dừng để ổn định trước khi rotate
 
+# Nếu true: trong AutoLine, khi detect cross sẽ BỎ pha forward+stop ở trên
+# và rotate ngay theo plan. Robot không nhích lên trước khi quay.
+# Set false để giữ behavior cũ (nhích lên trước, rồi mới rotate).
+cross_pre_skip_in_autoline: true
+
 # ── Rotate-until-line parameters ─────────────────────────────────────────────
 
 # Thời gian tối thiểu rotate trước khi bắt đầu check line reacquire.
