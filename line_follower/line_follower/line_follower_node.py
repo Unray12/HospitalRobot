@@ -261,7 +261,7 @@ class LineFollowerNode(Node):
             self.log.info(f"Plan duplicate ignored: {name}", event="PLAN")
             return
 
-        plan_data = self._cfg_mgr.load_plan(name)
+        plan_data = self._cfg_mgr.load_plan(name, force=True)
         if not plan_data:
             self.log.warning(f"Plan not found: {name}", event="PLAN")
             return

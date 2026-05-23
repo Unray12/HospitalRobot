@@ -1092,12 +1092,14 @@ class LineFollowerFSM:
         action = step.get("action", "Stop")
         speed = step.get("speed", self.base_speed)
         duration = step.get("duration")
+        min_duration = step.get("min_duration")
         until = step.get("until")
         timeout = step.get("timeout")
         total = len(self.cross_plan)
         self._log_info(
             f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}, "
-            f"speed={speed}, duration={duration}, until={until}, timeout={timeout}"
+            f"speed={speed}, duration={duration}, min_duration={min_duration}, "
+            f"until={until}, timeout={timeout}"
         )
 
     def _to_int(self, raw, default, field_name, step):
