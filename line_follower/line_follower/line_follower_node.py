@@ -330,8 +330,15 @@ class LineFollowerNode(Node):
         )
         self.follower.set_tracking_context(
             {
-                "line_sensor_frame": (None if self.tracking_only_huskylens else self._last_frame),
-                "line_sensor_stale": (True if self.tracking_only_huskylens else line_stale),
+                # Always pass the line_sensor frame so the FSM can fall back to
+                # 3-zone cross detection when HuskyLens is invalid/stale. The
+                # `only_huskylens` semantics are honored elsewhere:
+                #   - steering: huskylens strategy is used, fallback to line_sensor
+                #     for steering is disabled via tracking_allow_line_sensor_fallback.
+                #   - cross gate: _should_bypass_line_sensor_gate returns True (and
+                #     skips line_sensor cross check) while HuskyLens reports valid=1.
+                "line_sensor_frame": self._last_frame,
+                "line_sensor_stale": line_stale,
                 "line_sensor_ts": self._last_frame_ts,
                 "huskylens_frame": self._last_huskylens_frame,
                 "huskylens_stale": huskylens_stale,
@@ -341,7 +348,7 @@ class LineFollowerNode(Node):
         )
         self._consume_autoline_action()
         self._consume_step_messages()
-        result = self.follower.update((None if self.tracking_only_huskylens else self._last_frame), now)
+        result = self.follower.update(self._last_frame, now)
         self._consume_autoline_action()
         self._consume_step_messages()
         if result is None:

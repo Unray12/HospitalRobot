@@ -957,7 +957,14 @@ class LineFollowerFSM:
         return False
 
     def _next_rotate_uses_y_type(self):
-        """Return True when the next actionable plan step is a rotate-until-y_type."""
+        """Return True when the next actionable plan step is a rotate-until-line/y_type.
+
+        Both `until: line` and `until: y_type` qualify: in huskylens/hybrid mode
+        the `until: line` branch also exits on HuskyLens line-acquired y_type
+        (see _plan_action_until_line handler), so both step kinds need the
+        upstream cross_pre trigger to fire when y_type signals an approaching
+        cross.
+        """
         idx = self._plan_index
         guard = 0
         while idx < len(self.cross_plan) and guard < len(self.cross_plan):
@@ -972,7 +979,7 @@ class LineFollowerFSM:
             if action not in ("ROTATELEFT", "ROTATERIGHT"):
                 return False
             until = str(step.get("until", "") or "").strip().lower()
-            return until == "y_type"
+            return until in ("y_type", "line", "")
         return False
 
     def _huskylens_y_type(self):
