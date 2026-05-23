@@ -11,7 +11,7 @@ steps:
   action: RotateLeft
   until: line
   speed: 5
-  min_duration: 14.0
+  min_duration: 12.0
   end_state: true
   continue_immediately: true
   messages:

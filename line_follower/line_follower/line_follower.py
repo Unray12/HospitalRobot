@@ -647,7 +647,14 @@ class LineFollowerFSM:
             return "Stop", 0
         # Allow immediate transition for action steps that request no-wait-cross.
         # Keep existing behavior where next AutoLine step executes immediately.
-        if self._plan_continue_immediate or self._next_action_is_autoline():
+        # Also chain time-bounded steps (Forward/duration, WAIT, STOP) so the
+        # robot doesn't sit in FOLLOWING waiting for the next cross between a
+        # rotate and a "stop and announce" step.
+        if (
+            self._plan_continue_immediate
+            or self._next_action_is_autoline()
+            or self._next_action_is_self_terminating()
+        ):
             self._plan_continue_immediate = False
             return self._start_plan_action(now)
         self._plan_continue_immediate = False
@@ -1132,6 +1139,40 @@ class LineFollowerFSM:
                 idx = target
                 continue
             return action == "AUTOLINE"
+        return False
+
+    def _next_action_is_self_terminating(self):
+        """True if the next actionable step is a time-bounded action that does
+        NOT need a cross trigger to start (Forward/Backward/Left/Right with
+        duration, or WAIT/STOP). Such steps should be chained automatically
+        after the previous step finishes, instead of falling back to
+        FOLLOWING and waiting for the next cross."""
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL",):
+                continue
+            if action == "GOTO":
+                target = self._resolve_goto_target(step.get("target"))
+                if target is None:
+                    continue
+                idx = target
+                continue
+            if action in ("WAIT", "STOP"):
+                return True
+            if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
+                # Need a positive duration to be time-bounded.
+                try:
+                    return float(step.get("duration", 0.0)) > 0
+                except Exception:
+                    return False
+            return False
         return False
 
     def _has_pending_plan(self):
