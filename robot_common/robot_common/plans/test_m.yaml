@@ -1,0 +1,20 @@
+name: test_m
+start_without_cross: true
+steps:
+- label: S1_FOLLOW_LINE
+  action: AutoLine
+  enabled: true
+  messages:
+  - topic: /plan_message
+    message: 'say: Bắt đầu bám line, chờ ngã rẽ.'
+- label: S2_ROTATE_LEFT_TO_LINE
+  action: RotateLeft
+  until: line
+  speed: 5
+  min_duration: 12.0
+  end_state: true
+  continue_immediately: true
+  messages:
+  - topic: /plan_message
+    message: 'say: Phát hiện ngã rẽ, đang quay trái.'
+end_state: stop

@@ -1,0 +1,30 @@
+# =============================================================================
+# plan_mapping — single source of truth for digit → plan name
+# =============================================================================
+# Đọc bởi: line_follower (plan_alias), mqtt_bridge (plan_keys + room_plans).
+# TODO Low-1 resolved: không còn duplicate 3 chỗ.
+# =============================================================================
+
+# Digit key → plan name (keyboard / MQTT digit payload)
+plan_keys:
+  '0': clear
+  '1': a19
+  '2': a18
+  '3': a17
+  '4': a16
+  '5': a15
+  # Test plan: bám line tới cross, sau đó quay trái cho tới khi tìm lại được line.
+  'm': test_m
+
+# Room id / digit → plan name (MQTT "room:X" payload)
+room_plans:
+  a19: a19
+  a18: a18
+  a17: a17
+  a16: a16
+  a15: a15
+  '1': a19
+  '2': a18
+  '3': a17
+  '4': a16
+  '5': a15

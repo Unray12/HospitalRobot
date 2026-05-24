@@ -1,0 +1,45 @@
+# =============================================================================
+# camera_sensor — ESP32 camera face detection
+# =============================================================================
+# Đọc bởi: camera_sensor/camera_sensor/main.py:CameraSensorNode.__init__
+# Xem thêm: docs/02-project-flow.md §2 (Camera flow)
+#
+# Phần cứng: ESP32 (hrbot_camera) kết nối với HuskyLens IC qua UART 9600 baud.
+# Firmware dùng ALGORITHM_FACE_RECOGNITION, emit JSON envelope v1 qua
+# USB-CDC @ 115200. Port symlink được probe khi khởi động bởi
+# scripts/init_serial_symlinks.py.
+# =============================================================================
+
+serial:
+  # Symlink ổn định tạo bởi systemd service hospitalrobot-serial.
+  # Thay đổi nếu đặt lại rules probe trong scripts/init_serial_symlinks.py.
+  port: /dev/hospitalrobot/camera
+
+  # USB-CDC luôn 115200 giữa ESP32 và Pi — KHÔNG đổi.
+  # HuskyLens UART (bên trong firmware) là 9600 — đây là baudrate khác.
+  baudrate: 115200
+
+  # readline() timeout — nếu firmware bận, đọc sẽ trả về sau 0.2s.
+  # Quá cao làm sensor node bị trễ; quá thấp gây partial frame.
+  timeout: 0.2
+
+publish:
+  # Topic downstream: mqtt_bridge subscribe để forward sang MQTT face/camera
+  # và trigger plan_message dựa trên face ID.
+  topic: /face/camera
+
+# Sau khi mất kết nối serial, node tự retry mỗi reconnect_period_sec giây.
+# udev trigger restart service khi cắm lại USB, nhưng node cũng tự heal.
+reconnect_period_sec: 2.0
+
+# Để trống: node chỉ mở đúng port trên, không scan thêm.
+# Thêm vào đây nếu muốn fallback khi symlink chưa tạo kịp:
+# fallback_ports:
+#   - /dev/ttyACM0
+fallback_ports: []
+
+# Để trống: không scan /dev/ttyUSB* hay ttyACM* tự động.
+# Bật scan_prefixes khi chạy không có systemd service (dev mode):
+# scan_prefixes:
+#   - /dev/ttyACM
+scan_prefixes: []

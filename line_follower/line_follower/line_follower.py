@@ -1,7 +1,31 @@
+"""Finite-state controller for line following, plan execution, and HuskyLens guidance."""
+
 import time
-from .line_follow_strategies import LineSensorStrategy, HuskyLensStrategy, HybridStrategy
+
+from robot_common.logging_utils import to_bool
+from .line_follow_strategies import HybridStrategy, HuskyLensStrategy, LineSensorStrategy
+
+# HuskyLens y_type classification codes -- must stay in sync with the firmware
+# `huskylens_sensor/device_code/main.py` (Y_TYPE_* constants).
+Y_TYPE_NO_LINE       = 0
+Y_TYPE_BOTTOM_TO_MID = 1
+Y_TYPE_MID_TO_TOP    = 2
+Y_TYPE_BOTTOM_TO_TOP = 3
+
+# Any of these is treated as "robot is near a cross / line ends just under the
+# camera" and arms the cross_pre trigger. Adding a code here also makes the
+# rotate-until-y_type plan step exit correctly when the new code reappears.
+_Y_TYPE_CROSS_TRIGGER  = (Y_TYPE_BOTTOM_TO_MID,)
+# Rotate-exit signal: robot has reacquired a line going forward. Restricted
+# to MID_TO_TOP only -- BOTTOM_TO_TOP would also fire while still aligned
+# with the perpendicular cross bar mid-rotation, exiting too early.
+_Y_TYPE_LINE_ACQUIRED  = (Y_TYPE_MID_TO_TOP,)
+
 
 class LineFollowerFSM:
+    """Coordinate tracking strategies, cross handling, and plan-driven actions."""
+
+    # ── FSM state constants ────────────────────────────────────────────────────
     STATE_FOLLOWING = 0
     STATE_CROSSING = 1
     STATE_TURN_LEFT = 2
@@ -10,6 +34,21 @@ class LineFollowerFSM:
     STATE_PLAN = 5
     STATE_CROSS_PRE = 6
     STATE_STOPPED = 7
+
+    # ── Default durations (seconds) ───────────────────────────────────────────
+    # Used as fallback when no duration is specified in a plan step.
+    # WAIT default: brief pause before continuing (sub-second so it feels snappy)
+    _DEFAULT_WAIT_DURATION = 0.3
+    # FOLLOW default: minimum forward-follow time before plan advances
+    _DEFAULT_FOLLOW_DURATION = 0.6
+    # MOVE (Forward/Backward/Left/Right) default: half-second nudge
+    _DEFAULT_MOVE_DURATION = 0.5
+
+    # ── Jump-guard constants ───────────────────────────────────────────────────
+    # Safety cap on Goto/Label hops to prevent infinite plan loops.
+    # Max iterations = max(_JUMP_GUARD_MIN, plan_length * _JUMP_GUARD_MULTIPLIER)
+    _JUMP_GUARD_MIN = 4
+    _JUMP_GUARD_MULTIPLIER = 2
 
     def __init__(
         self,
@@ -33,9 +72,21 @@ class LineFollowerFSM:
         tracking_strict_mode=False,
         tracking_log_invalid_period=1.0,
         tracking_allow_line_sensor_fallback=True,
-        huskylens_max_abs_error=120,
-        huskylens_control_gain=1.0,
-        huskylens_deadband=1.0,
+        huskylens_lateral_deadband=10.0,
+        huskylens_heading_deadband=3.0,
+        huskylens_y_type_rotate_timeout=5.0,
+        huskylens_lateral_hysteresis=6.0,
+        huskylens_heading_hysteresis=3.0,
+        huskylens_command_hold_sec=0.20,
+        huskylens_smoothing_alpha=0.4,
+        huskylens_adaptive_speed=True,
+        huskylens_min_speed_factor=0.45,
+        huskylens_lateral_full_speed_offset=80.0,
+        huskylens_heading_full_speed_angle=40.0,
+        cross_pre_skip_in_autoline=False,
+        cross_seq_long_length=150,
+        cross_seq_short_length=75,
+        cross_seq_timeout=8.0,
         logger=None,
     ):
         self._logger = logger
@@ -59,9 +110,66 @@ class LineFollowerFSM:
         self.tracking_strict_mode = bool(tracking_strict_mode)
         self.tracking_log_invalid_period = float(max(0.1, tracking_log_invalid_period))
         self.tracking_allow_line_sensor_fallback = bool(tracking_allow_line_sensor_fallback)
-        self.huskylens_max_abs_error = int(max(1, huskylens_max_abs_error))
-        self.huskylens_control_gain = float(max(0.0, huskylens_control_gain))
-        self.huskylens_deadband = float(max(0.0, huskylens_deadband))
+        self.huskylens_lateral_deadband = float(max(0.0, huskylens_lateral_deadband))
+        self.huskylens_heading_deadband = float(max(0.0, huskylens_heading_deadband))
+        self.huskylens_y_type_rotate_timeout = float(max(0.0, huskylens_y_type_rotate_timeout))
+        # Hysteresis added to deadband to break free of a turn: once turning,
+        # the value must drop *inside* deadband by at least the hysteresis
+        # amount before Forward kicks back in. Prevents flicker on noisy frames.
+        self.huskylens_lateral_hysteresis = float(max(0.0, huskylens_lateral_hysteresis))
+        self.huskylens_heading_hysteresis = float(max(0.0, huskylens_heading_hysteresis))
+        # Minimum time to hold a non-Forward command before switching to another
+        # non-Forward command. Smoothes high-rate command flicker at 100 Hz.
+        self.huskylens_command_hold_sec = float(max(0.0, huskylens_command_hold_sec))
+        self._last_huskylens_action = None
+        self._last_huskylens_action_ts = 0.0
+        # EMA smoothing on raw HuskyLens (tail_offset_x, angle_deg) to damp
+        # frame-to-frame noise. alpha=0 disables, alpha=1 uses raw values.
+        # Default 0.4: each frame contributes 40%, prior smoothed value 60%.
+        # This filters the ±5-10 deg noise on angle_deg seen in field logs.
+        self.huskylens_smoothing_alpha = float(
+            min(1.0, max(0.0, huskylens_smoothing_alpha))
+        )
+        self._smoothed_tail_offset_x = None
+        self._smoothed_angle_deg = None
+        # Adaptive (proportional) correction speed. When value is just past
+        # deadband -> use slow speed (min_speed_factor * turn_speed) to fine-
+        # adjust without overshoot. When value is far past deadband -> ramp
+        # up to full turn_speed for fast catch-up. Linear interpolation over
+        # the "full_speed" offset/angle range.
+        self.huskylens_adaptive_speed = bool(huskylens_adaptive_speed)
+        self.huskylens_min_speed_factor = float(
+            min(1.0, max(0.0, huskylens_min_speed_factor))
+        )
+        self.huskylens_lateral_full_speed_offset = float(
+            max(1.0, huskylens_lateral_full_speed_offset)
+        )
+        self.huskylens_heading_full_speed_angle = float(
+            max(1.0, huskylens_heading_full_speed_angle)
+        )
+        # When True, skip the cross_pre forward+stop phase entirely and jump
+        # directly to the plan's next rotate action as soon as a cross is
+        # detected. Useful when the operator wants the robot to start turning
+        # immediately at a T/+ junction without nudging forward first.
+        self.cross_pre_skip_in_autoline = bool(cross_pre_skip_in_autoline)
+        # 4-way cross sequence detector via HuskyLens line_length_y.
+        # Trigger when the line ahead transitions from LONG to SHORT, which
+        # is the universal signature of approaching a cross or T-junction:
+        #   Phase 1: y_type in {BOT_TO_TOP, MID_TO_TOP} AND length > long_thr
+        #            (line ahead is long, robot is bám line on a straight)
+        #   Phase 2: y_type in {MID_TO_TOP, BOT_TO_MID} AND length < short_thr
+        #            (line ahead suddenly short -- end-of-line / cross bar in
+        #            front truncating the visible part)
+        #            -> CROSS DETECTED
+        # This handles the real-world case where the y_type can jump
+        # BOT_TO_TOP -> MID_TO_TOP directly within one frame (camera doesn't
+        # see a clean BOT_TO_MID phase), as long as the length collapse is
+        # observed.
+        self.cross_seq_long_length = int(max(0, cross_seq_long_length))
+        self.cross_seq_short_length = int(max(0, cross_seq_short_length))
+        self.cross_seq_timeout = float(max(0.0, cross_seq_timeout))
+        self._cross_seq_phase = 0
+        self._cross_seq_last_ts = 0.0
         self._tracking_context = {}
         self._last_tracking_invalid_log_ts = 0.0
 
@@ -70,72 +178,20 @@ class LineFollowerFSM:
         self._hybrid_strategy = HybridStrategy(self._huskylens_strategy, self._line_sensor_strategy)
         self._tracking_strategy = self._resolve_tracking_strategy(self.tracking_strategy_name)
 
-        self.state = self.STATE_FOLLOWING
-        self.crossing_start_time = None
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
-        self._cross_active = False
-        self._plan_new_step = True
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
 
-    def reset(self):
-        self.state = self.STATE_FOLLOWING
+    def _reset_state(self, state=STATE_FOLLOWING, reset_plan_index=True, clear_plan_fields=False):
+        self.state = state
         self.crossing_start_time = None
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
-        self._plan_new_step = True
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
-
-    def stop(self):
-        # Preserve current plan progress when stopping so status does not jump to step 1/N.
-        self._enter_stopped(reset_plan_progress=False)
-
-    def _enter_stopped(self, reset_plan_progress=True):
-        self.state = self.STATE_STOPPED
-        self.crossing_start_time = None
-        if reset_plan_progress:
+        if reset_plan_index:
             self._plan_index = 0
         self._plan_step_start = None
         self._plan_action_until = None
         self._plan_action = None
         self._plan_action_speed = None
         self._plan_action_until_line = False
+        self._plan_action_until_y_type = False
         self._plan_action_min_until = None
         self._plan_action_timeout = None
         self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
@@ -143,6 +199,11 @@ class LineFollowerFSM:
         self._plan_continue_immediate = False
         self._plan_force_complete = False
         self._cross_active = False
+        self._y_type_cross_active = False
+        self._cross_seq_phase = 0
+        self._cross_seq_last_ts = 0.0
+        self._smoothed_tail_offset_x = None
+        self._smoothed_angle_deg = None
         self._plan_new_step = True
         self._cross_pre_phase = 0
         self._cross_pre_until = None
@@ -152,62 +213,40 @@ class LineFollowerFSM:
         self._autoline_mode = False
         self._plan_lost_line_since = None
         self._last_plan_lost_line_warn_ts = 0.0
+        if clear_plan_fields:
+            self.cross_plan = []
+            self.plan_end_state = "stop"
+            self._plan_labels = {}
+
+    def _clear_plan_action_state(self):
+        self._plan_action = None
+        self._plan_action_speed = None
+        self._plan_action_until = None
+        self._plan_action_until_line = False
+        self._plan_action_until_y_type = False
+        self._plan_action_min_until = None
+        self._plan_action_timeout = None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
+        self._plan_rotate_strict_center = False
+
+    def reset(self):
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
+
+    def stop(self):
+        self._enter_stopped(reset_plan_progress=False)
+
+    def _enter_stopped(self, reset_plan_progress=True):
+        self._reset_state(state=self.STATE_STOPPED, reset_plan_index=reset_plan_progress)
 
     def set_plan(self, steps, end_state=None):
         self.cross_plan = steps or []
         if end_state:
             self.plan_end_state = end_state
         self._plan_labels = self._rebuild_plan_labels(self.cross_plan)
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._plan_new_step = True
-        self._cross_active = False
-        self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True)
 
     def clear_plan(self):
-        self.cross_plan = []
-        self.plan_end_state = "stop"
-        self._plan_labels = {}
-        self._plan_index = 0
-        self._plan_step_start = None
-        self._plan_action_until = None
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
-        self._plan_continue_immediate = False
-        self._plan_force_complete = False
-        self._cross_active = False
-        self.state = self.STATE_FOLLOWING
-        self._cross_pre_phase = 0
-        self._cross_pre_until = None
-        self._requested_autoline = None
-        self._requested_step_messages = None
-        self._plan_start_requested = False
-        self._autoline_mode = False
-        self._plan_lost_line_since = None
-        self._last_plan_lost_line_warn_ts = 0.0
+        self._reset_state(state=self.STATE_FOLLOWING, reset_plan_index=True, clear_plan_fields=True)
 
     def update(self, frame, now):
         if self.state == self.STATE_STOPPED:
@@ -218,6 +257,9 @@ class LineFollowerFSM:
             return self._run_plan_action(frame, now)
         if self.state == self.STATE_CROSS_PRE:
             return self._handle_cross_pre(now)
+        # Plan trigger via /plan_select with start_without_cross=true. Skips
+        # waiting for a physical line cross — useful when robot is hand-placed
+        # at a starting position with no nearby crossing.
         if self._plan_start_requested and self.cross_plan:
             self._plan_start_requested = False
             self._cross_active = False
@@ -229,6 +271,25 @@ class LineFollowerFSM:
             self._cross_pre_until = now + self.cross_pre_forward_duration
             self._log_info("===> PLAN trigger: start without cross")
             return "Forward", self.cross_pre_forward_speed
+
+        # HuskyLens y_type-based 4-way cross detection. Fires only after the
+        # complete sequence BOT_TO_TOP -> BOT_TO_MID -> MID_TO_TOP(len>min) is
+        # observed (see _update_cross_sequence). Single-event so it cannot
+        # re-fire on subsequent ticks while still seeing MID_TO_TOP.
+        if (
+            self.tracking_strategy_name == "huskylens"
+            and self.cross_plan
+            and self._next_rotate_uses_y_type()
+        ):
+            if self._update_cross_sequence(now):
+                if self._should_skip_cross_pre():
+                    self._log_info("===> PLAN trigger (cross_seq): skip cross_pre")
+                    return self._start_plan_action(now)
+                self.state = self.STATE_CROSS_PRE
+                self._cross_pre_phase = 0
+                self._cross_pre_until = now + self.cross_pre_forward_duration
+                self._log_info("===> PLAN trigger (cross_seq): enter cross_pre")
+                return "Forward", self.cross_pre_forward_speed
 
         if frame is None:
             # HuskyLens/hybrid mode may still provide valid tracking even without line sensor frame.
@@ -244,6 +305,10 @@ class LineFollowerFSM:
         right_full = frame["right_full"]
 
         total_black = left_count + mid_count + right_count
+        # Cross is detected only when ALL 3 zones are fully black. The
+        # cross_event flag distinguishes the rising edge from a sustained
+        # cross (e.g. robot sitting on top of the crossing) — we only act
+        # once per crossing.
         cross_detected = left_full and mid_full and right_full
         cross_event = cross_detected and not self._cross_active
         self._cross_active = cross_detected
@@ -267,12 +332,15 @@ class LineFollowerFSM:
                 return self._follow_line(frame)
             self.state = self.STATE_CROSSING
             self.crossing_start_time = now
-            self._log_info("===> CROSS detected: move forward 2s")
+            self._log_info(f"===> CROSS detected: move forward {self.crossing_duration}s")
             return "Forward", self.base_speed
 
         # Lost line -> stop
         if total_black == 0:
             if self._has_pending_plan():
+                # Don't reset plan_index here; operator may want to resume
+                # after re-aligning the robot. _hold_stop_for_plan_lost_line
+                # logs a periodic warning so the operator notices.
                 self._hold_stop_for_plan_lost_line(now)
                 self.state = self.STATE_FOLLOWING
                 return "Stop", 0
@@ -302,6 +370,10 @@ class LineFollowerFSM:
         return "Stop", 0
 
     def _handle_cross_pre(self, now):
+        # Two-phase pause-then-act executed before any plan action triggered
+        # by a cross. Phase 0: drive forward to fully cross the intersection
+        # so the rotate axis sits on the crossing center. Phase 1: brief stop
+        # to bleed off momentum before rotating.
         if self._cross_pre_until is None:
             self._cross_pre_phase = 0
             self._cross_pre_until = now + self.cross_pre_forward_duration
@@ -323,17 +395,29 @@ class LineFollowerFSM:
             self._cross_pre_until = None
             return self._start_plan_action(now)
 
+        # Defensive fallback: if _cross_pre_phase somehow lands outside {0, 1}
+        # (e.g. partial reset on plan reload), recover by re-arming phase 0
+        # rather than returning None — None would leave the FSM stuck in
+        # STATE_CROSS_PRE forever because the timer callback skips publish.
+        self._log_warn(f"cross_pre invalid phase={self._cross_pre_phase}; reset")
+        self._cross_pre_phase = 0
+        self._cross_pre_until = now + self.cross_pre_forward_duration
+        return "Forward", self.cross_pre_forward_speed
+
     def _start_plan_action(self, now):
         if not self.cross_plan:
             return self._follow_default()
 
+        # Loop guard: Goto/Label steps don't consume real time, so a plan that
+        # only contains Goto/Label could loop forever. Cap iterations at 2x
+        # the plan length to break runaway loops (real plans should never need
+        # this many no-op hops in a row).
         jump_guard = 0
-        while jump_guard < max(4, len(self.cross_plan) * 2):
+        while jump_guard < max(self._JUMP_GUARD_MIN, len(self.cross_plan) * self._JUMP_GUARD_MULTIPLIER):
             jump_guard += 1
             if self._plan_index >= len(self.cross_plan):
                 if self.plan_end_state == "follow":
                     return self._follow_default()
-                # Keep plan progress at end so status remains completed (not step 1/N).
                 self._enter_stopped(reset_plan_progress=False)
                 return "Stop", 0
 
@@ -345,19 +429,9 @@ class LineFollowerFSM:
                 continue
 
             action = self._normalize_action(step.get("action", "Stop"))
-            speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
-            duration = self._to_float(step.get("duration"), 0.0, "duration", step)
-            until = str(step.get("until", "") or "").strip().lower()
-            timeout = self._to_float(step.get("timeout"), None, "timeout", step)
-            continue_immediately = self._to_bool(
-                step.get("continue_immediately", step.get("no_wait_cross")),
-                False,
-            )
-            end_after_step = self._to_bool(step.get("end_state"), False)
-
             if action in ("LABEL",):
+                # Label is a marker for Goto targets, not an executable step.
                 continue
-
             if action == "GOTO":
                 target = self._resolve_goto_target(step.get("target"))
                 if target is None:
@@ -367,122 +441,21 @@ class LineFollowerFSM:
                 self._plan_index = target
                 continue
 
-            if action == "AUTOLINE":
-                enabled = self._to_bool(
-                    step.get("enabled", step.get("value", step.get("autoline"))),
-                    True,
-                )
-                self._requested_autoline = enabled
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
-                # After AutoLine step, return to FOLLOWING and wait next cross event
-                # before executing the next plan step.
-                return self._follow_default()
+            speed = self._to_int(step.get("speed"), self.base_speed, "speed", step)
+            duration = self._to_float(step.get("duration"), 0.0, "duration", step)
+            until = str(step.get("until", "") or "").strip().lower()
+            timeout = self._to_float(step.get("timeout"), None, "timeout", step)
+            continue_immediately = self._to_bool(
+                step.get("continue_immediately", step.get("no_wait_cross")), False,
+            )
+            end_after_step = self._to_bool(step.get("end_state"), False)
 
-            if action in ("AUTO",):
-                return self._follow_default()
-
-            if action in ("WAIT", "STOP"):
-                if duration and duration > 0:
-                    self.state = self.STATE_PLAN
-                    self._plan_action = "Stop"
-                    self._plan_action_speed = 0
-                    self._queue_step_messages(step)
-                    self._plan_continue_immediate = continue_immediately
-                    self._plan_force_complete = end_after_step
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._plan_action_min_until = None
-                    self._plan_action_timeout = None
-                    self._log_plan_step(self._plan_index, step, "timed-stop")
-                    return "Stop", 0
-                if action == "WAIT":
-                    duration = 0.3
-                    self.state = self.STATE_PLAN
-                    self._plan_action = "Stop"
-                    self._plan_action_speed = 0
-                    self._queue_step_messages(step)
-                    self._plan_continue_immediate = continue_immediately
-                    self._plan_force_complete = end_after_step
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._plan_action_min_until = None
-                    self._plan_action_timeout = None
-                    self._log_plan_step(self._plan_index, step, "wait-default")
-                    return "Stop", 0
-                if self.plan_end_state == "follow":
-                    self._log_info("[PLAN] Stop step reached, returning to follow")
-                    return self._follow_default()
-                self._enter_stopped(reset_plan_progress=False)
-                self._log_info("[PLAN] Stop step reached, robot stopped")
-                return "Stop", 0
-
-            if action == "FOLLOW":
-                if duration <= 0:
-                    duration = 0.6
-                self.state = self.STATE_PLAN
-                self._plan_action = "AutoFollow"
-                self._plan_action_speed = self.base_speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = now + duration
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._log_plan_step(self._plan_index, step, "follow")
-                return "Forward", self.base_speed
-
-            if action in ("ROTATELEFT", "ROTATERIGHT"):
-                move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
-                strict_line = self._to_bool(
-                    step.get("strict_line", step.get("center_only")),
-                    False,
-                )
-                min_duration = self._to_float(
-                    step.get("min_duration"),
-                    self.rotate_min_duration,
-                    "min_duration",
-                    step,
-                )
-                self.state = self.STATE_PLAN
-                self._plan_action = move_action
-                self._plan_action_speed = speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = None
-                self._plan_action_min_until = now + max(0.0, float(min_duration))
-                self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
-                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side) and (not strict_line)
-                self._plan_rotate_strict_center = bool(strict_line)
-                if duration > 0:
-                    self._plan_action_until = now + duration
-                    self._plan_action_until_line = False
-                    self._log_plan_step(self._plan_index, step, "rotate-duration")
-                    return move_action, speed
-                self._plan_action_until_line = (until == "line") or (until == "")
-                self._log_plan_step(self._plan_index, step, "rotate-until-line")
-                return move_action, speed
-
-            if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
-                if duration <= 0:
-                    duration = 0.5
-                move_action = action.capitalize()
-                self.state = self.STATE_PLAN
-                self._plan_action = move_action
-                self._plan_action_speed = speed
-                self._queue_step_messages(step)
-                self._plan_continue_immediate = continue_immediately
-                self._plan_force_complete = end_after_step
-                self._plan_action_until = now + duration
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._log_plan_step(self._plan_index, step, "move")
-                return move_action, speed
+            result = self._dispatch_plan_action(
+                action, step, now, speed, duration, until, timeout,
+                continue_immediately, end_after_step,
+            )
+            if result is not None:
+                return result
 
             self._log_warn(f"Unknown plan action skipped: {step.get('action')}")
             continue
@@ -490,6 +463,131 @@ class LineFollowerFSM:
         self._log_warn("Plan jump loop exceeded safety guard")
         self.stop()
         return "Stop", 0
+
+    def _dispatch_plan_action(
+        self, action, step, now, speed, duration, until, timeout,
+        continue_immediately, end_after_step,
+    ):
+        if action == "AUTOLINE":
+            return self._exec_autoline(step, continue_immediately, end_after_step)
+        if action in ("AUTO",):
+            return self._follow_default()
+        if action in ("WAIT", "STOP"):
+            return self._exec_wait_stop(action, step, now, duration, continue_immediately, end_after_step)
+        if action == "FOLLOW":
+            return self._exec_follow(step, now, duration, continue_immediately, end_after_step)
+        if action in ("ROTATELEFT", "ROTATERIGHT"):
+            return self._exec_rotate(action, step, now, speed, duration, until, timeout, continue_immediately, end_after_step)
+        if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
+            return self._exec_move(action, step, now, speed, duration, continue_immediately, end_after_step)
+        return None
+
+    def _exec_autoline(self, step, continue_immediately, end_after_step):
+        enabled = self._to_bool(
+            step.get("enabled", step.get("value", step.get("autoline"))), True,
+        )
+        self._requested_autoline = enabled
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._log_plan_step(self._plan_index, step, f"autoline-{enabled}")
+        return self._follow_default()
+
+    def _exec_wait_stop(self, action, step, now, duration, continue_immediately, end_after_step):
+        if duration and duration > 0:
+            self.state = self.STATE_PLAN
+            self._plan_action = "Stop"
+            self._plan_action_speed = 0
+            self._queue_step_messages(step)
+            self._plan_continue_immediate = continue_immediately
+            self._plan_force_complete = end_after_step
+            self._plan_action_until = now + duration
+            self._log_plan_step(self._plan_index, step, "timed-stop")
+            return "Stop", 0
+        if action == "WAIT":
+            duration = self._DEFAULT_WAIT_DURATION
+            self.state = self.STATE_PLAN
+            self._plan_action = "Stop"
+            self._plan_action_speed = 0
+            self._queue_step_messages(step)
+            self._plan_continue_immediate = continue_immediately
+            self._plan_force_complete = end_after_step
+            self._plan_action_until = now + duration
+            self._log_plan_step(self._plan_index, step, "wait-default")
+            return "Stop", 0
+        if self.plan_end_state == "follow":
+            self._log_info("[PLAN] Stop step reached, returning to follow")
+            return self._follow_default()
+        self._enter_stopped(reset_plan_progress=False)
+        self._log_info("[PLAN] Stop step reached, robot stopped")
+        return "Stop", 0
+
+    def _exec_follow(self, step, now, duration, continue_immediately, end_after_step):
+        if duration <= 0:
+            duration = self._DEFAULT_FOLLOW_DURATION
+        self.state = self.STATE_PLAN
+        self._plan_action = "AutoFollow"
+        self._plan_action_speed = self.base_speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = now + duration
+        self._log_plan_step(self._plan_index, step, "follow")
+        return "Forward", self.base_speed
+
+    def _exec_rotate(self, action, step, now, speed, duration, until, timeout, continue_immediately, end_after_step):
+        move_action = "RotateLeft" if action == "ROTATELEFT" else "RotateRight"
+        strict_line = self._to_bool(
+            step.get("strict_line", step.get("center_only")), False,
+        )
+        min_duration = self._to_float(
+            step.get("min_duration"), self.rotate_min_duration, "min_duration", step,
+        )
+        self.state = self.STATE_PLAN
+        self._plan_action = move_action
+        self._plan_action_speed = speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = None
+        self._plan_action_min_until = now + max(0.0, float(min_duration))
+        self._plan_action_timeout = now + timeout if timeout and timeout > 0 else None
+        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side) and (not strict_line)
+        self._plan_rotate_strict_center = bool(strict_line)
+        if duration > 0:
+            self._plan_action_until = now + duration
+            self._plan_action_until_line = False
+            self._plan_action_until_y_type = False
+            self._log_plan_step(self._plan_index, step, "rotate-duration")
+            return move_action, speed
+        if until == "y_type":
+            self._plan_action_until_line = False
+            self._plan_action_until_y_type = True
+            # Reset edge tracker so the *next* BOTTOM_TO_MID after rotation can retrigger.
+            self._y_type_cross_active = False
+            # Apply a default safety timeout if step doesn't supply one.
+            if self._plan_action_timeout is None and self.huskylens_y_type_rotate_timeout > 0:
+                self._plan_action_timeout = now + self.huskylens_y_type_rotate_timeout
+            self._log_plan_step(self._plan_index, step, "rotate-until-y_type")
+            return move_action, speed
+        self._plan_action_until_line = (until == "line") or (until == "")
+        self._plan_action_until_y_type = False
+        self._log_plan_step(self._plan_index, step, "rotate-until-line")
+        return move_action, speed
+
+    def _exec_move(self, action, step, now, speed, duration, continue_immediately, end_after_step):
+        if duration <= 0:
+            duration = self._DEFAULT_MOVE_DURATION
+        move_action = action.capitalize()
+        self.state = self.STATE_PLAN
+        self._plan_action = move_action
+        self._plan_action_speed = speed
+        self._queue_step_messages(step)
+        self._plan_continue_immediate = continue_immediately
+        self._plan_force_complete = end_after_step
+        self._plan_action_until = now + duration
+        self._log_plan_step(self._plan_index, step, "move")
+        return move_action, speed
 
     def _run_plan_action(self, frame, now):
         if self._plan_action is None:
@@ -501,56 +599,54 @@ class LineFollowerFSM:
                 if frame is None:
                     return "Forward", self.base_speed
                 return self._follow_line(frame)
-            self._plan_action = None
-            self._plan_action_speed = None
-            self._plan_action_until = None
-            self._plan_action_until_line = False
-            self._plan_action_min_until = None
-            self._plan_action_timeout = None
-            self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-            self._plan_rotate_strict_center = False
+            self._clear_plan_action_state()
             return self._after_plan_action(now)
 
         if self._plan_action_until_line:
             if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
                 self._log_warn(f"Plan rotate timeout reached: {self._plan_action}")
-                self._plan_action = None
-                self._plan_action_speed = None
+                self._clear_plan_action_state()
                 self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
                 self._plan_rotate_strict_center = False
                 return self._after_plan_action(now)
             if self._plan_action_min_until is not None and now < self._plan_action_min_until:
                 return self._plan_action, int(self._plan_action_speed)
             if frame is not None and self._is_line_reacquired(
-                frame,
-                self._plan_action,
+                frame, self._plan_action,
                 allow_side_stop=self._plan_rotate_allow_side_stop,
                 strict_center=self._plan_rotate_strict_center,
             ):
-                self._plan_action = None
-                self._plan_action_speed = None
-                self._plan_action_until_line = False
-                self._plan_action_min_until = None
-                self._plan_action_timeout = None
-                self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-                self._plan_rotate_strict_center = False
+                self._clear_plan_action_state()
+                return self._after_plan_action(now)
+            # In huskylens/hybrid tracking, the camera can detect a line ahead
+            # before the 3-zone line sensor (robot rotating over no-line floor).
+            # Accept HuskyLens line-acquired y_type as an exit signal too.
+            if self.tracking_strategy_name in ("huskylens", "hybrid"):
+                y_type = self._huskylens_y_type()
+                if y_type is not None and y_type in _Y_TYPE_LINE_ACQUIRED:
+                    self._log_info(
+                        f"===> until:line satisfied by HuskyLens y_type={y_type}"
+                    )
+                    self._clear_plan_action_state()
+                    return self._after_plan_action(now)
+            return self._plan_action, int(self._plan_action_speed)
+
+        if self._plan_action_until_y_type:
+            if self._plan_action_timeout is not None and now >= self._plan_action_timeout:
+                self._log_warn(f"Plan rotate y_type timeout reached: {self._plan_action}")
+                self._clear_plan_action_state()
+                return self._after_plan_action(now)
+            if self._plan_action_min_until is not None and now < self._plan_action_min_until:
+                return self._plan_action, int(self._plan_action_speed)
+            if self._huskylens_y_type() in _Y_TYPE_LINE_ACQUIRED:
+                self._clear_plan_action_state()
                 return self._after_plan_action(now)
             return self._plan_action, int(self._plan_action_speed)
 
         if self._plan_action_until is not None and now < self._plan_action_until:
             return self._plan_action, int(self._plan_action_speed)
 
-        # action done
-        self._plan_action = None
-        self._plan_action_speed = None
-        self._plan_action_until = None
-        self._plan_action_until_line = False
-        self._plan_action_min_until = None
-        self._plan_action_timeout = None
-        self._plan_rotate_allow_side_stop = bool(self.rotate_early_stop_on_side)
-        self._plan_rotate_strict_center = False
+        self._clear_plan_action_state()
         return self._after_plan_action(now)
 
     def _follow_default(self):
@@ -570,7 +666,14 @@ class LineFollowerFSM:
             return "Stop", 0
         # Allow immediate transition for action steps that request no-wait-cross.
         # Keep existing behavior where next AutoLine step executes immediately.
-        if self._plan_continue_immediate or self._next_action_is_autoline():
+        # Also chain time-bounded steps (Forward/duration, WAIT, STOP) so the
+        # robot doesn't sit in FOLLOWING waiting for the next cross between a
+        # rotate and a "stop and announce" step.
+        if (
+            self._plan_continue_immediate
+            or self._next_action_is_autoline()
+            or self._next_action_is_self_terminating()
+        ):
             self._plan_continue_immediate = False
             return self._start_plan_action(now)
         self._plan_continue_immediate = False
@@ -658,12 +761,12 @@ class LineFollowerFSM:
         if bool((frame_context or {}).get("line_sensor_stale", False)):
             return None
 
-        left_count = frame["left_count"]
-        mid_count = frame["mid_count"]
-        right_count = frame["right_count"]
-        left_full = frame["left_full"]
-        mid_full = frame["mid_full"]
-        right_full = frame["right_full"]
+        left_count = int(frame.get("left_count", 0) or 0)
+        mid_count = int(frame.get("mid_count", 0) or 0)
+        right_count = int(frame.get("right_count", 0) or 0)
+        left_full = bool(frame.get("left_full", False))
+        mid_full = bool(frame.get("mid_full", False))
+        right_full = bool(frame.get("right_full", False))
 
         total_black = left_count + mid_count + right_count
         if total_black > 0:
@@ -701,6 +804,19 @@ class LineFollowerFSM:
         return "Forward", self.base_speed
 
     def _compute_huskylens_command(self, frame_context):
+        """Compute a command from the normalized HuskyLens frame.
+
+        Lateral correction comes from ``tail_offset_x`` (sign of the tail offset),
+        heading correction from ``angle_deg``. Lateral takes priority over heading;
+        within each axis the deadband from config decides when to start steering.
+
+        Three smoothing layers stack to fight noisy-frame oscillation:
+          1. Deadband on each axis (lateral/heading)
+          2. Hysteresis — once turning, the value must fall *inside* deadband by
+             ``hysteresis`` extra before Forward releases.
+          3. Command hold — once a non-Forward command is issued, do not switch
+             to a *different* non-Forward command for ``command_hold_sec`` seconds.
+        """
         huskylens = (frame_context or {}).get("huskylens_frame")
         if not isinstance(huskylens, dict):
             return None
@@ -719,23 +835,124 @@ class LineFollowerFSM:
         except Exception:
             return None
 
-        # Independent control:
-        # 1) prioritize lateral correction from tail_offset_x with threshold +/-3
-        # 2) then heading correction from angle_deg with threshold +/-3
-        if tail_offset_x < -10.0:
-            self.state = self.STATE_TURN_RIGHT
-            return "Right", self.turn_speed_right
-        if tail_offset_x > 10.0:
+        # EMA smoothing to damp HuskyLens frame-to-frame noise on angle_deg
+        # / tail_offset_x. Without this the direction value bouncing ±8 deg
+        # around 0 causes RotateLeft <-> RotateRight flicker every new frame.
+        alpha = self.huskylens_smoothing_alpha
+        if alpha > 0:
+            if self._smoothed_tail_offset_x is None:
+                self._smoothed_tail_offset_x = tail_offset_x
+                self._smoothed_angle_deg = angle_deg
+            else:
+                self._smoothed_tail_offset_x = (
+                    (1.0 - alpha) * self._smoothed_tail_offset_x + alpha * tail_offset_x
+                )
+                self._smoothed_angle_deg = (
+                    (1.0 - alpha) * self._smoothed_angle_deg + alpha * angle_deg
+                )
+            tail_offset_x = self._smoothed_tail_offset_x
+            angle_deg = self._smoothed_angle_deg
+
+        def _scaled(speed):
+            return max(0, int(speed))
+
+        def _adaptive(base_turn_speed, value, deadband, full_speed_value):
+            """Linear ramp from min_speed_factor*base (just past deadband) to
+            base (when |value| >= full_speed_value). Falls back to min speed
+            when called before deadband is exceeded (shouldn't happen but
+            kept defensive)."""
+            if not self.huskylens_adaptive_speed:
+                return _scaled(base_turn_speed)
+            slow = max(1, int(round(base_turn_speed * self.huskylens_min_speed_factor)))
+            abs_val = abs(value)
+            if abs_val <= deadband:
+                return slow
+            span = max(1.0, float(full_speed_value) - float(deadband))
+            fraction = min(1.0, (abs_val - deadband) / span)
+            return max(slow, min(int(base_turn_speed),
+                                  int(round(slow + (base_turn_speed - slow) * fraction))))
+
+        lat_db = self.huskylens_lateral_deadband
+        hd_db = self.huskylens_heading_deadband
+        lat_hyst = self.huskylens_lateral_hysteresis
+        hd_hyst = self.huskylens_heading_hysteresis
+
+        prev = self._last_huskylens_action
+        # When already turning a given direction, require the offset/angle to
+        # drop INSIDE deadband by `hysteresis` extra before releasing. This
+        # widens the "stay turning" band on the active side without widening
+        # the entry threshold.
+        lat_release_left  = lat_db - lat_hyst   # tail_offset_x must drop below this to stop strafing Left
+        lat_release_right = -(lat_db - lat_hyst)  # tail_offset_x must rise above this to stop strafing Right
+        hd_release_left   = hd_db - hd_hyst
+        hd_release_right  = -(hd_db - hd_hyst)
+
+        # Decide raw command (lateral first, then heading, else forward).
+        if prev == "Left" and tail_offset_x > lat_release_left:
+            raw = "Left"
+        elif prev == "Right" and tail_offset_x < lat_release_right:
+            raw = "Right"
+        elif tail_offset_x > lat_db:
+            raw = "Left"
+        elif tail_offset_x < -lat_db:
+            raw = "Right"
+        elif prev == "RotateLeft" and angle_deg > hd_release_left:
+            raw = "RotateLeft"
+        elif prev == "RotateRight" and angle_deg < hd_release_right:
+            raw = "RotateRight"
+        elif angle_deg > hd_db:
+            raw = "RotateLeft"
+        elif angle_deg < -hd_db:
+            raw = "RotateRight"
+        else:
+            raw = "Forward"
+
+        # Command hold: once a non-Forward command is active, block switches to
+        # a *different* non-Forward command for command_hold_sec. Switching to
+        # Forward is always allowed (we want to settle on the line, not flick
+        # between turn directions).
+        now = time.time()
+        hold = self.huskylens_command_hold_sec
+        if (
+            prev is not None
+            and prev != "Forward"
+            and raw != "Forward"
+            and raw != prev
+            and (now - self._last_huskylens_action_ts) < hold
+        ):
+            raw = prev
+
+        # Latch + state mapping.
+        if raw != prev:
+            self._last_huskylens_action_ts = now
+        self._last_huskylens_action = raw
+
+        if raw == "Left":
             self.state = self.STATE_TURN_LEFT
-            return "Left", self.turn_speed_left
-        if angle_deg < -3.0:
+            return "Left", _adaptive(
+                self.turn_speed_left, tail_offset_x, lat_db,
+                self.huskylens_lateral_full_speed_offset,
+            )
+        if raw == "Right":
             self.state = self.STATE_TURN_RIGHT
-            return "RotateRight", self.turn_speed_right
-        if angle_deg > 3.0:
+            return "Right", _adaptive(
+                self.turn_speed_right, tail_offset_x, lat_db,
+                self.huskylens_lateral_full_speed_offset,
+            )
+        if raw == "RotateLeft":
             self.state = self.STATE_TURN_LEFT
-            return "RotateLeft", self.turn_speed_left
+            return "RotateLeft", _adaptive(
+                self.turn_speed_left, angle_deg, hd_db,
+                self.huskylens_heading_full_speed_angle,
+            )
+        if raw == "RotateRight":
+            self.state = self.STATE_TURN_RIGHT
+            return "RotateRight", _adaptive(
+                self.turn_speed_right, angle_deg, hd_db,
+                self.huskylens_heading_full_speed_angle,
+            )
         self.state = self.STATE_FOLLOWING
-        return "Forward", self.base_speed
+        return "Forward", _scaled(self.base_speed)
 
     def _log_info(self, msg, event="INFO"):
         if self._logger:
@@ -788,11 +1005,6 @@ class LineFollowerFSM:
     def set_tracking_context(self, frame_context):
         self._tracking_context = frame_context if isinstance(frame_context, dict) else {}
 
-    def set_huskylens_frame(self, frame):
-        if not isinstance(self._tracking_context, dict):
-            self._tracking_context = {}
-        self._tracking_context["huskylens_frame"] = frame if isinstance(frame, dict) else None
-
     def _resolve_tracking_strategy(self, strategy_name):
         normalized = str(strategy_name or "line_sensor").strip().lower()
         if normalized == "huskylens":
@@ -821,7 +1033,11 @@ class LineFollowerFSM:
 
     def _should_skip_cross_pre(self):
         """Skip pre-forward phase when next actionable step is rotate for immediate turn."""
-        if self._autoline_mode:
+        # Operator override: in autoline mode, when configured to skip, jump
+        # straight from cross_event to the plan's rotate without the forward
+        # nudge / stop phases.
+        force_skip_in_autoline = bool(self.cross_pre_skip_in_autoline) and self._autoline_mode
+        if self._autoline_mode and not force_skip_in_autoline:
             return False
         idx = self._plan_index
         guard = 0
@@ -835,6 +1051,120 @@ class LineFollowerFSM:
             if action in ("LABEL", "GOTO"):
                 continue
             return action in ("ROTATELEFT", "ROTATERIGHT")
+        return False
+
+    def _next_rotate_uses_y_type(self):
+        """Return True when the next actionable plan step is a rotate-until-line/y_type.
+
+        Both `until: line` and `until: y_type` qualify: in huskylens/hybrid mode
+        the `until: line` branch also exits on HuskyLens line-acquired y_type
+        (see _plan_action_until_line handler), so both step kinds need the
+        upstream cross_pre trigger to fire when y_type signals an approaching
+        cross.
+        """
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL", "GOTO"):
+                continue
+            if action not in ("ROTATELEFT", "ROTATERIGHT"):
+                return False
+            until = str(step.get("until", "") or "").strip().lower()
+            return until in ("y_type", "line", "")
+        return False
+
+    def _huskylens_y_type(self):
+        ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
+        if bool(ctx.get("huskylens_stale", False)):
+            return None
+        huskylens = ctx.get("huskylens_frame")
+        if not isinstance(huskylens, dict):
+            return None
+        if not (
+            bool(huskylens.get("connected", 0))
+            and bool(huskylens.get("algorithm_set", 0))
+            and bool(huskylens.get("valid", 0))
+        ):
+            return None
+        try:
+            return int(huskylens.get("y_type", 0))
+        except Exception:
+            return None
+
+    def _huskylens_line_length(self):
+        """Return the latest HuskyLens line_length_y, or 0 if frame unusable."""
+        ctx = self._tracking_context if isinstance(self._tracking_context, dict) else {}
+        if bool(ctx.get("huskylens_stale", False)):
+            return 0
+        huskylens = ctx.get("huskylens_frame")
+        if not isinstance(huskylens, dict):
+            return 0
+        try:
+            return int(huskylens.get("line_length_y", 0))
+        except Exception:
+            return 0
+
+    def _update_cross_sequence(self, now):
+        """Cross detector based on the LONG -> SHORT line_length_y collapse.
+
+        Phase 0 (idle): waiting.
+        Phase 1: saw y_type in {BOT_TO_TOP, MID_TO_TOP} with line_length_y
+                 > cross_seq_long_length. Robot is on a straight, line ahead
+                 visible far. Stays in phase 1 as long as the line remains long.
+        Phase 2: y_type in {MID_TO_TOP, BOT_TO_MID} with line_length_y
+                 < cross_seq_short_length. Line ahead collapsed -- this is the
+                 cross signature. CROSS DETECTED, return True.
+
+        Resets to phase 0 if cross_seq_timeout seconds pass without any update.
+        """
+        y_type = self._huskylens_y_type()
+        if y_type is None:
+            return False
+        length = self._huskylens_line_length()
+
+        # Timeout reset.
+        if (
+            self._cross_seq_phase > 0
+            and self.cross_seq_timeout > 0
+            and (now - self._cross_seq_last_ts) > self.cross_seq_timeout
+        ):
+            self._log_info(
+                f"===> Cross seq timeout in phase {self._cross_seq_phase}, reset"
+            )
+            self._cross_seq_phase = 0
+
+        is_forward_line = y_type in (Y_TYPE_BOTTOM_TO_TOP, Y_TYPE_MID_TO_TOP)
+        is_approach    = y_type in (Y_TYPE_MID_TO_TOP, Y_TYPE_BOTTOM_TO_MID)
+
+        if self._cross_seq_phase == 0:
+            if is_forward_line and length > self.cross_seq_long_length:
+                self._cross_seq_phase = 1
+                self._cross_seq_last_ts = now
+                self._log_info(
+                    f"===> Cross seq phase 1: long line (y_type={y_type} len={length})"
+                )
+            return False
+
+        # phase 1: watching for collapse
+        if is_forward_line and length > self.cross_seq_long_length:
+            self._cross_seq_last_ts = now   # still long, refresh timestamp
+            return False
+
+        if is_approach and length < self.cross_seq_short_length:
+            self._log_info(
+                f"===> Cross seq phase 2: short line (y_type={y_type} len={length}) "
+                f"-> CROSS DETECTED"
+            )
+            self._cross_seq_phase = 0
+            return True
+
+        # In-between: keep phase 1 but don't refresh timestamp aggressively
         return False
 
     def _next_action_is_autoline(self):
@@ -856,6 +1186,40 @@ class LineFollowerFSM:
                 idx = target
                 continue
             return action == "AUTOLINE"
+        return False
+
+    def _next_action_is_self_terminating(self):
+        """True if the next actionable step is a time-bounded action that does
+        NOT need a cross trigger to start (Forward/Backward/Left/Right with
+        duration, or WAIT/STOP). Such steps should be chained automatically
+        after the previous step finishes, instead of falling back to
+        FOLLOWING and waiting for the next cross."""
+        idx = self._plan_index
+        guard = 0
+        while idx < len(self.cross_plan) and guard < len(self.cross_plan):
+            guard += 1
+            step = self.cross_plan[idx]
+            idx += 1
+            if not isinstance(step, dict):
+                continue
+            action = self._normalize_action(step.get("action", "Stop"))
+            if action in ("LABEL",):
+                continue
+            if action == "GOTO":
+                target = self._resolve_goto_target(step.get("target"))
+                if target is None:
+                    continue
+                idx = target
+                continue
+            if action in ("WAIT", "STOP"):
+                return True
+            if action in ("FORWARD", "BACKWARD", "LEFT", "RIGHT"):
+                # Need a positive duration to be time-bounded.
+                try:
+                    return float(step.get("duration", 0.0)) > 0
+                except Exception:
+                    return False
+            return False
         return False
 
     def _has_pending_plan(self):
@@ -936,12 +1300,14 @@ class LineFollowerFSM:
         action = step.get("action", "Stop")
         speed = step.get("speed", self.base_speed)
         duration = step.get("duration")
+        min_duration = step.get("min_duration")
         until = step.get("until")
         timeout = step.get("timeout")
         total = len(self.cross_plan)
         self._log_info(
             f"[PLAN] Step {step_index_1_based}/{total}: action={action}, mode={mode}, "
-            f"speed={speed}, duration={duration}, until={until}, timeout={timeout}"
+            f"speed={speed}, duration={duration}, min_duration={min_duration}, "
+            f"until={until}, timeout={timeout}"
         )
 
     def _to_int(self, raw, default, field_name, step):
@@ -967,18 +1333,7 @@ class LineFollowerFSM:
             return default
 
     def _to_bool(self, raw, default):
-        if raw is None:
-            return bool(default)
-        if isinstance(raw, bool):
-            return raw
-        if isinstance(raw, (int, float)):
-            return bool(raw)
-        text = str(raw).strip().lower()
-        if text in {"1", "true", "yes", "on", "enable", "enabled"}:
-            return True
-        if text in {"0", "false", "no", "off", "disable", "disabled"}:
-            return False
-        return bool(default)
+        return to_bool(raw, default)
 
     def _queue_step_messages(self, step):
         raw = step.get("messages")

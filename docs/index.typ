@@ -149,7 +149,7 @@
   #inline("Bước 5 - Thử tuyến điều khiển end-to-end")
   ```bash
   ros2 topic pub --once /pick_robot std_msgs/String "{data: '1'}"
-  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a20'}"
+  ros2 topic pub --once /plan_select std_msgs/String "{data: 'a19'}"
   ros2 topic echo /motor_cmd
   ```
 ]

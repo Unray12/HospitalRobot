@@ -18,7 +18,7 @@
   - Publish:
     `/face/camera` (`std_msgs/String`)
   - Output format chuẩn:
-    `<DEV1,FACE,0|1>` hoặc `<DEV1,NO_OBJECT>`
+    `<DEV1,FACE,0>`, `<DEV1,FACE,1>`, `<DEV1,FACE,1,2,3>` hoặc `<DEV1,NO_OBJECT>`
   - Input format chấp nhận:
     chuỗi biến thể có/không có dấu `< >`, có ký tự nhiễu, có lỗi chính tả nhẹ.
 
@@ -26,7 +26,7 @@
   - Section:
     `robot_common/robot_common/config.json -> camera_sensor`
   - Serial:
-    `port=/dev/ttyACM0`, `baudrate=115200`, `timeout=0.2`
+    `port=/dev/ttyACM2`, `baudrate=9600`, `timeout=0.2`
   - Reconnect:
     `reconnect_period_sec=2.0`
   - Topic:
@@ -47,6 +47,7 @@
   - Chuẩn hoá state token:
     `FACE` hoặc biến thể lỗi chính tả -> `FACE`,
     `NO_OBJECT` và biến thể -> `NO_OBJECT`.
+  - Với `FACE`, parser giữ nhiều ID nếu firmware gửi dạng `1;2;3` và normalize thành `1,2,3`.
   - Nếu payload lỗi định dạng:
     drop frame và log warning định kỳ.
 

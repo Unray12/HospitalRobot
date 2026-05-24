@@ -23,13 +23,13 @@
   - Subscribe:
     `/debug_logs_toggle` (`std_msgs/Bool`)
   - Internal source payload kỳ vọng:
-    JSON có key `LineSensor`, với 3 cụm địa chỉ `0x25`, `0x24`, `0x23`.
+    JSON có key `LineSensor`, với 3 cụm địa chỉ `0x25` = left, `0x24` = middle, `0x23` = right.
 
   #inline("Configuration (current defaults)")
   - Section:
     `robot_common/robot_common/config.json -> line_sensors`
   - Serial:
-    `port=/dev/ttyACM1`, `baudrate=115200`, `timeout=0.1`
+    `port=/dev/ttyACM0`, `baudrate=115200`, `timeout=0.1`
   - Reconnect:
     `reconnect_period_sec=2.0`,
     fallback `[/dev/ttyACM1, /dev/ttyACM0]`

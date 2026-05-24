@@ -1,4 +1,4 @@
-from line_follower.line_follower.line_follower import LineFollowerFSM
+from line_follower.line_follower import LineFollowerFSM
 
 
 def _frame(left_count, mid_count, right_count, left_full=False, mid_full=False, right_full=False):
@@ -71,10 +71,12 @@ def test_rotate_until_line_timeout_moves_next_step():
     )
     fsm.update(_frame(1, 1, 1, True, True, True), now=0.0)
     fsm.update(_frame(1, 1, 1, True, True, True), now=3.2)
+    # After timeout returns to following.  Right-bias frame triggers RotateRight
+    # from normal line-following (speed = turn_speed_right, default = base_speed).
     out = fsm.update(_frame(0, 1, 3, False, False, False), now=4.3)
-    assert out == ("RotateRight", 6)
+    assert out == ("RotateRight", 8)
     out = fsm.update(_frame(0, 1, 3, False, False, False), now=4.7)
-    assert out == ("Forward", 8)
+    assert out == ("RotateRight", 8)
 
 
 def test_plan_goto_label():
@@ -92,3 +94,37 @@ def test_plan_goto_label():
     fsm.update(_frame(1, 1, 1, True, True, True), now=3.2)
     out = fsm.update(_frame(0, 2, 0, False, True, False), now=4.3)
     assert out == ("Stop", 0)
+
+
+def test_handle_cross_pre_recovers_from_invalid_phase():
+    """Defensive guard: an unexpected _cross_pre_phase must not return None forever."""
+    fsm = LineFollowerFSM(
+        cross_plan=[{"action": "RotateLeft", "until": "line"}, {"action": "Stop"}],
+        cross_pre_forward_duration=1.0,
+        cross_pre_stop_duration=0.5,
+    )
+    fsm.state = LineFollowerFSM.STATE_CROSS_PRE
+    fsm._cross_pre_phase = 99   # invalid
+    fsm._cross_pre_until = 0.0
+
+    result = fsm.update(None, now=10.0)
+
+    assert result is not None
+    assert fsm._cross_pre_phase == 0
+
+
+def test_handle_cross_pre_recovers_when_until_is_none():
+    """If _cross_pre_until is None on entry, we re-arm phase 0 forward."""
+    fsm = LineFollowerFSM(
+        cross_plan=[{"action": "Stop"}],
+        cross_pre_forward_speed=4,
+        cross_pre_forward_duration=2.0,
+    )
+    fsm.state = LineFollowerFSM.STATE_CROSS_PRE
+    fsm._cross_pre_phase = 0
+    fsm._cross_pre_until = None
+
+    direction, speed = fsm.update(None, now=0.0)
+    assert direction == "Forward"
+    assert speed == 4
+    assert fsm._cross_pre_until is not None

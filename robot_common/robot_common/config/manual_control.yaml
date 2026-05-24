@@ -1,0 +1,39 @@
+# =============================================================================
+# manual_control — operator VR/keyboard control + auto-mode sync
+# =============================================================================
+# Đọc bởi: manual_control/manual_control/manual_control_node.py
+# Xem thêm: docs/03-end-to-end-flow.md §3 (Manual control flow)
+#
+# Node này nhận lệnh từ VR app hoặc keyboard (qua mqtt_bridge) và:
+#   1. Publish /motor_cmd trực tiếp khi manual_override
+#   2. Publish /auto_mode + gọi /set_auto_mode khi toggle auto
+# AutoModeSync đảm bảo service call được retry đến khi line_follower nhận.
+# =============================================================================
+
+# Tốc độ mặc định khi operator gửi lệnh không kèm speed.
+# Cao hơn line_follower.base_speed (8) để operator cảm nhận responsive.
+base_speed: 10
+
+# Nếu true: khi operator gửi lệnh tay (VR_control) TRONG KHI robot đang
+# auto mode, manual_control sẽ TẮT auto mode trước rồi execute lệnh.
+# Nếu false: lệnh tay bị bỏ qua khi đang auto — operator không thể override.
+manual_override_on_input: true
+
+topics:
+  # Input: lệnh điều khiển tay từ mqtt_bridge hoặc app ("Forward", "Stop", ...)
+  vr_control: /VR_control
+
+  # Input: bật/tắt auto mode ("1" / "0" string)
+  pick_robot: /pick_robot
+
+  # Output: lệnh motor sau khi format ("Direction:Speed")
+  cmd_vel: /motor_cmd
+
+  # Output: trạng thái auto mode (Bool)
+  auto_mode: /auto_mode
+
+service:
+  # Service đến line_follower để sync auto mode.
+  # manual_control dùng AutoModeSync để retry nếu service chưa ready
+  # (30 lần × 200ms ≈ 6s timeout trước khi give_up).
+  set_auto_mode: /set_auto_mode

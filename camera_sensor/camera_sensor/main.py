@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-import re
+"""ROS2 node parse envelope camera (Device Protocol v1) -> <DEV1,FACE,...> string.
+
+Firmware schema (xem `docs/20-device-protocol.md`):
+  {"dev_id":"hrbot_camera","event":"boot","payload":{"fw":"camera","ver":1}}
+  {"dev_id":"hrbot_camera","event":"data","payload":{"kind":"face","ids":[1,2]}}
+  {"dev_id":"hrbot_camera","event":"data","payload":{"kind":"no_object"}}
+  {"dev_id":"hrbot_camera","event":"info","payload":{"msg":"..."}}
+  {"dev_id":"hrbot_camera","event":"error","payload":{"code":"..."}}
+
+Downstream (mqtt_bridge, speaker) dùng String "<DEV1,FACE,1>" qua /face/camera, node
+này dịch envelope -> string để consumer không phải đổi.
+"""
 
 import rclpy
 from rclpy.node import Node
@@ -8,9 +19,14 @@ from std_msgs.msg import String
 from .camera_sensor_reader import CameraSensorReader
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
+from robot_common.device_protocol import parse_envelope, is_silent_error
+
+DEV_ID = "hrbot_camera"
+DOWNSTREAM_DEV = "DEV1"
 
 
 class CameraSensorNode(Node):
+    """Publish normalized face/no-object events from the camera serial reader."""
     def __init__(self):
         super().__init__("camera_sensor")
         self.log = LogAdapter(self.get_logger(), "camera_sensor")
@@ -23,7 +39,11 @@ class CameraSensorNode(Node):
         baudrate = int(serial_cfg.get("baudrate", 115200))
         read_timeout = float(serial_cfg.get("timeout", 0.2))
         topic = str(pub_cfg.get("topic", "/face/camera"))
-        rate_hz = float(pub_cfg.get("rate_hz", 30.0))
+        # Firmware emits at 10Hz (LOOP_DELAY_MS=100 in device_code/main.py).
+        # Polling much faster just wastes CPU on empty ticks. Default to 15Hz
+        # so we still catch each frame with a little jitter headroom; override
+        # via `publish.rate_hz` if firmware loop rate changes.
+        rate_hz = float(pub_cfg.get("rate_hz", 15.0))
 
         self.reconnect_period_sec = float(
             config.get("reconnect_period_sec", serial_cfg.get("reconnect_period_sec", 2.0))
@@ -31,7 +51,12 @@ class CameraSensorNode(Node):
         self.fallback_ports = config.get("fallback_ports", ["/dev/ttyACM1", "/dev/ttyACM0"])
         self.scan_prefixes = config.get("scan_prefixes", ["/dev/ttyACM", "/dev/ttyUSB", "COM"])
         self.malformed_log_every = int(max(1, config.get("malformed_log_every", 20)))
+        self.status_log_period = float(max(0.1, config.get("status_log_period", 2.0)))
         self._drop_count = 0
+        self._last_kind = None
+        self._last_ids = None
+        self._frames_since_log = 0
+        self._last_status_log_ts = 0.0
 
         self.reader = CameraSensorReader(
             port=port,
@@ -56,12 +81,36 @@ class CameraSensorNode(Node):
 
         normalized = self._normalize_face_payload(line)
         if normalized is None:
-            self._drop_count += 1
-            if self._drop_count % self.malformed_log_every == 1:
-                self.log.warning(f"Dropped malformed camera frame: {line}", event="FRAME")
-            return
+            return  # parse_envelope đã chia silent skip vs warning
 
         self.pub.publish(String(data=normalized))
+        self._frames_since_log += 1
+        self._log_status(normalized)
+
+    def _log_status(self, normalized):
+        # Parse "<DEV1,FACE,1,2>" hoặc "<DEV1,NO_OBJECT>" cho status.
+        inner = normalized.strip("<>")
+        parts = inner.split(",") if inner else []
+        kind = parts[1] if len(parts) >= 2 else "?"
+        ids = parts[2:] if len(parts) > 2 else []
+
+        now = self.get_clock().now().nanoseconds / 1e9
+        changed = (kind != self._last_kind) or (ids != self._last_ids)
+        periodic = (now - self._last_status_log_ts) >= self.status_log_period
+        if not changed and not periodic:
+            return
+        self._last_kind = kind
+        self._last_ids = ids
+        self._last_status_log_ts = now
+
+        self.log.info(
+            "Camera frame status",
+            event="STATUS",
+            kind=kind,
+            ids=",".join(ids) if ids else "-",
+            frames=self._frames_since_log,
+        )
+        self._frames_since_log = 0
 
     def _reconnect_cb(self):
         if self.reader.is_connected():
@@ -73,81 +122,30 @@ class CameraSensorNode(Node):
             self.log.info("Camera serial reconnected", event="SERIAL")
 
     def _normalize_face_payload(self, raw):
-        text = (raw or "").strip()
-        if not text:
+        """Parse 1 envelope -> string downstream hoặc None (skip silently)."""
+        envelope, err = parse_envelope(raw, expected_dev_id=DEV_ID)
+        if envelope is None:
+            if is_silent_error(err):
+                return None
+            self._drop_count += 1
+            if self._drop_count % self.malformed_log_every == 1:
+                self.log.warning(f"Dropped malformed camera frame ({err}): {raw}", event="FRAME")
+            return None
+        if not envelope.is_data():
+            # boot/info/error — bỏ qua thầm lặng.
             return None
 
-        text = text.upper().replace(" ", "")
-        text = text.replace("Ư", "")
-
-        if "<" in text and ">" in text:
-            start = text.find("<")
-            end = text.find(">", start + 1)
-            if end > start:
-                text = text[start + 1:end]
-        text = text.strip("<>")
-        text = re.sub(r"[^A-Z0-9_,]", "", text)
-        if not text:
-            return None
-
-        parts = [p for p in text.split(",") if p]
-        if len(parts) == 2:
-            m = re.match(
-                r"^(DEV1|DEV|DV1|EV1|D1|V1|DV|EV)(FACE|ACE|NO_OBJECT|NOOBJECT|NO_OBECT|NO_BJECT|O_OBJECT)$",
-                parts[0],
-            )
-            if m:
-                parts = [m.group(1), m.group(2), parts[1]]
-        if len(parts) < 2:
-            return None
-
-        dev_raw = parts[0]
-        state_raw = parts[1]
-        rest = ",".join(parts[2:]) if len(parts) > 2 else ""
-
-        dev = self._normalize_device(dev_raw)
-        state = self._normalize_state(state_raw)
-        if dev is None or state is None:
-            return None
-
-        if state == "NO_OBJECT":
-            return f"<{dev},NO_OBJECT>"
-
-        face_id = self._extract_face_id(rest)
-        return f"<{dev},FACE,{face_id}>"
-
-    def _normalize_device(self, token):
-        t = (token or "").strip()
-        if not t:
-            return None
-        if t.startswith("DEV") and len(t) > 3 and t[3:].isdigit():
-            return t
-        if t in {"DEV", "DV1", "EV1", "D1", "V1", "DV", "EV", "DEV1"}:
-            return "DEV1"
-        if any(ch in t for ch in "DEV") and "1" in t:
-            return "DEV1"
+        kind = envelope.payload.get("kind")
+        if kind == "face":
+            ids_raw = envelope.payload.get("ids") or []
+            if not isinstance(ids_raw, list):
+                return None
+            ids = [int(i) for i in ids_raw if isinstance(i, (int, float))]
+            ids_str = ",".join(str(i) for i in ids) if ids else "0"
+            return f"<{DOWNSTREAM_DEV},FACE,{ids_str}>"
+        if kind == "no_object":
+            return f"<{DOWNSTREAM_DEV},NO_OBJECT>"
         return None
-
-    def _normalize_state(self, token):
-        t = (token or "").strip()
-        if not t:
-            return None
-        if "FACE" in t or t == "ACE":
-            return "FACE"
-        if (
-            t in {"NO_OBJECT", "NOOBJECT", "NO_OBECT", "NO_BJECT", "O_OBJECT"}
-            or ("NO" in t and "OBJECT" in t)
-        ):
-            return "NO_OBJECT"
-        return None
-
-    def _extract_face_id(self, token):
-        if not token:
-            return 0
-        m = re.search(r"\d+", token)
-        if not m:
-            return 0
-        return int(m.group(0))
 
     def destroy_node(self):
         self.reader.close()

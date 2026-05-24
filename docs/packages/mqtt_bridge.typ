@@ -22,11 +22,13 @@
   - ROS subscribe -> MQTT publish:
     `/face/camera -> face/camera`,
     `/plan_status -> plan_status`,
-    `/plan_message -> plan_message`
+    `/plan_message -> plan_message`,
+    `/huskylens/frame -> huskylens/frame`,
+    `/huskylens/valid -> huskylens/valid`
   - Plan command format (recommended):
-    `room:a20..a15` hoặc `room:1..6`, `room:0` hoặc `clear` để clear plan.
+    `room:a19..a15` hoặc `room:1..5`, `room:0` hoặc `clear` để clear plan.
   - Backward compatible plan command:
-    `1..6`, `phong:*`, `plan:*`, direct plan name.
+    `1..5`, `phong:*`, `plan:*`, direct plan name.
 
   #inline("Configuration (current defaults)")
   - Section:
@@ -51,7 +53,7 @@
   - Mode/debug:
     `k` toggle auto, `e` toggle debug logs
   - Plan hotkeys:
-    `1..6` select room-plan, `0` clear
+    `1..5` select room-plan, `0` clear
   - Quit:
     `q`
 

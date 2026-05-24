@@ -1,0 +1,43 @@
+# =============================================================================
+# line_sensors — ESP32 line sensor driver (3 zone, 12 channels I2C)
+# =============================================================================
+# Đọc bởi: line_sensors/line_sensors/line_sensor_driver_node.py
+# Xem thêm: docs/02-project-flow.md §3 (Line sensor flow)
+#
+# Phần cứng: ESP32 (hrbot_line) đọc 3 sensor module qua I2C:
+#   0x25 = left   (4 channels s1-s4)
+#   0x24 = middle (4 channels s1-s4)
+#   0x23 = right  (4 channels s1-s4)
+# Publish: /line_sensors/frame [left_count, mid_count, right_count,
+#                                left_full, mid_full, right_full]
+# =============================================================================
+
+serial:
+  port: /dev/hospitalrobot/line
+  baudrate: 115200
+  # Timeout thấp vì firmware emit 10 Hz — 0.1s đủ capture 1 frame per poll.
+  timeout: 0.1
+
+filter:
+  # Nếu frame toàn zero (mất line thoáng qua), giữ frame non-zero gần nhất
+  # trong zero_hold_sec để chống nhiễu/bounce của line sensor.
+  zero_hold_sec: 0.15
+
+  # Phải có ít nhất zero_min_streak frame zero liên tiếp mới thực sự
+  # publish zero — tránh spike 1 frame ảnh hưởng FSM.
+  zero_min_streak: 3
+
+publish:
+  topic: /line_sensors/frame
+
+  # 100 Hz để line_follower FSM có frame mới mỗi timer tick (10ms).
+  # Firmware emit 10 Hz nên mỗi ROS tick đọc cùng frame từ OS buffer.
+  rate_hz: 100
+
+topics:
+  # Subscribe topic này để bật/tắt debug log runtime (không restart node).
+  debug_toggle: /debug_logs_toggle
+
+reconnect_period_sec: 2.0
+fallback_ports: []
+scan_prefixes: []

@@ -1,28 +1,38 @@
+"""ROS2 node that coordinates autonomous tracking, plans, and motor commands."""
+
 import json
 import time
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int16MultiArray, Bool, String
+from std_msgs.msg import Bool, Int16MultiArray, String
 from std_srvs.srv import SetBool
 
 from .line_follower import LineFollowerFSM
 from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
-from robot_common.logging_utils import LogAdapter
+from robot_common.logging_utils import LogAdapter, to_bool
 
 
 class LineFollowerNode(Node):
+    """Bridge ROS topics/services into the line-following finite-state machine."""
+
     def __init__(self):
+        """Create publishers, subscriptions, timers, and the FSM from shared config."""
         super().__init__("line_follower")
         self.log = LogAdapter(self.get_logger(), "line_follower")
 
         config = ConfigManager("line_follower", logger=self.log).load()
+        plan_mapping = ConfigManager("robot_common", "plan_mapping.yaml", logger=self.log).load()
+        self._cfg_mgr = ConfigManager("line_follower", logger=self.log)
         topics_cfg = config.get("topics", {})
         service_cfg = config.get("service", {})
         tracking_cfg = config.get("tracking", {})
         huskylens_cfg = config.get("huskylens", {})
-        self.plan_alias = config.get("plan_alias", {})
+        # Centralized digit→plan mapping lives in robot_common/plan_mapping.yaml.
+        # Local plan_alias key in line_follower.yaml kept as backwards-compatible
+        # fallback for installs that haven't synced robot_common yet.
+        self.plan_alias = plan_mapping.get("plan_keys", config.get("plan_alias", {}))
         self.auto_on_plan_select_default = bool(config.get("auto_on_plan_select", True))
         self.tracking_strategy = str(tracking_cfg.get("strategy", "line_sensor")).strip().lower() or "line_sensor"
         if self.tracking_strategy not in {"line_sensor", "huskylens", "hybrid"}:
@@ -52,20 +62,27 @@ class LineFollowerNode(Node):
         self._last_frame_ts = 0.0
         self._last_huskylens_frame = None
         self._last_huskylens_ts = 0.0
+        self._last_huskylens_log_key = None   # (valid, y_type, line_length_bucket) for change detection
         self._last_plan_name = None
         self._last_plan_ts = 0.0
         self._active_plan_name = None
         self._last_plan_status_text = None
         self._last_plan_status_log_ts = 0.0
-        self.plan_status_log_period = float(config.get("plan_status_log_period", 0.8))
+        # Reduced from 0.8 -> 5.0 to cut noise: PLAN_STATUS still logs on change,
+        # this period only governs the periodic heartbeat when nothing changes.
+        self.plan_status_log_period = float(config.get("plan_status_log_period", 5.0))
         self._active_plan_autoline = None
         self._plan_completion_reported = False
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.log)
+        cfg_mgr = self._cfg_mgr
         plan_name = config.get("cross_plan_name")
-        plan_data = cfg_mgr.load_plan(plan_name, force=True) if plan_name else None
+        plan_data = cfg_mgr.load_plan(plan_name) if plan_name else None
         plan_steps = plan_data.get("steps", []) if plan_data else config.get("cross_plan", [])
-        plan_end_state = plan_data.get("end_state", config.get("plan_end_state", "stop")) if plan_data else config.get("plan_end_state", "stop")
+        plan_end_state = (
+            plan_data.get("end_state", config.get("plan_end_state", "stop"))
+            if plan_data
+            else config.get("plan_end_state", "stop")
+        )
 
         self.follower = LineFollowerFSM(
             base_speed=self.base_speed,
@@ -88,9 +105,21 @@ class LineFollowerNode(Node):
             tracking_strict_mode=self.tracking_strict_mode,
             tracking_log_invalid_period=self.tracking_log_invalid_period,
             tracking_allow_line_sensor_fallback=not self.tracking_only_huskylens,
-            huskylens_max_abs_error=huskylens_cfg.get("max_abs_error", 120),
-            huskylens_control_gain=huskylens_cfg.get("control_gain", 1.0),
-            huskylens_deadband=huskylens_cfg.get("deadband", 1.0),
+            huskylens_lateral_deadband=huskylens_cfg.get("lateral_deadband", 10.0),
+            huskylens_heading_deadband=huskylens_cfg.get("heading_deadband", 3.0),
+            huskylens_y_type_rotate_timeout=huskylens_cfg.get("y_type_rotate_timeout", 5.0),
+            huskylens_lateral_hysteresis=huskylens_cfg.get("lateral_hysteresis", 6.0),
+            huskylens_heading_hysteresis=huskylens_cfg.get("heading_hysteresis", 3.0),
+            huskylens_command_hold_sec=huskylens_cfg.get("command_hold_sec", 0.20),
+            huskylens_smoothing_alpha=float(huskylens_cfg.get("smoothing_alpha", 0.4)),
+            huskylens_adaptive_speed=bool(huskylens_cfg.get("adaptive_speed", True)),
+            huskylens_min_speed_factor=float(huskylens_cfg.get("min_speed_factor", 0.45)),
+            huskylens_lateral_full_speed_offset=float(huskylens_cfg.get("lateral_full_speed_offset", 80.0)),
+            huskylens_heading_full_speed_angle=float(huskylens_cfg.get("heading_full_speed_angle", 40.0)),
+            cross_pre_skip_in_autoline=bool(config.get("cross_pre_skip_in_autoline", True)),
+            cross_seq_long_length=int(huskylens_cfg.get("cross_seq_long_length", 150)),
+            cross_seq_short_length=int(huskylens_cfg.get("cross_seq_short_length", 75)),
+            cross_seq_timeout=float(huskylens_cfg.get("cross_seq_timeout", 8.0)),
             logger=self.log,
         )
         if plan_name:
@@ -118,11 +147,35 @@ class LineFollowerNode(Node):
             self.log.info("Line sensor input disabled (only_huskylens=true)", event="LINE_SENSOR")
         self.create_subscription(Bool, auto_topic, self._auto_cb, 10)
         self.create_subscription(String, plan_topic, self._plan_cb, 10)
-        self._subscribe_huskylens = (
-            self.huskylens_enabled
-            or self.tracking_strategy in {"huskylens", "hybrid"}
-            or (self.tracking_strategy == "line_sensor" and not self.huskylens_fallback_on_invalid)
-        )
+
+        self._subscribe_huskylens = self.huskylens_enabled or self.tracking_strategy in {"huskylens", "hybrid"}
+        self._line_sensor_fallback_enabled = (not self.tracking_only_huskylens) and self.huskylens_fallback_on_invalid
+        if self.tracking_strategy in {"huskylens", "hybrid"}:
+            self.log.info(
+                (
+                    f"HuskyLens fallback to line sensor={'on' if self._line_sensor_fallback_enabled else 'off'} "
+                    f"(strict_mode={int(self.tracking_strict_mode)})"
+                ),
+                event="FALLBACK",
+            )
+        elif self.huskylens_fallback_on_invalid and self.tracking_only_huskylens:
+            self.log.warning(
+                "fallback_on_invalid=true has no effect while only_huskylens=true",
+                event="FALLBACK",
+            )
+        elif self.huskylens_fallback_on_invalid and not self.huskylens_enabled:
+            self.log.warning(
+                "fallback_on_invalid=true but HuskyLens input is disabled by config/strategy",
+                event="FALLBACK",
+            )
+        if self.tracking_strategy == "line_sensor" and self.huskylens_enabled:
+            self.log.info(
+                "HuskyLens subscription kept only for observability; tracking strategy remains line_sensor",
+                event="HUSKYLENS",
+            )
+
+        self.follower.tracking_allow_line_sensor_fallback = self._line_sensor_fallback_enabled
+
         if self._subscribe_huskylens:
             self.create_subscription(String, self.huskylens_topic_frame, self._huskylens_cb, 10)
             self.log.info(f"HuskyLens input enabled: {self.huskylens_topic_frame}", event="HUSKYLENS")
@@ -173,14 +226,31 @@ class LineFollowerNode(Node):
                 self._last_huskylens_ts = time.time()
                 return
             self._last_huskylens_frame = {
-                "connected": int(sensor.get("connected", 0)),
+                "connected":     int(sensor.get("connected", 0)),
                 "algorithm_set": int(sensor.get("algorithm_set", 0)),
-                "valid": int(sensor.get("valid", 0)),
-                "tail_offset_x": float(sensor.get("tail_offset_x")),
-                "angle_deg": float(sensor.get("angle_deg")),
-                "direction": int(sensor.get("direction", 0)),
+                "valid":         int(sensor.get("valid", 0)),
+                "tail_offset_x": float(sensor.get("tail_offset_x", 0.0)),
+                "angle_deg":     float(sensor.get("angle_deg", 0.0)),
+                "direction":     int(sensor.get("direction", 0)),
+                "y_type":        int(sensor.get("y_type", 0)),
+                "line_length_y": int(sensor.get("line_length_y", 0)),
+                "y_head":        int(sensor.get("y_head", 0)),
+                "y_tail":        int(sensor.get("y_tail", 0)),
             }
             self._last_huskylens_ts = time.time()
+            # Log only when (valid, y_type) changes -- much less spammy than the
+            # 2-second STATUS heartbeat in the firmware-side node, and surfaces
+            # every cross-related transition immediately.
+            f = self._last_huskylens_frame
+            key = (f["valid"], f["y_type"])
+            if key != self._last_huskylens_log_key:
+                self.log.info(
+                    f"HuskyLens change | valid={f['valid']} y_type={f['y_type']} "
+                    f"line_length_y={f['line_length_y']} tail_offset_x={f['tail_offset_x']:.0f} "
+                    f"angle_deg={f['angle_deg']:.1f}",
+                    event="HUSKYLENS_CHANGE",
+                )
+                self._last_huskylens_log_key = key
         except Exception:
             self._last_huskylens_frame = None
             self._last_huskylens_ts = time.time()
@@ -211,26 +281,18 @@ class LineFollowerNode(Node):
             name = self.plan_alias[name]
 
         now = time.time()
-        if (
-            self._last_plan_name == name
-            and (now - self._last_plan_ts) < self.plan_select_debounce_sec
-        ):
+        if self._last_plan_name == name and (now - self._last_plan_ts) < self.plan_select_debounce_sec:
             self.log.info(f"Plan duplicate ignored: {name}", event="PLAN")
             return
 
-        cfg_mgr = ConfigManager("line_follower", logger=self.log)
-        plan_data = cfg_mgr.load_plan(name, force=True)
+        plan_data = self._cfg_mgr.load_plan(name, force=True)
         if not plan_data:
             self.log.warning(f"Plan not found: {name}", event="PLAN")
             return
 
         steps = plan_data.get("steps", [])
         end_state = plan_data.get("end_state", "stop")
-        auto_flag_raw = (
-            plan_data.get("autoline")
-            if "autoline" in plan_data
-            else plan_data.get("auto_on_select")
-        )
+        auto_flag_raw = plan_data.get("autoline") if "autoline" in plan_data else plan_data.get("auto_on_select")
         auto_on_select = self._to_bool(auto_flag_raw, self.auto_on_plan_select_default)
         start_without_cross = self._to_bool(
             plan_data.get("start_without_cross", plan_data.get("start_immediately")),
@@ -251,22 +313,33 @@ class LineFollowerNode(Node):
             self.log.info(f"Auto enabled by plan select: {name}", event="PLAN")
         elif self.autoMode:
             self.follower.reset()
-        if start_without_cross:
-            if self.follower.request_plan_start():
-                self._publish_plan_status_event("triggered_without_cross", status=self.follower.get_plan_status())
-                self.log.info(f"Plan triggered without cross: {name}", event="PLAN")
+        if start_without_cross and self.follower.request_plan_start():
+            self._publish_plan_status_event("triggered_without_cross", status=self.follower.get_plan_status())
+            self.log.info(f"Plan triggered without cross: {name}", event="PLAN")
         self.log.info(f"Plan selected: {name}", event="PLAN")
 
     def _set_auto_mode(self, enabled: bool):
+        """Toggle autonomous mode while preserving explicit plan lifecycle state."""
         if enabled and not self.autoMode:
             self.autoMode = True
             self.follower.reset()
+            self._plan_completion_reported = False
             self.log.info("Auto Mode Enabled", event="MODE")
+            if self._active_plan_name:
+                self._publish_plan_status_event("auto_enabled", status=self.follower.get_plan_status())
         elif not enabled and self.autoMode:
             self.autoMode = False
             self.follower.stop()
             self._publish_stop()
             self.log.info("Auto Mode Disabled", event="MODE")
+            if self._active_plan_name:
+                self._publish_plan_status_event("paused", status=self.follower.get_plan_status())
+                self.log.info(
+                    f"Plan paused with progress preserved: {self._active_plan_name}",
+                    event="PLAN",
+                )
+        elif not enabled and self._active_plan_name and not self._plan_completion_reported:
+            self._publish_plan_status_event("paused", status=self.follower.get_plan_status())
 
     def _timer_cb(self):
         if not self.autoMode:
@@ -281,6 +354,9 @@ class LineFollowerNode(Node):
         )
         self.follower.set_tracking_context(
             {
+                # Strict single-sensor mode: when only_huskylens=true, do NOT
+                # leak the line_sensor frame into the FSM. Cross detection has
+                # to come from HuskyLens alone (y_type cross trigger).
                 "line_sensor_frame": (None if self.tracking_only_huskylens else self._last_frame),
                 "line_sensor_stale": (True if self.tracking_only_huskylens else line_stale),
                 "line_sensor_ts": self._last_frame_ts,
@@ -312,10 +388,7 @@ class LineFollowerNode(Node):
         self._active_plan_autoline = bool(requested)
         self.follower.set_autoline_mode(bool(requested))
         self._on_autoline_step_callback(bool(requested))
-        self._publish_plan_status_event(
-            "autoline_step",
-            status=self.follower.get_plan_status(),
-        )
+        self._publish_plan_status_event("autoline_step", status=self.follower.get_plan_status())
         if requested:
             self.pick_pub.publish(String(data="1"))
             self._set_auto_mode(True)
@@ -343,15 +416,9 @@ class LineFollowerNode(Node):
                 payload = str(message)
             pub = self._get_string_publisher(topic)
             pub.publish(String(data=payload))
-            self.log.info(
-                f"[PLAN_MSG] topic={topic} payload={payload}",
-                event="PLAN_MESSAGE",
-            )
+            self.log.info(f"[PLAN_MSG] topic={topic} payload={payload}", event="PLAN_MESSAGE")
             if topic == self.plan_status_topic:
-                self.log.info(
-                    f"ROS2 -> MQTT plan status: {payload}",
-                    event="PLAN_STATUS_MQTT",
-                )
+                self.log.info(f"ROS2 -> MQTT plan status: {payload}", event="PLAN_STATUS_MQTT")
         self._publish_plan_status_event("step_message_sent", status=status)
 
     def _get_string_publisher(self, topic: str):
@@ -362,26 +429,17 @@ class LineFollowerNode(Node):
         return pub
 
     def _on_autoline_step_callback(self, enabled: bool):
-        """
-        Callback hook when plan step AutoLine is applied.
-        Add your custom function call here (service call, extra publish, etc.).
-        """
+        """Run the post-autoline callback hook used by the bridge/UI layers."""
         state = "ON" if enabled else "OFF"
         self.log.info(
             f"[CALLBACK] AutoLine step applied -> {state} (plan={self._active_plan_name})",
             event="AUTOLINE_CALLBACK",
         )
-        self._publish_plan_status_event(
-            "autoline_callback",
-            status=self.follower.get_plan_status(),
-        )
+        self._publish_plan_status_event("autoline_callback", status=self.follower.get_plan_status())
         self._my_function_after_rotate_to_autoline(enabled)
 
     def _my_function_after_rotate_to_autoline(self, enabled: bool):
-        """
-        Custom hook after Rotate...until-line transitions to AutoLine step.
-        Publishes structured callback payload to /plan_callback for MQTT bridge/UI/backend.
-        """
+        """Publish structured plan callback payloads for downstream integrations."""
         status = self.follower.get_plan_status()
         payload = {
             "event": "rotate_to_autoline",
@@ -440,7 +498,6 @@ class LineFollowerNode(Node):
         self._plan_completion_reported = True
         self._publish_plan_status_event("completed", status=status)
 
-        # Return to normal idle behavior after completed stop-plan.
         end_state = str(status.get("end_state", "") or "").strip().lower()
         if end_state == "follow":
             return
@@ -477,23 +534,17 @@ class LineFollowerNode(Node):
         self.log.info(msg.data, event="PLAN_EVENT")
 
     def _to_bool(self, value, default):
-        if value is None:
-            return default
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            text = value.strip().lower()
-            if text in {"1", "true", "yes", "on"}:
-                return True
-            if text in {"0", "false", "no", "off"}:
-                return False
-        return bool(value)
-
+        return to_bool(value, default)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = LineFollowerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

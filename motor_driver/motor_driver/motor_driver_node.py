@@ -51,7 +51,8 @@ class MotorDriverNode(Node):
         if not direction:
             return
         wheel_speeds = self.motor.move(direction, speed)
-        self._log_motor_debug(direction, speed, wheel_speeds)
+        if wheel_speeds is not None:
+            self._log_motor_debug(direction, speed, wheel_speeds)
 
     def _reconnect_cb(self):
         if self.motor.is_connected():
@@ -89,6 +90,11 @@ class MotorDriverNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = MotorDriverNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

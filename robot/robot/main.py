@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Bringup entrypoint that launches the configured HospitalRobot node set."""
+
 import sys
 
 import launch
@@ -8,7 +10,20 @@ from robot_common.config_manager import ConfigManager
 
 
 def _load_config():
+    """Load bringup configuration from the shared robot package section."""
     return ConfigManager("robot").load()
+
+
+def _node_map():
+    """Return the supported bringup node aliases and their ROS package/executable pairs."""
+    return {
+        "line_sensor_driver": ("line_sensors", "line_sensor_driver"),
+        "line_follower": ("line_follower", "line_follower"),
+        "motor_driver": ("motor_driver", "motor_driver"),
+        "manual_control": ("manual_control", "manual_control"),
+        "camera_sensor": ("camera_sensor", "camera_sensor"),
+        "huskylens_sensor": ("huskylens_sensor", "huskylens_sensor"),
+    }
 
 
 def main():
@@ -18,14 +33,7 @@ def main():
         ["line_sensor_driver", "line_follower", "motor_driver", "manual_control", "camera_sensor", "huskylens_sensor"],
     )
 
-    node_map = {
-        "line_sensor_driver": ("line_sensors", "line_sensor_driver"),
-        "line_follower": ("line_follower", "line_follower"),
-        "motor_driver": ("motor_driver", "motor_driver"),
-        "manual_control": ("manual_control", "manual_control"),
-        "camera_sensor": ("camera_sensor", "camera_sensor"),
-        "huskylens_sensor": ("huskylens_sensor", "huskylens_sensor"),
-    }
+    node_map = _node_map()
 
     actions = []
     for name in nodes_cfg:

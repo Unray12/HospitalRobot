@@ -1,0 +1,182 @@
+# =============================================================================
+# mqtt_bridge — MQTT ↔ ROS2 bridge + keyboard teleop
+# =============================================================================
+# Đọc bởi: mqtt_bridge/mqtt_bridge/MQTTBridgeROS.py
+# Xem thêm:
+#   docs/11-mqtt-messaging.md  — contract MQTT đầy đủ
+#   docs/03-end-to-end-flow.md §2 — plan select flow
+# =============================================================================
+
+# ── MQTT broker ───────────────────────────────────────────────────────────────
+# Broker mặc định: mosquitto local. Không có TLS/auth — chỉ dùng localhost.
+# Nếu deploy multi-robot hoặc remote control, cần thêm TLS + credentials.
+
+broker:
+  address: 127.0.0.1
+  port: 1883
+
+# ── Topic mapping ─────────────────────────────────────────────────────────────
+# Mỗi cặp *_ros / *_mqtt là ROS topic name và MQTT topic name tương ứng.
+# Lưu ý: ROS topic bắt đầu bằng "/" (absolute), MQTT không có "/".
+
+topics:
+  # Input: lệnh điều khiển tay từ app/keyboard
+  vr_control: VR_control
+
+  # Input: bật/tắt auto mode ("1"/"0")
+  pick_robot: pick_robot
+
+  # Input: chọn plan ("room:1", "a19", "clear", ...)
+  plan_select: plan_select
+
+  # Output: toggle debug log cho sensor nodes
+  debug_toggle: /debug_logs_toggle
+
+  # Output: filtered ROS logs → MQTT (xem log_bridge section)
+  robot_logs: robot_logs
+
+  # Camera face detection: ROS → MQTT
+  camera_face_ros: /face/camera
+  camera_face_mqtt: face/camera
+
+  # Plan status JSON: ROS → MQTT (event, state, step, ...)
+  plan_status_ros: /plan_status
+  plan_status_mqtt: plan_status
+
+  # Plan message (TTS): ROS → MQTT ("say: ...")
+  plan_message_ros: /plan_message
+  plan_message_mqtt: plan_message
+
+  # HuskyLens frame: ROS → MQTT (cho dashboard/debug)
+  huskylens_frame_ros: /huskylens/frame
+  huskylens_frame_mqtt: huskylens/frame
+
+  # HuskyLens valid flag: ROS → MQTT
+  huskylens_valid_ros: /huskylens/valid
+  huskylens_valid_mqtt: huskylens/valid
+
+# ── Keyboard teleop ───────────────────────────────────────────────────────────
+# Mapping phím → action trong terminal mqtt_bridge.
+# Thay đổi key nếu bàn phím layout khác hoặc conflict với terminal shortcuts.
+
+keyboard:
+  forward: w
+  backward: s
+  left: a
+  right: d
+  stop: ' '          # Space
+  rotate_left: j
+  rotate_right: p
+  toggle_debug_logs: e
+  toggle_auto: k
+  quit: q
+
+# ── Echo suppression ──────────────────────────────────────────────────────────
+# Bridge vừa publish vừa subscribe cùng topic (VR_control, pick_robot, ...).
+# Inbound message trùng (topic, payload) trong cửa sổ này bị drop để tránh loop.
+# Tăng nếu broker có latency cao; giảm nếu muốn retry nhanh hơn.
+echo_suppress_window_sec: 0.35
+
+# ── Log control ───────────────────────────────────────────────────────────────
+# Mỗi channel có enabled flag + period (throttle) riêng.
+# Tắt channel không cần để giảm noise trong journalctl.
+
+log_control:
+  # Log mỗi message MQTT → ROS (inbound). Tắt mặc định vì 10+ msg/s.
+  bridge_in_enabled: false
+
+  # Log mỗi message ROS → MQTT (outbound). Tắt mặc định.
+  bridge_out_enabled: false
+
+  # Throttle period cho bridge_in/out log (giây).
+  bridge_traffic_period: 1.0
+
+  # Log plan status JSON khi publish ra MQTT.
+  plan_status_enabled: true
+  plan_status_period: 0.5
+
+  # Log plan message (TTS) khi publish ra MQTT.
+  plan_message_enabled: true
+  plan_message_period: 0.5
+
+  # Log HuskyLens frame (thường tắt vì 10-20 Hz).
+  huskylens_frame_enabled: false
+  huskylens_frame_period: 2.0
+
+  # Log HuskyLens valid flag.
+  huskylens_valid_enabled: true
+
+  # Nếu true: chỉ log khi valid thay đổi (0→1 hoặc 1→0), không throttle.
+  # Nếu false: throttle theo huskylens_frame_period.
+  huskylens_valid_log_on_change: true
+
+# ── Plan key mapping ──────────────────────────────────────────────────────────
+# Source of truth: robot_common/config/plan_mapping.yaml.
+# Blocks below kept as backwards-compat fallback (MQTTBridgeROS.py prefers
+# plan_mapping.yaml and falls back here when robot_common isn't synced).
+
+plan_keys:
+  '0': clear
+  '1': a19
+  '2': a18
+  '3': a17
+  '4': a16
+  '5': a15
+
+# ── Room plan mapping ─────────────────────────────────────────────────────────
+# MQTT payload "room:X" hoặc "phong:X" → plan name.
+# Hỗ trợ cả tên phòng trực tiếp (a19) và số (1).
+# PlanCommandResolver (plan_resolver.py) dùng map này để normalize.
+
+room_plans:
+  a19: a19
+  a18: a18
+  a17: a17
+  a16: a16
+  a15: a15
+  '1': a19
+  '2': a18
+  '3': a17
+  '4': a16
+  '5': a15
+
+# ── Camera face → plan message ────────────────────────────────────────────────
+# Khi camera nhận diện face ID, bridge có thể publish plan_message (TTS).
+
+camera_face_forward:
+  # Nếu true: forward raw face payload sang MQTT face/camera.
+  enabled: false
+
+camera_face_plan_message:
+  # Nếu true: khi nhận diện face ID có trong id_messages, publish TTS.
+  enabled: true
+
+  # Gate: chỉ publish TTS khi đang có active plan VÀ autoline đang bật.
+  # Tránh phát TTS chào khi robot đang idle hoặc rotate.
+  require_plan_autoline: true
+
+  # Mapping face ID → câu TTS. Key là string ID từ HuskyLens face recognition.
+  # ID 0 = unknown face (chưa learn). ID 1-4 = face đã learn.
+  id_messages:
+    '0': 'say: Xin vui lòng nhường đường giúp con di chuyển ạ. Con xin cảm ơn.'
+    '1': 'say: Con kính chào bác Chiến. Chúc Giám đốc một ngày làm việc hiệu quả và nhiều sức khỏe.'
+    '2': 'say: Con Kính chào Bác Minh. Chúc Bác một ngày làm việc thành công.'
+    '3': 'say: Con chào Thầy Thơ. Chúc Thầy một ngày làm việc hiệu quả và nhiều năng lượng.'
+    '4': 'say: Con chào Thầy Nhân. Chúc Thầy một ngày làm việc thành công và nhiều sức khỏe.'
+
+# ── Log bridge (rosout → MQTT) ────────────────────────────────────────────────
+# Subscribe /rosout, lọc theo source_nodes + keywords, publish sang robot_logs.
+# Cho phép dashboard/UI nhận sự kiện plan quan trọng mà không cần đọc ROS logs.
+
+log_bridge:
+  enabled: true
+  ros_topic: /rosout
+
+  # Chỉ forward log từ các node này (lowercase node name).
+  source_nodes:
+    - line_follower
+
+  # Chỉ forward log chứa ít nhất 1 keyword này.
+  keywords:
+    - '[PLAN_STATUS]'
+    - '[PLAN]'

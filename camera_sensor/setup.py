@@ -18,8 +18,8 @@ setup(
     zip_safe=True,
     maintainer='aclab',
     maintainer_email='thanhtinh1234789@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='ESP32 camera sensor bridge: parses face detection envelopes and publishes to /face/camera',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

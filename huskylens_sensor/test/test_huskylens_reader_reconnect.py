@@ -1,5 +1,5 @@
-import huskylens_sensor.huskylens_sensor.huskylens_sensor_reader as reader_module
-from huskylens_sensor.huskylens_sensor.huskylens_sensor_reader import HuskyLensSensorReader
+import huskylens_sensor.huskylens_sensor_reader as reader_module
+from huskylens_sensor.huskylens_sensor_reader import HuskyLensSensorReader
 
 
 def test_reconnect_tries_fallback_candidates_in_order(monkeypatch):
@@ -19,7 +19,6 @@ def test_reconnect_tries_fallback_candidates_in_order(monkeypatch):
     reader._open_serial = fake_open
     reader._discover_ports = lambda prefixes: ["/dev/ttyACM3", "/dev/ttyACM1"]
     reader.is_connected = lambda: False
-    monkeypatch.setattr(reader_module, "serial", object())
 
     ok = reader.reconnect(
         fallback_ports=["/dev/ttyACM0", "/dev/ttyACM1"],

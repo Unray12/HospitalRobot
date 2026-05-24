@@ -14,7 +14,7 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='aclab',
-    maintainer_email='aclab@todo.todo',
+    maintainer_email='aclab@example.com',
     description='Robot bringup (multi-node executor)',
     license='Apache-2.0',
     extras_require={

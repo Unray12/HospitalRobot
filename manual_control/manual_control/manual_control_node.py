@@ -1,6 +1,8 @@
+"""ROS2 node that translates operator commands into manual drive and auto-mode sync."""
+
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String, Bool
+from std_msgs.msg import Bool, String
 from std_srvs.srv import SetBool
 
 from .auto_mode_sync import AutoModeSync
@@ -8,8 +10,12 @@ from robot_common.command_protocol import format_command
 from robot_common.config_manager import ConfigManager
 from robot_common.logging_utils import LogAdapter
 
+
 class ManualControlNode(Node):
+    """Handle VR/operator control while keeping auto-mode service state aligned."""
+
     def __init__(self):
+        """Create pubs/subs and a retry loop for auto-mode service synchronization."""
         super().__init__("manual_control")
         self.log = LogAdapter(self.get_logger(), "manual_control")
 
@@ -55,10 +61,12 @@ class ManualControlNode(Node):
         self.cmd_pub.publish(out_msg)
 
     def _pick_cb(self, msg: String):
+        """Mirror operator auto-mode toggles onto the topic and service sync path."""
         data = msg.data.strip()
         self.autoMode = data == "1"
         self.auto_pub.publish(Bool(data=self.autoMode))
         self._auto_sync.queue(self.autoMode)
+        self.log.info(f"Operator set auto mode: {int(self.autoMode)}", event="MODE")
 
     def _sync_auto_mode_timer_cb(self):
         action, enabled = self._auto_sync.step(self.auto_client.service_is_ready())
@@ -97,6 +105,11 @@ class ManualControlNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = ManualControlNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
